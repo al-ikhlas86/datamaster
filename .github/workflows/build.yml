@@ -1,0 +1,144 @@
+name: Build Data Master
+
+# Pola SAMA PERSIS proyek saudara Presensi (D:\Presensi\.github\workflows\build.yml,
+# sudah terbukti jalan di lapangan) - compile TIDAK jalan tiap commit/push biasa,
+# baru jalan otomatis kalau push GIT TAG berawalan "v" (mis. v1.0.0), yang berarti
+# "versi ini siap dirilis ke PC sekolah". workflow_dispatch tetap ada utk build
+# uji manual tanpa bikin Release/tag.
+#
+# Alur rilis: build (publish Launcher WPF self-contained win-x64 + publish
+# DataMaster.Web LANGSUNG ke subfolder "web/" di dalam hasil publish Launcher -
+# lihat ServerProcessManager.LocateServerExecutable() yang mengasumsikan tata
+# letak persis ini, zip satu paket) -> release (bikin GitHub Release, tag jadi
+# nomor versi) -> Launcher yang sudah terpasang otomatis cek rilis terbaru lewat
+# GitHub REST API (repo ini privat, lihat UpdateChecker.cs) & pasang sendiri,
+# TANPA installer & TANPA sentuhan manual di PC sekolah manapun.
+#
+# BEDA dari Presensi: DataMaster cuma 1 target (net10.0-windows, win-x64) - tidak
+# ada dukungan net48 (tidak ada kebutuhan Windows 7 lama utk instalasi sekolah
+# baru), dan hasil publish 2 PROYEK digabung jadi 1 folder sebelum di-zip (Presensi
+# cuma 1 proyek/1 exe).
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Tentukan nomor versi dari tag git
+        id: version
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF -like 'refs/tags/v*') {
+            $v = $env:GITHUB_REF -replace 'refs/tags/v', ''
+          } else {
+            # workflow_dispatch manual (bukan rilis resmi) - versi placeholder,
+            # TIDAK dipublish sbg Release (lihat kondisi if masing2 step di bawah).
+            $v = "0.0.0-dev"
+          }
+          echo "version=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore DataMaster.slnx
+
+      - name: Publish Launcher (self-contained win-x64)
+        run: dotnet publish src/DataMaster.Launcher/DataMaster.Launcher.csproj -c Release -r win-x64 --self-contained true -p:PublishReadyToRun=false -p:Version=${{ steps.version.outputs.version }} -o publish/DataMaster
+
+      # LANGSUNG ke subfolder "web/" di dalam hasil publish Launcher - inilah
+      # struktur folder yang dicari ServerProcessManager.LocateServerExecutable()
+      # di PC pengguna (baseDir/web/DataMaster.Web.exe). JANGAN ubah lokasi ini
+      # tanpa ikut mengubah ServerProcessManager.cs.
+      - name: Publish DataMaster.Web (self-contained win-x64) ke subfolder web/
+        run: dotnet publish src/DataMaster.Web/DataMaster.Web.csproj -c Release -r win-x64 --self-contained true -p:PublishReadyToRun=false -p:Version=${{ steps.version.outputs.version }} -o publish/DataMaster/web
+
+      # Folder mentah ini SENGAJA cuma diupload utk build manual (workflow_dispatch,
+      # dipakai developer debug) - persis alasan yang sama di build.yml Presensi:
+      # rilis bertag cuma tampilkan zip yang relevan, bukan folder mentah + zip
+      # sekaligus (bikin bingung "unduh yang mana").
+      - name: Upload artifact (folder mentah, dipakai debug manual)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v6
+        with:
+          name: DataMaster-win-x64
+          path: publish/DataMaster
+          retention-days: 30
+
+      # Nama zip HARUS SAMA PERSIS dgn AssetName di UpdateChecker.cs
+      # ("DataMaster-win-x64.zip") - itu yang dicari lewat GitHub API saat
+      # aplikasi cek pembaruan.
+      - name: Bikin zip hasil publish (diunduh app via GitHub API - UpdateChecker.cs)
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Compress-Archive -Path "publish\DataMaster\*" -DestinationPath "dist\DataMaster-win-x64.zip" -Force
+
+      - name: Upload zip (utk dipublish job release)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v6
+        with:
+          name: DataMaster-Zip
+          path: dist/*.zip
+          retention-days: 90
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: DataMaster-Zip
+          path: dist
+
+      # Tidak ada manifest XML terpisah - UpdateChecker.cs di app baca tag_name +
+      # daftar asset rilis ini LANGSUNG lewat GitHub REST API (perlu token, krn
+      # repo privat), jadi cukup pastikan nama file zip di sini konsisten.
+      - name: Terbitkan GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          name: "Data Master ${{ github.ref_name }}"
+          generate_release_notes: true
+          files: dist/*.zip
+
+  # Artefak build MEMAKAN KUOTA STORAGE GitHub Actions (jatah 500 MB paket Free,
+  # gabungan LINTAS SEMUA repo privat di akun) - Presensi pernah terukur nyata
+  # 38 artefak/~4,1 GB numpuk cuma dari 1 repo, jauh di atas jatah (2026-09-02).
+  # Simpan 3 RUN terbaru saja, sisanya dihapus. Menghapus run TIDAK menyentuh
+  # GitHub Release (dibuktikan langsung di Presensi, bukan cuma dokumentasi) -
+  # zip yang sudah TERBIT di Release permanen tersimpan terpisah, tidak kena
+  # jatah 500 MB ini, dan Launcher/UpdateChecker.cs narik dari situ bukan dari
+  # artefak Actions, jadi auto-update tetap jalan normal biarpun run lama dihapus.
+  cleanup:
+    needs: [build, release]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Bersihkan run build lama (simpan 3 terbaru)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${{ github.repository }}/actions/workflows/build.yml/runs?per_page=100" \
+            --jq '.workflow_runs[] | select(.status == "completed") | "\(.created_at) \(.id)"' \
+            | sort -r | tail -n +3 | awk '{print $2}' \
+            | while read -r id; do
+                echo "hapus run lama id=$id"
+                gh api -X DELETE "repos/${{ github.repository }}/actions/runs/$id" || true
+              done
