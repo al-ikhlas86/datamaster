@@ -1,0 +1,97 @@
+@model List<DataMaster.Data.Entities.TahunAjaran>
+@{
+    ViewData["Title"] = "Tahun Ajaran";
+    var tahunSekarang = DateTime.Now.Year;
+}
+
+<h3 class="mb-3">Tahun Ajaran</h3>
+
+<div class="row g-3">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header"><strong>Tambah Tahun Ajaran</strong></div>
+            <div class="card-body">
+                <form asp-action="Store" method="post">
+                    <div class="mb-3">
+                        <select name="nama" class="form-select" required>
+                            @for (var y = 2021; y <= tahunSekarang + 30; y++)
+                            {
+                                <option value="@y/@(y + 1)">@y/@(y + 1)</option>
+                            }
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Simpan</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead><tr><th>No</th><th>Tahun Ajaran</th><th>Status</th><th>Aksi</th></tr></thead>
+                        <tbody>
+                        @if (Model.Count == 0)
+                        {
+                            <tr><td colspan="4" class="text-center text-muted py-4">Belum ada tahun ajaran.</td></tr>
+                        }
+                        else
+                        {
+                            var no = 1;
+                            foreach (var t in Model)
+                            {
+                                <tr>
+                                    <td>@(no++)</td>
+                                    <td>@t.Nama</td>
+                                    <td>
+                                        @if (t.IsActive)
+                                        {
+                                            <span class="badge bg-success">Aktif</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">Tidak Aktif</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (t.IsActive)
+                                        {
+                                            <span class="text-muted small">Sedang Aktif</span>
+                                        }
+                                        else
+                                        {
+                                            <form asp-action="SetActive" asp-route-id="@t.TahunAjaranId" method="post" class="d-inline form-aktifkan-ta" data-nama="@t.Nama">
+                                                <button type="submit" class="btn btn-sm btn-outline-success">Aktifkan</button>
+                                            </form>
+                                            <form asp-action="Delete" asp-route-id="@t.TahunAjaranId" method="post" class="d-inline form-hapus-ta" data-nama="@t.Nama">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">Hapus</button>
+                                            </form>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.querySelectorAll('.form-aktifkan-ta').forEach(function (f) {
+            f.addEventListener('submit', function (e) {
+                if (!confirm('Tahun ajaran ' + this.dataset.nama + ' akan diaktifkan. Tahun ajaran lain akan dinonaktifkan.')) e.preventDefault();
+            });
+        });
+        document.querySelectorAll('.form-hapus-ta').forEach(function (f) {
+            f.addEventListener('submit', function (e) {
+                if (!confirm('Tahun ajaran ' + this.dataset.nama + ' akan dihapus permanen.')) e.preventDefault();
+            });
+        });
+    </script>
+}

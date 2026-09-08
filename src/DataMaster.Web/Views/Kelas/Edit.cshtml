@@ -1,0 +1,35 @@
+@model DataMaster.Data.Entities.Kelas
+@{
+    ViewData["Title"] = "Edit Kelas";
+}
+
+<h3 class="mb-3">Edit Kelas</h3>
+
+<div class="card" style="max-width:500px">
+    <div class="card-body">
+        <form asp-action="Update" asp-route-id="@Model.KelasId" method="post">
+            <div class="mb-3">
+                <label class="form-label">Nama Kelas *</label>
+                <input type="text" name="nama_kelas" class="form-control @(ViewData.ModelState["nama_kelas"] != null ? "is-invalid" : "")" value="@Model.NamaKelas" required />
+                @if (ViewData.ModelState["nama_kelas"] is { } ms && ms.Errors.Count > 0)
+                {
+                    <div class="invalid-feedback">@ms.Errors[0].ErrorMessage</div>
+                }
+                <div class="form-text">Awalan tingkat ditambahkan otomatis. Tingkat tidak dapat diubah.</div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Wali Kelas</label>
+                <input type="text" class="form-control" value="(belum tersedia - modul Guru belum dibangun)" readonly disabled />
+                <div class="form-text">Diatur dari menu Wali Kelas &amp; Mata Pelajaran, bukan di sini.</div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Tingkat</label>
+                <input type="text" class="form-control" value="Kelas @Model.Tingkat SD" readonly disabled />
+            </div>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Simpan</button>
+                <a asp-action="Index" class="btn btn-outline-secondary">Batal</a>
+            </div>
+        </form>
+    </div>
+</div>

@@ -20,7 +20,9 @@ supaya tahu persis sudah sampai mana dan apa langkah berikutnya.
 | Skema database (EF Core entities + DbContext + migrasi awal) | Selesai — 21 entity (Siswa, CalonSiswa, Guru, Kelas, TahunAjaran, WaliKelas, KepalaSekolah, Ekskul+EkskulSiswa, MataPelajaran, GuruMataPelajaran, KurikulumAlokasi, JamPelajaran+JamPelajaranTingkat, JadwalPelajaran, JadwalPiket, KalenderAkademik, RiwayatAkademik, Tingkat, User+AuthGroup+AuthGroupUser, SystemSetting), migrasi `InitialCreate` diterapkan ke `App_Data/datamaster.db`. Enum disimpan sbg TEXT (bukan int) supaya identik pembacaan MySQL ENUM asli. Belum: field yang butuh validasi non-schema (format TA "YYYY/YYYY", regex nama, dst) — itu tanggung jawab layer aplikasi/controller nanti, bukan DbContext. |
 | Halaman/Controller: **Siswa (CRUD, arsip, import upsert 3-langkah, cetak, dokumen)** | Selesai & teruji end-to-end |
 | Halaman/Controller: **PSB/Calon Siswa (CRUD, filter tingkat/status, Terima→auto-generate NIS→jadi Siswa, Tolak, hard-delete dgn proteksi)** | Selesai & teruji end-to-end — spec 01 §3.17-3.28 tuntas. Modul "Siswa & PSB" (spec 01) 100% selesai dibangun. |
-| Halaman/Controller modul lain (Guru, Kelas, Tahun Ajaran, Ekskul, Kurikulum, Jadwal, Kalender, Akademik, Auth) | Belum dimulai — Kelas/TahunAjaran jadi PRIORITAS berikut krn modul Siswa/PSB sudah bergantung padanya (saat ini di-seed manual utk testing) |
+| Halaman/Controller: **Tahun Ajaran** (CRUD, aktifkan, delete-selalu-gagal) | Selesai & teruji end-to-end |
+| Halaman/Controller: **Kelas** (CRUD, arsip+proteksi siswa aktif, kelola siswa per kelas, cetak per-kelas/per-tingkat, format-nama-otomatis anti-double-prefix) + **Master Tingkat** (`KurikulumController`, hanya 3 method Tingkat - modul Kurikulum lengkap belum) | Selesai & teruji end-to-end. **LINGKUP BELUM LENGKAP disengaja**: fitur penetapan Wali Kelas (assignWaliKelas dari PenugasanMengajar.php) BELUM diporting krn butuh modul Guru dulu (belum ada) - kolom Wali Kelas sementara nonaktif/placeholder di UI. |
+| Halaman/Controller modul lain (Guru, Ekskul, Penugasan Mengajar, Kepala Sekolah, Kurikulum lengkap, Jadwal, Kalender, Akademik, Auth) | Belum dimulai — **Guru jadi PRIORITAS berikutnya** (banyak modul lain bergantung padanya: Wali Kelas, Kepala Sekolah, Jadwal Pelajaran) |
 | Sinkronisasi Hub API (port dari SyncPush.php) | Belum dimulai |
 | Launcher (splash, start/stop server, WebView2, auto-update) | Kerangka XAML splash sudah ada (`MainWindow.xaml`); `MainWindow.xaml.cs` (logic start server + WebView2 + auto-update) belum dimulai |
 | CI GitHub Actions (build+release, pola Presensi) | Belum dimulai |
@@ -79,6 +81,31 @@ supaya tahu persis sudah sampai mana dan apa langkah berikutnya.
   resmi).").
 - Tidak ada bug baru ditemukan di modul ini (pola sama modul Siswa, dan 2 bug yang sudah
   ditemukan di sesi modul Siswa tidak terulang di sini).
+
+## Catatan modul Tahun Ajaran & Kelas (+ Master Tingkat)
+
+- File: `Controllers/TahunAjaranController.cs`, `Controllers/KelasController.cs`,
+  `Controllers/KurikulumController.cs` (BARU, HANYA berisi 3 action Master Tingkat -
+  `store`/`UpdateBatch`/`delete` di route `kurikulum/tingkat/*` - route SENGAJA
+  dipertahankan di bawah "kurikulum" walau UI-nya cuma muncul di halaman Kelas, persis
+  arsitektur route PHP asli. JANGAN kaget nanti kalau modul Kurikulum lengkap dibangun
+  dan controllernya sudah ada duluan - tinggal ditambah action-action lain di file yang sama).
+- **LINGKUP SENGAJA DIPERSEMPIT (didokumentasikan, bukan gap diam-diam)**: fitur
+  penetapan Wali Kelas (form autocomplete guru multi-slot di halaman Kelas PHP asli,
+  lihat 02-guru-kelas-struktur.md §7.2/§13.11) BELUM diporting - butuh data Guru yang
+  belum ada modelnya di UI. `Edit.cshtml` menampilkan field Wali Kelas sbg readonly
+  placeholder "(belum tersedia - modul Guru belum dibangun)". Ini HARUS diselesaikan
+  saat modul Guru/PenugasanMengajar dibangun - jangan anggap Kelas "selesai total"
+  sampai itu tersambung.
+- **Diuji end-to-end via HTTP nyata**: buat+aktifkan Tahun Ajaran, tambah Tingkat lewat
+  panel di halaman Kelas (route `kurikulum/tingkat/store` dgn `kembali_ke=kelas`), tambah
+  Kelas dgn verifikasi `formatNamaKelas()` (auto-prefix "Kelas 1 Al Ikhlas" dari input
+  "Al Ikhlas", DAN anti-double-prefix kalau user sudah ketik "Kelas 1 ..." sendiri),
+  penolakan nama kelas duplikat per-tingkat, integrasi penuh lintas modul (siswa
+  ditempatkan ke kelas via `Siswa::Store`, kartu total siswa di index Kelas ter-update,
+  arsip kelas DITOLAK selama masih ada siswa aktif dgn pesan jumlah yang benar,
+  keluarkan siswa lalu arsip berhasil, restore mengembalikan status aktif).
+- Tidak ada bug baru ditemukan di modul ini.
 
 ## Prinsip wajib dipegang tiap sesi lanjutan
 
