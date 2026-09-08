@@ -28,8 +28,9 @@ supaya tahu persis sudah sampai mana dan apa langkah berikutnya.
 | Halaman/Controller: **Ekskul** (CRUD, arsip, kelola peserta) | Selesai & teruji end-to-end. **Modul "Guru, Kelas, Struktur" (spec 02) kini 100% SELESAI dibangun.** |
 | Halaman/Controller: **Kalender Akademik** (CRUD, kalender visual, import Excel dgn parser tanggal Indonesia fleksibel, validasi anti-salah-tahun) | Selesai & teruji end-to-end, TERMASUK uji regresi bug historis "strtotime salah tahun" (§7) — "7 Juni 2027" terverifikasi ke-parse sebagai 2027, bukan mundur ke 2026. |
 | Halaman/Controller: **Akademik** (Kenaikan Kelas, Kelulusan, Arsip Historis, Rekap Lulusan) | Selesai & teruji end-to-end. |
-| Halaman/Controller: **Kurikulum lengkap** (Mata Pelajaran CRUD+import, Struktur Kurikulum/Alokasi JP matrix+salin+import, Jam Belajar dgn 2 aturan bentrok+salin+import) | Selesai & teruji end-to-end. **Spec 03 kini HANYA menyisakan: Jadwal Pelajaran (paling kompleks, disengaja ditunda paling akhir).** |
-| Halaman/Controller modul lain (Jadwal Pelajaran, Auth/Manajemen Pengguna, Dashboard, Sync Hub API, Launcher) | Belum dimulai — spec 04 (Infra/Auth) juga masih tersisa penuh. |
+| Halaman/Controller: **Kurikulum lengkap** (Mata Pelajaran CRUD+import, Struktur Kurikulum/Alokasi JP matrix+salin+import, Jam Belajar dgn 2 aturan bentrok+salin+import) | Selesai & teruji end-to-end. |
+| Halaman/Controller: **Jadwal Pelajaran** (grid per-kelas kode "35K", parser `bacaKode()`, deteksi bentrok guru lintas kelas, salin TA sama/beda, Piket replace-all, Cetak semua kelas, Per Guru+beban, import Excel dgn pencocokan kolom dinamis+prioritas kolom-tak-dikenal) | Selesai & teruji end-to-end. **Spec 03 (Kurikulum, Jadwal Pelajaran, Kalender Akademik, Akademik) kini 100% SELESAI dibangun.** |
+| Halaman/Controller modul lain (Auth/Manajemen Pengguna, Dashboard, Sync Hub API, Launcher) | Belum dimulai — spec 04 (Infra/Auth) masih tersisa penuh. |
 | Sinkronisasi Hub API (port dari SyncPush.php) | Belum dimulai |
 | Launcher (splash, start/stop server, WebView2, auto-update) | Kerangka XAML splash sudah ada (`MainWindow.xaml`); `MainWindow.xaml.cs` (logic start server + WebView2 + auto-update) belum dimulai |
 | CI GitHub Actions (build+release, pola Presensi) | Belum dimulai |
@@ -309,10 +310,62 @@ supaya tahu persis sudah sampai mana dan apa langkah berikutnya.
   Pelajaran, salin dari TA lain), 3 alur import Excel (Mata Pelajaran/Alokasi/Jam Belajar)
   masing-masing dgn campuran baris valid+invalid DAN kasus duplikat-dalam-file-yang-sama.
 
-**Spec 03 (Kurikulum, Jadwal Pelajaran, Kalender Akademik, Akademik) kini HANYA
-menyisakan Jadwal Pelajaran** - modul terakhir dan paling kompleks (grid entri jadwal,
-parser kode "35K", deteksi bentrok guru, piket, cetak, import Excel dgn pencocokan
-kolom dinamis) sebelum spec 03 100% selesai.
+## Catatan modul Jadwal Pelajaran
+
+- File: `Controllers/JadwalPelajaranController.cs`, `Models/JadwalPelajaran/
+  JadwalPelajaranViewModels.cs`, `Views/JadwalPelajaran/*.cshtml` (Index=grid utama,
+  PerGuru, Cetak=`Layout=null` HTML cetak murni, Import). Modul TERAKHIR dan PALING
+  KOMPLEKS di spec 03 - sengaja ditunda paling akhir sesuai rencana.
+- **`bacaKode()` parser** (private): regex `^(\d*)([A-Z]+)$` - nomor guru opsional di
+  depan, kode mapel wajib huruf di belakang. Kode tanpa nomor ("F") = mapel TANPA guru
+  tetap (BTAQ Ummi berkelompok - FITUR, bukan bug, guru boleh tetap ditambahkan kalau
+  mau via kode ber-nomor "12F"). Sel kosong pada grid manual = HAPUS slot (`simpanGrid`
+  memanggil `hapusSlot()`); sel kosong saat IMPORT = SKIP diam-diam (BEDA sengaja -
+  import tidak pernah menghapus, cuma menambah/memperbarui, direplikasi persis §4).
+- **Cek bentrok guru disederhanakan pasca-restrukturisasi 2026-08-20**: karena
+  `JamPelajaranId` sudah mengandung (tahun+hari+jam ke), cukup cocokkan
+  Guru+JamPelajaranId+Semester (beda kelas) - TIDAK perlu hitung overlap waktu lagi.
+  Diverifikasi: guru yang sama mengajar 2 kelas di JAM YANG SAMA (JamPelajaranId sama)
+  DITOLAK dgn pesan "Guru tersebut sudah mengajar {mapel} di kelas {kelas} pada jam
+  yang sama.", sedangkan guru yang sama di JAM BEDA pada kelas lain DIIZINKAN (bukan
+  false-positive).
+- **Salin lintas TA - 2 jalur berbeda** (`Salin()`): TA sama+semester beda →
+  `JamPelajaranId` dipakai LANGSUNG (identik lintas semester dalam 1 TA); TA BEDA →
+  wajib dipetakan via (Hari,JamKe) karena `JamPelajaranId` berbeda per TA - tanpa
+  pasangan atau kombinasi (kelas,jam) sudah terisi → dilewati diam-diam (bukan error).
+  Kedua jalur diuji terpisah termasuk re-run (jalur sama → semua "sudah terisi").
+- **Import Excel - kolom tak dikenal dilaporkan PALING ATAS** (unshift), prefix "KOLOM
+  DILEWATI (seluruh isinya tidak ikut masuk): ..." - dampak 1 kolom rusak = 1 kelas
+  kehilangan jadwal seharian, lebih prioritas dari 1 sel salah. Diuji dgn 2 skenario
+  sekaligus dalam 1 file (hari tak dikenal DAN nama kelas tak dikenal di kolom
+  berbeda) + kolom lain yang valid tetap diproses normal (kombinasi bentrok guru DAN
+  kode mapel tak terdaftar via jalur import, bukan cuma jalur grid manual).
+- **1 bug nyata ditemukan & diperbaiki** (di luar cakupan port PHP, murni konsistensi
+  internal C#): `DownloadTemplate()` awalnya memilih label "Waktu" per jam_ke dari
+  `JamSemua.FirstOrDefault(j => j.JamKe==jk)` TANPA urutan hari eksplisit (bergantung
+  urutan default DB) - untuk jam_ke yang punya rentang waktu BEDA antar hari (mis. jam
+  ke-2 = Istirahat 08:10-08:25 di Senin tapi jam pelajaran biasa 08:10-08:50 di
+  Selasa), template bisa menampilkan waktu dari hari yang salah, tidak konsisten dgn
+  grid Index (yang SUDAH BENAR memprioritaskan hari sesuai `HariAktif` mulai Senin).
+  Fix: `DownloadTemplate()` sekarang iterasi `HariAktif` juga sebelum fallback, sama
+  seperti Index.
+- **Diuji end-to-end via HTTP nyata, mencakup SEMUA invarian kritis** (skenario nyata
+  2 kelas beda tingkat, 2 guru, 3 mapel termasuk 1 tanpa-guru-tetap, jam kegiatan
+  Istirahat): simpan grid manual (kode ber-nomor, kode tanpa nomor, error kode tak
+  dikenali/mapel tak terdaftar/guru tak ditemukan diverifikasi via §4 `bacaKode()`),
+  progres kurikulum kalkulasi benar (pas/kurang/lebih, warna sesuai), guru piket
+  replace-all, salin TA-sama-semester-beda DAN salin lintas-TA-beda dgn pemetaan
+  (hari,jam_ke), halaman Per Guru (beban mengajar akurat dari COUNT JadwalPelajaran
+  langsung), halaman Cetak (grid semua kelas + legend kode/guru), import Excel dgn
+  kombinasi kolom-tak-dikenal + bentrok guru + kode tak terdaftar dalam 1 file
+  sekaligus, file <4 baris ditolak dgn pesan tepat, baris kegiatan diverifikasi TIDAK
+  PERNAH tersentuh import (dicoba isi kode sampah di sel kegiatan → tetap diabaikan
+  total, 0 tersimpan 0 dilewati - bukti `Jenis==kegiatan` di-skip SEBELUM `bacaKode()`
+  dipanggil sama sekali).
+
+**Spec 03 (Kurikulum, Jadwal Pelajaran, Kalender Akademik, Akademik) kini 100%
+SELESAI dibangun dan teruji end-to-end.** Fase berikutnya: spec 04 (Auth/Manajemen
+Pengguna, Dashboard, Sinkronisasi Hub API, Backup) - belum tersentuh sama sekali.
 
 ## Prinsip wajib dipegang tiap sesi lanjutan
 

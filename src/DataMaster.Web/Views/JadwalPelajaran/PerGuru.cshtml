@@ -1,0 +1,91 @@
+@model DataMaster.Web.Models.JadwalPelajaran.JadwalPerGuruViewModel
+@{
+    ViewData["Title"] = "Jadwal Per Guru";
+    var namaHari = new Dictionary<string, string> { ["senin"] = "Senin", ["selasa"] = "Selasa", ["rabu"] = "Rabu", ["kamis"] = "Kamis", ["jumat"] = "Jumat", ["sabtu"] = "Sabtu", ["minggu"] = "Minggu" };
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Jadwal Per Guru</h3>
+    <a asp-action="Index" asp-route-tahun="@Model.TahunAjaranId" asp-route-semester="@Model.Semester" class="btn btn-outline-secondary">Kembali ke Grid</a>
+</div>
+
+<form method="get" class="row g-2 mb-3 align-items-end" id="formFilter">
+    <div class="col-auto">
+        <label class="form-label">Tahun Ajaran</label>
+        <select name="tahun" class="form-select" onchange="document.getElementById('formFilter').submit()">
+            @foreach (var (id, nama) in Model.TahunAjaranList)
+            {
+                if (id == Model.TahunAjaranId) { <option value="@id" selected>@nama</option> }
+                else { <option value="@id">@nama</option> }
+            }
+        </select>
+    </div>
+    <div class="col-auto">
+        <label class="form-label">Semester</label>
+        <select name="semester" class="form-select" onchange="document.getElementById('formFilter').submit()">
+            @if (Model.Semester == "ganjil") { <option value="ganjil" selected>Ganjil</option> } else { <option value="ganjil">Ganjil</option> }
+            @if (Model.Semester == "genap") { <option value="genap" selected>Genap</option> } else { <option value="genap">Genap</option> }
+        </select>
+    </div>
+    <div class="col-auto">
+        <label class="form-label">Guru</label>
+        <select name="guru" class="form-select" onchange="document.getElementById('formFilter').submit()">
+            @foreach (var g in Model.GuruList)
+            {
+                var beban = Model.Beban.FirstOrDefault(b => b.GuruId == g.GuruId)?.Jam ?? 0;
+                var label = $"#{g.NomorUrut} {g.Nama} ({beban} jam)";
+                if (g.GuruId == Model.GuruId) { <option value="@g.GuruId" selected>@label</option> }
+                else { <option value="@g.GuruId">@label</option> }
+            }
+        </select>
+    </div>
+</form>
+
+@if (Model.GuruId is null)
+{
+    <p class="text-muted">Belum ada guru pengajar aktif.</p>
+    return;
+}
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">Jadwal Mengajar</div>
+            <div class="card-body">
+                @if (Model.Jadwal.Count == 0)
+                {
+                    <p class="text-muted mb-0">Guru ini belum punya jadwal mengajar pada semester ini.</p>
+                }
+                else
+                {
+                    <table class="table table-sm">
+                        <thead><tr><th>Hari</th><th>Jam Ke</th><th>Waktu</th><th>Kelas</th><th>Mata Pelajaran</th></tr></thead>
+                        <tbody>
+                            @foreach (var j in Model.Jadwal)
+                            {
+                                <tr><td>@namaHari[j.Hari]</td><td>@j.JamKe</td><td>@j.WaktuLabel</td><td>@j.NamaKelas</td><td>@j.NamaMapel</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">Beban Mengajar</div>
+            <table class="table table-sm mb-0">
+                <tbody>
+                    @foreach (var b in Model.Beban.OrderByDescending(b => b.Jam))
+                    {
+                        <tr class="@(b.Jam == 0 ? "text-muted" : "")">
+                            <td>#@b.NomorUrut @b.Nama</td>
+                            <td class="text-end">@b.Jam jam</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <div class="card-footer text-muted small">Guru dengan 0 jam berarti belum dijadwalkan mengajar pada semester ini.</div>
+        </div>
+    </div>
+</div>

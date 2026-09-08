@@ -1,0 +1,104 @@
+@model DataMaster.Web.Models.JadwalPelajaran.JadwalCetakViewModel
+@{
+    Layout = null;
+    var namaHari = new Dictionary<string, string> { ["senin"] = "Senin", ["selasa"] = "Selasa", ["rabu"] = "Rabu", ["kamis"] = "Kamis", ["jumat"] = "Jumat", ["sabtu"] = "Sabtu", ["minggu"] = "Minggu" };
+}
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Cetak Jadwal Pelajaran</title>
+<style>
+    body { font-family: Arial, sans-serif; font-size: 9px; margin: 12px; }
+    h2, h4 { margin: 0 0 4px 0; text-align: center; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 10px; }
+    th, td { border: 1px solid #333; padding: 2px 4px; text-align: center; }
+    .kegiatan { background: #fff3cd; font-style: italic; }
+    .kosong { color: #999; }
+    .no-print { margin-bottom: 10px; }
+    @@media print { .no-print { display: none; } }
+</style>
+</head>
+<body>
+<div class="no-print">
+    <button onclick="window.print()">Cetak</button>
+    <button onclick="window.close()">Tutup</button>
+</div>
+
+<h2>JADWAL PELAJARAN @Model.TahunAjaranNama</h2>
+<h4>Semester @(Model.Semester == "ganjil" ? "Ganjil" : "Genap")</h4>
+
+@if (Model.KelasList.Count == 0)
+{
+    <p>Belum ada kelas aktif.</p>
+}
+else
+{
+    foreach (var h in Model.HariAktif)
+    {
+        <h4>@namaHari[h]</h4>
+        <table>
+            <thead>
+                <tr>
+                    <th rowspan="2">Jam</th><th rowspan="2">Waktu</th>
+                    <th colspan="@Model.KelasList.Count">Kelas</th>
+                </tr>
+                <tr>
+                    @foreach (var k in Model.KelasList) { <th>@k.NamaKelas</th> }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var baris in Model.PerHari[h])
+                {
+                    <tr class="@(baris.BarisKegiatan ? "kegiatan" : "")">
+                        <td>@baris.JamKe</td>
+                        <td>@baris.WaktuLabel</td>
+                        @if (baris.BarisKegiatan)
+                        {
+                            <td colspan="@Model.KelasList.Count">@baris.LabelKegiatan</td>
+                        }
+                        else
+                        {
+                            foreach (var k in Model.KelasList)
+                            {
+                                var sel = baris.PerKelas.GetValueOrDefault(k.KelasId);
+                                if (sel is null || sel.Kosong)
+                                {
+                                    <td class="kosong">-</td>
+                                }
+                                else
+                                {
+                                    <td>@sel.Kode</td>
+                                }
+                            }
+                        }
+                    </tr>
+                }
+                <tr>
+                    <td colspan="2"><strong>Piket</strong></td>
+                    <td colspan="@Model.KelasList.Count">
+                        @string.Join(", ", Model.PiketPerHari.GetValueOrDefault(h, [])?.Select(p => p.GuruNama) ?? [])
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    }
+}
+
+<h4>Legenda</h4>
+<div style="display:flex;gap:24px">
+    <table style="width:auto">
+        <thead><tr><th>Kode</th><th>Mata Pelajaran</th></tr></thead>
+        <tbody>
+            @foreach (var m in Model.LegendMapel) { <tr><td>@m.Kode</td><td>@m.Nama</td></tr> }
+        </tbody>
+    </table>
+    <table style="width:auto">
+        <thead><tr><th>Nomor</th><th>Pengajar</th></tr></thead>
+        <tbody>
+            @foreach (var g in Model.LegendGuru) { <tr><td>@g.NomorUrut</td><td>@g.Nama</td></tr> }
+        </tbody>
+    </table>
+</div>
+</body>
+</html>

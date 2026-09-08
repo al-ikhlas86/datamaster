@@ -1,0 +1,50 @@
+@{
+    ViewData["Title"] = "Import Jadwal Pelajaran";
+    int taId = ViewBag.TahunAjaranId;
+    string semester = ViewBag.Semester;
+    string taNama = ViewBag.TahunAjaranNama;
+    int jumlahKelas = ViewBag.JumlahKelas;
+    int jumlahJam = ViewBag.JumlahJam;
+}
+
+<h3 class="mb-3">Import Jadwal Pelajaran</h3>
+<p class="text-muted">Import untuk: <strong>@taNama</strong> &middot; Semester <strong>@(semester == "ganjil" ? "Ganjil" : "Genap")</strong> &middot; @jumlahKelas kelas &middot; @jumlahJam baris jam</p>
+
+<div class="alert alert-info">
+    <ol class="mb-0">
+        <li>Unduh template - bentuknya sama seperti file jadwal Excel sekolah.</li>
+        <li>Blok isi selnya lalu salin, dan tempel ke template.</li>
+        <li>Simpan, unggah kembali file di bawah.</li>
+    </ol>
+    <hr />
+    <p class="mb-1">Format sel: <code>&lt;nomor guru&gt;&lt;kode mapel&gt;</code>, contoh <strong>35K</strong>.</p>
+    <p class="mb-1">Nama kelas &amp; daftar jam pada template dibuat otomatis berdasarkan data saat ini.</p>
+    <p class="mb-1">Sel yang kodenya tidak dikenali, atau membuat guru bentrok, akan dilewati dan dilaporkan - jadwal lama tidak tertimpa diam-diam.</p>
+    <p class="mb-0">Slot yang sudah ada isinya akan diperbarui sesuai isi file.</p>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-5">
+        <div class="card"><div class="card-body text-center">
+            <p>Download template Excel sesuai kelas &amp; jam saat ini</p>
+            <a asp-action="DownloadTemplate" asp-route-tahun="@taId" asp-route-semester="@semester" class="btn btn-success btn-lg">Download Template XLSX</a>
+        </div></div>
+    </div>
+    <div class="col-md-7">
+        <div class="card"><div class="card-body">
+            <form asp-action="ProcessImport" method="post" enctype="multipart/form-data">
+                <input type="hidden" name="tahun_ajaran_id" value="@taId" />
+                <input type="hidden" name="semester" value="@semester" />
+                <div class="mb-3">
+                    <label class="form-label">Pilih File Excel *</label>
+                    <input type="file" name="file" class="form-control" accept=".xlsx,.xls" required />
+                    <div class="form-text">Format file: .xlsx atau .xls (Max: 5MB)</div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-lg">Import Sekarang</button>
+                    <a asp-action="Index" asp-route-tahun="@taId" asp-route-semester="@semester" class="btn btn-outline-secondary btn-lg">Batal</a>
+                </div>
+            </form>
+        </div></div>
+    </div>
+</div>

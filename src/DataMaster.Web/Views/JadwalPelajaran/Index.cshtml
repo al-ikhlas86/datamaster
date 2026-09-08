@@ -1,0 +1,279 @@
+@using System.Text.Json
+@model DataMaster.Web.Models.JadwalPelajaran.JadwalPelajaranIndexViewModel
+@{
+    ViewData["Title"] = "Jadwal Pelajaran";
+    var namaHari = new Dictionary<string, string> { ["senin"] = "Senin", ["selasa"] = "Selasa", ["rabu"] = "Rabu", ["kamis"] = "Kamis", ["jumat"] = "Jumat", ["sabtu"] = "Sabtu", ["minggu"] = "Minggu" };
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Jadwal Pelajaran</h3>
+    <div class="d-flex gap-2">
+        <a asp-action="Import" asp-route-tahun="@Model.TahunAjaranId" asp-route-semester="@Model.Semester" class="btn btn-outline-secondary">Import Excel</a>
+        <a asp-action="Cetak" asp-route-tahun="@Model.TahunAjaranId" asp-route-semester="@Model.Semester" target="_blank" class="btn btn-outline-secondary">Cetak</a>
+        <a asp-action="PerGuru" asp-route-tahun="@Model.TahunAjaranId" asp-route-semester="@Model.Semester" class="btn btn-outline-secondary">Per Guru</a>
+    </div>
+</div>
+
+@if (!Model.AdaTahunAjaran)
+{
+    <p class="text-muted">Belum ada tahun ajaran. Tambahkan dulu di menu Akademik &raquo; Tahun Ajaran.</p>
+    return;
+}
+
+<form method="get" class="row g-2 mb-3 align-items-end" id="formKonteks">
+    <div class="col-auto">
+        <label class="form-label">Tahun Ajaran</label>
+        <select name="tahun" class="form-select" onchange="document.getElementById('formKonteks').submit()">
+            @foreach (var (id, nama) in Model.TahunAjaranList)
+            {
+                if (id == Model.TahunAjaranId) { <option value="@id" selected>@nama</option> }
+                else { <option value="@id">@nama</option> }
+            }
+        </select>
+    </div>
+    <div class="col-auto">
+        <label class="form-label">Semester</label>
+        <select name="semester" class="form-select" onchange="document.getElementById('formKonteks').submit()">
+            @if (Model.Semester == "ganjil") { <option value="ganjil" selected>Ganjil</option> } else { <option value="ganjil">Ganjil</option> }
+            @if (Model.Semester == "genap") { <option value="genap" selected>Genap</option> } else { <option value="genap">Genap</option> }
+        </select>
+    </div>
+    @if (Model.AdaKelasAktif)
+    {
+        <div class="col-auto">
+            <label class="form-label">Kelas</label>
+            <select name="kelas" class="form-select" onchange="document.getElementById('formKonteks').submit()">
+                @foreach (var k in Model.KelasList)
+                {
+                    if (k.KelasId == Model.KelasId) { <option value="@k.KelasId" selected>@k.NamaKelas</option> }
+                    else { <option value="@k.KelasId">@k.NamaKelas</option> }
+                }
+            </select>
+        </div>
+    }
+</form>
+
+@if (TempData["import_errors"] is string errJson)
+{
+    <div class="alert alert-warning">
+        <strong>Rincian:</strong>
+        <ul class="mb-0">
+            @foreach (var e in JsonSerializer.Deserialize<List<string>>(errJson) ?? [])
+            {
+                <li>@e</li>
+            }
+        </ul>
+    </div>
+}
+
+@if (!Model.AdaJamBelajar)
+{
+    <p class="text-muted">Jam belajar untuk tahun ajaran ini belum diatur. Buka menu Kurikulum &amp; Jam Belajar &raquo; Jam Belajar terlebih dahulu.</p>
+    return;
+}
+@if (!Model.AdaKelasAktif)
+{
+    <p class="text-muted">Belum ada kelas aktif. Tambahkan dulu di menu Kelola Kelas.</p>
+    return;
+}
+
+@if (Model.Progres.Count > 0)
+{
+    <div class="card mb-3">
+        <div class="card-header">Progres Kurikulum</div>
+        <div class="card-body">
+            <table class="table table-sm mb-0">
+                <thead><tr><th>Mata Pelajaran</th><th class="text-center">Alokasi</th><th class="text-center">Terpakai</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var p in Model.Progres)
+                    {
+                        var warna = p.Terpakai == p.Alokasi ? "text-success" : (p.Terpakai < p.Alokasi ? "text-danger" : "text-warning");
+                        var ket = p.Terpakai == p.Alokasi ? "pas" : (p.Terpakai < p.Alokasi ? $"kurang {p.Alokasi - p.Terpakai}" : $"lebih {p.Terpakai - p.Alokasi}");
+                        <tr>
+                            <td>@p.Nama</td>
+                            <td class="text-center">@p.Alokasi</td>
+                            <td class="text-center @warna fw-semibold">@p.Terpakai</td>
+                            <td class="@warna">@ket</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+<div class="alert alert-info">Isi tiap sel dengan <code>&lt;nomor guru&gt;&lt;kode mapel&gt;</code>, contoh <strong>35K</strong>. Tanpa guru tetap? Cukup kode mapelnya saja, contoh <strong>F</strong>. Kosongkan sel untuk menghapus isinya.</div>
+
+<form asp-action="StoreGrid" method="post" id="formGrid">
+    <input type="hidden" name="tahun_ajaran_id" value="@Model.TahunAjaranId" />
+    <input type="hidden" name="semester" value="@Model.Semester" />
+    <input type="hidden" name="kelas_id" value="@Model.KelasId" />
+    <div class="table-responsive">
+        <table class="table table-bordered table-sm align-middle" style="table-layout:fixed">
+            <colgroup>
+                <col style="width:48px" /><col style="width:84px" />
+                @foreach (var h in Model.HariAktif) { <col /> }
+            </colgroup>
+            <thead>
+                <tr>
+                    <th>Jam</th><th>Waktu</th>
+                    @foreach (var h in Model.HariAktif) { <th>@namaHari[h]</th> }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var baris in Model.Grid)
+                {
+                    <tr>
+                        <td class="text-center">@baris.JamKe</td>
+                        <td class="text-center" style="overflow:hidden;white-space:nowrap">@baris.WaktuLabel</td>
+                        @foreach (var h in Model.HariAktif)
+                        {
+                            var sel = baris.PerHari[h];
+                            if (sel.JamPelajaranId is null)
+                            {
+                                <td class="bg-light"></td>
+                            }
+                            else if (sel.Jenis == "kegiatan")
+                            {
+                                <td class="bg-warning-subtle text-body-secondary fst-italic text-center">@sel.Label</td>
+                            }
+                            else if (sel.DibatasiTingkatLain)
+                            {
+                                <td class="bg-light text-muted text-center">&ndash;</td>
+                            }
+                            else
+                            {
+                                <td>
+                                    <input type="text" name="sel[@sel.JamPelajaranId]" value="@sel.Kode" class="form-control form-control-sm text-uppercase text-center sel-kode"
+                                           maxlength="8" style="text-transform:uppercase" />
+                                </td>
+                            }
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <button type="submit" class="btn btn-primary">Simpan Jadwal</button>
+    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modalSalin">Salin dari...</button>
+    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modalKode">Daftar Kode</button>
+</form>
+
+<div class="card mt-4">
+    <div class="card-header">Guru Piket</div>
+    <div class="card-body">
+        <p class="text-muted mb-3">Centang guru yang bertugas piket. Boleh lebih dari satu per hari.</p>
+        <form asp-action="SimpanPiket" method="post">
+            <input type="hidden" name="tahun_ajaran_id" value="@Model.TahunAjaranId" />
+            <input type="hidden" name="semester" value="@Model.Semester" />
+            <div class="row g-3">
+                @foreach (var h in Model.HariAktif)
+                {
+                    var terpilih = Model.PiketPerHari.TryGetValue(h, out var list) ? list : [];
+                    <div class="col-md-3">
+                        <div class="border rounded p-2">
+                            <strong>@namaHari[h]</strong>
+                            <div style="max-height:180px;overflow-y:auto">
+                                @foreach (var g in Model.GuruList)
+                                {
+                                    var checkedAttr = terpilih.Contains(g.GuruId);
+                                    <div class="form-check">
+                                        @if (checkedAttr)
+                                        {
+                                            <input class="form-check-input" type="checkbox" name="piket[@h]" value="@g.GuruId" id="pk_@(h)_@g.GuruId" checked />
+                                        }
+                                        else
+                                        {
+                                            <input class="form-check-input" type="checkbox" name="piket[@h]" value="@g.GuruId" id="pk_@(h)_@g.GuruId" />
+                                        }
+                                        <label class="form-check-label small" for="pk_@(h)_@g.GuruId">@g.Nama</label>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+            <button type="submit" class="btn btn-primary mt-3">Simpan Piket</button>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="modalSalin" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form asp-action="Salin" method="post">
+                <input type="hidden" name="tahun_ajaran_id" value="@Model.TahunAjaranId" />
+                <input type="hidden" name="semester" value="@Model.Semester" />
+                <div class="modal-header"><h5 class="modal-title">Salin Jadwal</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <p class="text-muted">Menyalin jadwal seluruh kelas dari sumber yang dipilih. Slot yang sudah terisi tidak akan ditimpa.</p>
+                    <div class="mb-2">
+                        <label class="form-label">Dari Tahun Ajaran</label>
+                        <select name="sumber_ta" class="form-select">
+                            @foreach (var (id, nama) in Model.TahunAjaranList)
+                            {
+                                <option value="@id">@nama</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Dari Semester</label>
+                        <select name="sumber_semester" class="form-select">
+                            @if (Model.Semester == "ganjil")
+                            {
+                                <option value="ganjil">Ganjil</option>
+                                <option value="genap" selected>Genap</option>
+                            }
+                            else
+                            {
+                                <option value="ganjil" selected>Ganjil</option>
+                                <option value="genap">Genap</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary">Salin Sekarang</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalKode" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">Daftar Kode</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body row">
+                <div class="col-6">
+                    <h6>Kode Mapel</h6>
+                    <table class="table table-sm"><tbody>
+                        @foreach (var m in Model.MapelList.Where(m => m.Kode != null))
+                        {
+                            <tr><td>@m.Kode</td><td>@m.Nama</td></tr>
+                        }
+                    </tbody></table>
+                </div>
+                <div class="col-6">
+                    <h6>Nomor Guru</h6>
+                    <table class="table table-sm"><tbody>
+                        @foreach (var g in Model.GuruList.Where(g => g.NomorUrut != null))
+                        {
+                            <tr><td>@g.NomorUrut</td><td>@g.Nama</td></tr>
+                        }
+                    </tbody></table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.querySelectorAll('.sel-kode').forEach(function (el) {
+            el.addEventListener('input', function () { this.value = this.value.toUpperCase(); });
+        });
+    </script>
+}
