@@ -1,0 +1,18 @@
+@model DataMaster.Web.Models.CalonSiswa.CalonSiswaFormViewModel
+@{
+    ViewData["Title"] = "Tambah Calon Siswa";
+}
+
+<h3 class="mb-3">Tambah Calon Siswa</h3>
+
+<div class="alert alert-info">
+    NIS dibuat otomatis &amp; kelas (nama kelas spesifik) baru dipilih saat calon siswa diterima jadi siswa aktif - Tingkat/Kelas yang Dituju di bawah cukup perkiraan awal (mis. Kelas 1, atau Kelas 4 untuk siswa pindahan), supaya daftar pendaftar bisa dikelompokkan per tingkat.
+</div>
+
+<form asp-action="Store" method="post" enctype="multipart/form-data">
+    <partial name="_Form" model="Model" />
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary btn-lg">Simpan Calon Siswa</button>
+        <a asp-action="Index" class="btn btn-outline-secondary btn-lg">Batal</a>
+    </div>
+</form>

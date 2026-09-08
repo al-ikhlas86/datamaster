@@ -1,0 +1,115 @@
+@model DataMaster.Web.Models.CalonSiswa.CalonSiswaFormViewModel
+@{
+    ViewData["Title"] = "Detail Calon Siswa";
+    var statusLabel = char.ToUpper(Model.Status[0]) + Model.Status[1..];
+}
+
+<h5 class="text-muted mb-3">@Model.Input.Nama &bull; Status: @statusLabel</h5>
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <form asp-action="Update" asp-route-id="@Model.Input.CalonSiswaId" method="post" enctype="multipart/form-data">
+            <partial name="_Form" model="Model" />
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+                <a asp-action="Index" class="btn btn-outline-secondary">Batal</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card mb-3">
+            <div class="card-header"><strong>Ringkasan</strong></div>
+            <div class="card-body">
+                <dl class="row mb-0 small">
+                    <dt class="col-5">Nama</dt><dd class="col-7">@Model.Input.Nama</dd>
+                    <dt class="col-5">Status</dt><dd class="col-7">@statusLabel</dd>
+                    <dt class="col-5">Didaftarkan</dt><dd class="col-7">@(Model.CreatedAt?.ToString("dd MMM yyyy") ?? "-")</dd>
+                    @if (!string.IsNullOrEmpty(Model.Catatan))
+                    {
+                        <dt class="col-5">Catatan</dt><dd class="col-7">@Model.Catatan</dd>
+                    }
+                </dl>
+            </div>
+        </div>
+
+        @if (Model.Status == "menunggu")
+        {
+            <div class="card border-success mb-3">
+                <div class="card-header text-success"><strong>Terima sebagai Siswa</strong></div>
+                <div class="card-body">
+                    <div class="alert alert-info small">NIS dibuat otomatis - tidak perlu diisi manual lagi.</div>
+                    <form asp-action="Terima" asp-route-id="@Model.Input.CalonSiswaId" method="post">
+                        <div class="mb-2">
+                            <label class="form-label">Kelas *</label>
+                            <select name="kelas_id" class="form-select @(Model.Errors.ContainsKey("KelasTerima") ? "is-invalid" : "")" required>
+                                <option value="">-- Pilih Kelas --</option>
+                                @foreach (var k in Model.KelasOptionsUntukTerima)
+                                {
+                                    <option value="@k.KelasId">@k.NamaKelas</option>
+                                }
+                            </select>
+                            @if (Model.Errors.TryGetValue("KelasTerima", out var errKelas))
+                            {
+                                <div class="invalid-feedback">@errKelas</div>
+                            }
+                            @if (string.IsNullOrEmpty(Model.Input.TingkatDituju))
+                            {
+                                <div class="form-text text-warning">Tingkat tujuan belum diisi pendaftar ini - daftar di atas menampilkan SEMUA kelas, periksa baik-baik sebelum memilih.</div>
+                            }
+                            else
+                            {
+                                <div class="form-text">Daftar dibatasi ke kelas tingkat "@Model.Input.TingkatDituju" sesuai tujuan pendaftaran.</div>
+                            }
+                        </div>
+                        <button type="submit" class="btn btn-success w-100">Terima &amp; Pindahkan ke Kelas</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-body">
+                    <form asp-action="Tolak" asp-route-id="@Model.Input.CalonSiswaId" method="post" class="form-tolak-calon" data-nama="@Model.Input.Nama">
+                        <div class="mb-2">
+                            <label class="form-label">Catatan (opsional)</label>
+                            <input type="text" name="catatan" class="form-control" placeholder="Alasan tidak diterima" />
+                        </div>
+                        <button type="submit" class="btn btn-outline-danger w-100">Tandai Tidak Diterima</button>
+                    </form>
+                </div>
+            </div>
+        }
+        else if (Model.Status == "diterima" && Model.SiswaIdHasilTerima.HasValue)
+        {
+            <div class="alert alert-success">
+                Sudah diterima sebagai siswa aktif. <a asp-controller="Siswa" asp-action="Detail" asp-route-id="@Model.SiswaIdHasilTerima">Lihat data siswa</a>
+            </div>
+        }
+
+        @if (Model.Status != "diterima")
+        {
+            <div class="card">
+                <div class="card-body">
+                    <form asp-action="Delete" asp-route-id="@Model.Input.CalonSiswaId" method="post" class="form-delete-calon" data-nama="@Model.Input.Nama">
+                        <button type="submit" class="btn btn-danger w-100">Hapus Permanen</button>
+                    </form>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.querySelectorAll('.form-tolak-calon').forEach(function (f) {
+            f.addEventListener('submit', function (e) {
+                if (!confirm('Calon siswa ' + this.dataset.nama + ' akan ditandai tidak diterima.')) e.preventDefault();
+            });
+        });
+        document.querySelectorAll('.form-delete-calon').forEach(function (f) {
+            f.addEventListener('submit', function (e) {
+                if (!confirm('Data calon siswa ' + this.dataset.nama + ' akan dihapus permanen.')) e.preventDefault();
+            });
+        });
+    </script>
+}

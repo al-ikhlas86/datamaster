@@ -1,0 +1,163 @@
+@model DataMaster.Web.Models.CalonSiswa.CalonSiswaFormViewModel
+@{
+    string Err(string key) => Model.Errors.TryGetValue(key, out var v) ? v : "";
+    string Cls(string key) => Model.Errors.ContainsKey(key) ? "is-invalid" : "";
+}
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="card mb-3">
+            <div class="card-header"><strong>Identitas Calon Siswa</strong></div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">Nama Lengkap *</label>
+                    <input type="text" name="Nama" class="form-control @Cls("Nama")" value="@Model.Input.Nama" required />
+                    <div class="invalid-feedback">@Err("Nama")</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Jenis Kelamin *</label>
+                    <select name="JenisKelamin" class="form-select @Cls("JenisKelamin")" required>
+                        <option value="">-- Pilih --</option>
+                        @if (Model.Input.JenisKelamin == "L")
+                        {
+                            <option value="L" selected>Laki-laki</option>
+                            <option value="P">Perempuan</option>
+                        }
+                        else if (Model.Input.JenisKelamin == "P")
+                        {
+                            <option value="L">Laki-laki</option>
+                            <option value="P" selected>Perempuan</option>
+                        }
+                        else
+                        {
+                            <option value="L">Laki-laki</option>
+                            <option value="P">Perempuan</option>
+                        }
+                    </select>
+                    <div class="invalid-feedback">@Err("JenisKelamin")</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">NISN</label>
+                    <input type="text" name="Nisn" class="form-control @Cls("Nisn")" value="@Model.Input.Nisn" />
+                    <div class="invalid-feedback">@Err("Nisn")</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Tingkat/Kelas yang Dituju</label>
+                    <select name="TingkatDituju" class="form-select @Cls("TingkatDituju")">
+                        <option value="">-- Belum tahu / lainnya --</option>
+                        @foreach (var t in Model.TingkatOptions)
+                        {
+                            if (t.Kode == Model.Input.TingkatDituju)
+                            {
+                                <option value="@t.Kode" selected>@t.Label</option>
+                            }
+                            else
+                            {
+                                <option value="@t.Kode">@t.Label</option>
+                            }
+                        }
+                    </select>
+                    <div class="form-text">Mis. siswa pindahan langsung ke Kelas 4, bukan Kelas 1.</div>
+                    <div class="invalid-feedback">@Err("TingkatDituju")</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Tempat Lahir</label>
+                    <input type="text" name="TempatLahir" class="form-control @Cls("TempatLahir")" value="@Model.Input.TempatLahir" />
+                    <div class="invalid-feedback">@Err("TempatLahir")</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Tanggal Lahir</label>
+                    <input type="date" name="TanggalLahir" class="form-control" value="@Model.Input.TanggalLahir?.ToString("yyyy-MM-dd")" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Asal Sekolah</label>
+                    <input type="text" name="AsalSekolah" class="form-control @Cls("AsalSekolah")" value="@Model.Input.AsalSekolah" />
+                    <div class="invalid-feedback">@Err("AsalSekolah")</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Alamat Rumah</label>
+                    <input type="text" name="AlamatJalan" class="form-control @Cls("AlamatJalan")" value="@Model.Input.AlamatJalan" />
+                    <div class="invalid-feedback">@Err("AlamatJalan")</div>
+                </div>
+                <div class="row g-2">
+                    <div class="col-3">
+                        <label class="form-label">RT</label>
+                        <input type="text" name="AlamatRt" maxlength="5" class="form-control @Cls("AlamatRt")" value="@Model.Input.AlamatRt" />
+                    </div>
+                    <div class="col-3">
+                        <label class="form-label">RW</label>
+                        <input type="text" name="AlamatRw" maxlength="5" class="form-control @Cls("AlamatRw")" value="@Model.Input.AlamatRw" />
+                    </div>
+                    <div class="col-3">
+                        <label class="form-label">Kelurahan</label>
+                        <input type="text" name="AlamatKelurahan" class="form-control @Cls("AlamatKelurahan")" value="@Model.Input.AlamatKelurahan" />
+                    </div>
+                    <div class="col-3">
+                        <label class="form-label">Kecamatan</label>
+                        <input type="text" name="AlamatKecamatan" class="form-control @Cls("AlamatKecamatan")" value="@Model.Input.AlamatKecamatan" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card mb-3">
+            <div class="card-header"><strong>Data Orang Tua / Wali</strong></div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">Nama Ayah</label>
+                    <input type="text" name="NamaAyah" class="form-control @Cls("NamaAyah")" value="@Model.Input.NamaAyah" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Pekerjaan Ayah</label>
+                    <input type="text" name="PekerjaanAyah" class="form-control @Cls("PekerjaanAyah")" value="@Model.Input.PekerjaanAyah" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Nama Ibu</label>
+                    <input type="text" name="NamaIbu" class="form-control @Cls("NamaIbu")" value="@Model.Input.NamaIbu" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Pekerjaan Ibu</label>
+                    <input type="text" name="PekerjaanIbu" class="form-control @Cls("PekerjaanIbu")" value="@Model.Input.PekerjaanIbu" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">No. Handphone <span class="text-muted small">(penting untuk dihubungi)</span></label>
+                    <input type="text" name="NoHandphone" class="form-control @Cls("NoHandphone")" value="@Model.Input.NoHandphone" placeholder="Contoh: 08123456789" />
+                    <div class="invalid-feedback">@Err("NoHandphone")</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header"><strong>Dokumen (opsional, bisa menyusul)</strong></div>
+            <div class="card-body">
+                @{
+                    var dokumenFields = new (string Name, string Label, string? Lama)[]
+                    {
+                        ("DokumenKk", "Kartu Keluarga (KK)", Model.DokumenKkLama),
+                        ("DokumenAkta", "Akta Kelahiran", Model.DokumenAktaLama),
+                        ("DokumenKia", "Kartu Identitas Anak (KIA)", Model.DokumenKiaLama),
+                        ("DokumenIjazah", "Ijazah", Model.DokumenIjazahLama),
+                    };
+                }
+                @foreach (var (name, label, lama) in dokumenFields)
+                {
+                    <div class="mb-3">
+                        <label class="form-label">@label</label>
+                        @if (Model.IsEdit && !string.IsNullOrEmpty(lama))
+                        {
+                            <div class="mb-2 d-flex gap-2">
+                                <a asp-action="Dokumen" asp-route-id="@Model.Input.CalonSiswaId" asp-route-field="@name" target="_blank" class="btn btn-sm btn-outline-secondary">Lihat</a>
+                                <form asp-action="DeleteDokumen" asp-route-id="@Model.Input.CalonSiswaId" asp-route-field="@name" method="post" onsubmit="return confirm('Dokumen ini akan dihapus secara permanen.');">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Hapus</button>
+                                </form>
+                            </div>
+                        }
+                        <input type="file" name="@name" class="form-control" accept=".pdf,.jpg,.jpeg,.png" />
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>

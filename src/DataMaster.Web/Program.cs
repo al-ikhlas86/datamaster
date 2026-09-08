@@ -34,6 +34,7 @@ builder.Services.AddSession(options =>
 builder.Services.AddDbContext<DataMasterDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DataMaster")));
 builder.Services.AddScoped<DocumentStorageService>();
+builder.Services.AddScoped<PsbService>();
 
 var app = builder.Build();
 

@@ -18,8 +18,9 @@ supaya tahu persis sudah sampai mana dan apa langkah berikutnya.
 |---|---|
 | Solusi + 3 proyek (Data/Web/Launcher) discaffold, build sukses | Selesai |
 | Skema database (EF Core entities + DbContext + migrasi awal) | Selesai — 21 entity (Siswa, CalonSiswa, Guru, Kelas, TahunAjaran, WaliKelas, KepalaSekolah, Ekskul+EkskulSiswa, MataPelajaran, GuruMataPelajaran, KurikulumAlokasi, JamPelajaran+JamPelajaranTingkat, JadwalPelajaran, JadwalPiket, KalenderAkademik, RiwayatAkademik, Tingkat, User+AuthGroup+AuthGroupUser, SystemSetting), migrasi `InitialCreate` diterapkan ke `App_Data/datamaster.db`. Enum disimpan sbg TEXT (bukan int) supaya identik pembacaan MySQL ENUM asli. Belum: field yang butuh validasi non-schema (format TA "YYYY/YYYY", regex nama, dst) — itu tanggung jawab layer aplikasi/controller nanti, bukan DbContext. |
-| Halaman/Controller: **Siswa (CRUD, arsip, import upsert 3-langkah, cetak, dokumen)** | Selesai & teruji end-to-end (lihat catatan uji di bawah). Modul PSB/CalonSiswa dari spec 01 BELUM dibangun (bagian §3.17-3.28 spec) — lanjutan berikutnya. |
-| Halaman/Controller modul lain (Guru, Kelas, Kurikulum, Jadwal, Kalender, Akademik, Auth) | Belum dimulai |
+| Halaman/Controller: **Siswa (CRUD, arsip, import upsert 3-langkah, cetak, dokumen)** | Selesai & teruji end-to-end |
+| Halaman/Controller: **PSB/Calon Siswa (CRUD, filter tingkat/status, Terima→auto-generate NIS→jadi Siswa, Tolak, hard-delete dgn proteksi)** | Selesai & teruji end-to-end — spec 01 §3.17-3.28 tuntas. Modul "Siswa & PSB" (spec 01) 100% selesai dibangun. |
+| Halaman/Controller modul lain (Guru, Kelas, Tahun Ajaran, Ekskul, Kurikulum, Jadwal, Kalender, Akademik, Auth) | Belum dimulai — Kelas/TahunAjaran jadi PRIORITAS berikut krn modul Siswa/PSB sudah bergantung padanya (saat ini di-seed manual utk testing) |
 | Sinkronisasi Hub API (port dari SyncPush.php) | Belum dimulai |
 | Launcher (splash, start/stop server, WebView2, auto-update) | Kerangka XAML splash sudah ada (`MainWindow.xaml`); `MainWindow.xaml.cs` (logic start server + WebView2 + auto-update) belum dimulai |
 | CI GitHub Actions (build+release, pola Presensi) | Belum dimulai |
@@ -60,6 +61,24 @@ supaya tahu persis sudah sampai mana dan apa langkah berikutnya.
   TempData memakai session provider yang sama utk flash message "message"/"error"/"warning"
   (baca sekali lalu hilang, pola flashdata CI4) — dirender global via
   `Views/Shared/_FlashMessages.cshtml` yang di-include `_Layout.cshtml`.
+
+## Catatan modul PSB/Calon Siswa
+
+- File: `Controllers/CalonSiswaController.cs`, `Models/CalonSiswa/CalonSiswaViewModels.cs`,
+  `Views/CalonSiswa/*.cshtml`, `Services/PsbService.cs` (port `PsbProcessor.php` - dipakai
+  jalur web SEKARANG, dan akan dipakai LAGI oleh service sinkronisasi Hub API nanti saat
+  `pullKeputusanPsb` diimplementasikan - JANGAN duplikasi logic Terima/Tolak di 2 tempat,
+  selalu panggil `PsbService` yang sama seperti PHP aslinya memanggil `PsbProcessor` yang sama).
+- **Diuji end-to-end via HTTP nyata** (perlu seed manual TahunAjaran+Tingkat+Kelas dulu krn
+  modul Kelas/TahunAjaran belum ada UI-nya — lihat riwayat sesi ini kalau perlu pola seed
+  serupa): create calon siswa, Terima→NIS auto-generate `26270001` (format prefix tahun
+  ajaran "2026/2027"→"2627" + urut 4 digit, PERSIS spec §3.24) dan redirect ke halaman
+  Detail Siswa hasil promosi, Tolak→redirect ke Index (BEDA dari Terima yg redirect ke
+  Siswa), hard-delete calon ditolak (berhasil) vs calon diterima (DITOLAK dgn pesan
+  verbatim "Calon siswa yang sudah diterima tidak bisa dihapus (sudah jadi data siswa
+  resmi).").
+- Tidak ada bug baru ditemukan di modul ini (pola sama modul Siswa, dan 2 bug yang sudah
+  ditemukan di sesi modul Siswa tidak terulang di sini).
 
 ## Prinsip wajib dipegang tiap sesi lanjutan
 

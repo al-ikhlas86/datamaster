@@ -1,0 +1,93 @@
+@model DataMaster.Web.Models.CalonSiswa.CalonSiswaIndexViewModel
+@{
+    ViewData["Title"] = "Calon Siswa";
+    var statusBadge = new Dictionary<string, (string cls, string label)>
+    {
+        ["menunggu"] = ("bg-warning text-dark", "Menunggu"),
+        ["diterima"] = ("bg-success", "Diterima"),
+        ["ditolak"] = ("bg-secondary", "Ditolak"),
+    };
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Calon Siswa</h3>
+    <a asp-action="Create" class="btn btn-primary">Tambah Calon Siswa</a>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <select class="form-select form-select-sm" style="width:auto" onchange="location.href=this.value">
+        @if (string.IsNullOrEmpty(Model.Tingkat))
+        {
+            <option value="@Url.Action("Index", new { status = Model.Status, tingkat = (string?)null })" selected>Semua Tingkat</option>
+        }
+        else
+        {
+            <option value="@Url.Action("Index", new { status = Model.Status, tingkat = (string?)null })">Semua Tingkat</option>
+        }
+        @foreach (var t in Model.TingkatOptions)
+        {
+            if (t.Kode == Model.Tingkat)
+            {
+                <option value="@Url.Action("Index", new { status = Model.Status, tingkat = t.Kode })" selected>@t.Label</option>
+            }
+            else
+            {
+                <option value="@Url.Action("Index", new { status = Model.Status, tingkat = t.Kode })">@t.Label</option>
+            }
+        }
+    </select>
+
+    <div class="btn-group">
+        @foreach (var s in new[] { "menunggu", "diterima", "ditolak", "semua" })
+        {
+            var label = s switch { "menunggu" => "Menunggu", "diterima" => "Diterima", "ditolak" => "Ditolak", _ => "Semua" };
+            <a class="btn btn-sm @(s == Model.Status ? "btn-primary" : "btn-outline-primary")" href="@Url.Action("Index", new { status = s, tingkat = Model.Tingkat })">@label</a>
+        }
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr><th>No</th><th>Nama</th><th>JK</th><th>Tingkat Dituju</th><th>Asal Sekolah</th><th>No. HP</th><th>Status</th><th>Didaftarkan</th><th>Aksi</th></tr>
+                </thead>
+                <tbody>
+                @if (Model.Rows.Count == 0)
+                {
+                    <tr><td colspan="9" class="text-center text-muted py-4">Belum ada calon siswa@(Model.Status != "semua" ? " dengan status ini" : ""). <a asp-action="Create">Tambah sekarang</a>.</td></tr>
+                }
+                else
+                {
+                    var no = 1;
+                    foreach (var c in Model.Rows)
+                    {
+                        var (cls, label) = statusBadge[c.Status];
+                        <tr>
+                            <td>@(no++)</td>
+                            <td><a asp-action="Detail" asp-route-id="@c.CalonSiswaId">@c.Nama</a></td>
+                            <td><span class="badge @(c.JenisKelamin == "L" ? "bg-primary" : "bg-danger")">@c.JenisKelamin</span></td>
+                            <td>
+                                @if (string.IsNullOrEmpty(c.TingkatDituju))
+                                {
+                                    <span class="fst-italic text-muted">belum diisi</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-info text-dark">@c.TingkatDituju</span>
+                                }
+                            </td>
+                            <td>@(c.AsalSekolah ?? "-")</td>
+                            <td>@(c.NoHandphone ?? "-")</td>
+                            <td><span class="badge @cls">@label</span></td>
+                            <td>@(c.CreatedAt?.ToString("dd MMM yyyy") ?? "-")</td>
+                            <td><a asp-action="Detail" asp-route-id="@c.CalonSiswaId" class="btn btn-sm btn-outline-info">Detail</a></td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
