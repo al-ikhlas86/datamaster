@@ -17,9 +17,17 @@ public sealed class ServerProcessManager : IDisposable
     private Process? _process;
     private bool _intentionalStop;
     private StreamWriter? _logWriter;
+    private readonly LauncherConfig _config = LauncherConfig.Load();
 
     public int Port { get; private set; }
-    public string BaseUrl => $"http://127.0.0.1:{Port}";
+
+    // Mode "klien": tidak pernah menyalakan proses server sendiri sama sekali -
+    // BaseUrl langsung menunjuk PC "server" lain di jaringan lokal yang sama
+    // (lihat LauncherConfig.Mode). Mode lain (mandiri/server): PC ini sendiri
+    // yang menyalakan server, BaseUrl SELALU 127.0.0.1 (loopback tetap jalan
+    // walau Kestrel-nya didengarkan ke 0.0.0.0 juga utk mode "server").
+    public bool IsKlien => _config.Mode == "klien";
+    public string BaseUrl { get; private set; } = "";
 
     // Dipicu kalau proses server berhenti TANPA diminta Launcher - satu2nya
     // penyebab sah saat ini: DatabaseBackupService.RestoreAsync() memanggil
@@ -31,6 +39,19 @@ public sealed class ServerProcessManager : IDisposable
 
     public async Task<bool> StartAsync(CancellationToken ct)
     {
+        if (IsKlien)
+        {
+            // Mode klien: TIDAK menyalakan proses server sama sekali - PC ini
+            // cuma jendela yang menampilkan PC "server" lain di jaringan lokal
+            // yang sama (lihat LauncherConfig.KlienServerUrl). Deadline lebih
+            // panjang (60d, bukan 30d) drpd mode lokal krn PC server bisa saja
+            // baru dinyalakan/masih boot bareng PC klien ini.
+            _intentionalStop = false;
+            BaseUrl = (_config.KlienServerUrl ?? "").TrimEnd('/');
+            if (BaseUrl.Length == 0) return false;
+            return await WaitUntilHealthyAsync(ct, checkLocalProcessAlive: false, timeoutSeconds: 60);
+        }
+
         // Bersihkan proses & handle log SEBELUMNYA dulu - PENTING utk alur restart
         // (server berhenti sendiri stlh restore, lihat ServerExitedUnexpectedly).
         // Tanpa ini, StreamWriter kedua ke berkas log HARI YANG SAMA akan gagal
@@ -44,7 +65,16 @@ public sealed class ServerProcessManager : IDisposable
         _logWriter = null;
 
         _intentionalStop = false;
-        Port = GetFreeTcpPort();
+        var isServerMode = _config.Mode == "server";
+        Port = isServerMode ? _config.ServerPort : GetFreeTcpPort();
+        // BaseUrl (dipakai WebView2 PC INI sendiri + healthz check lokal) SELALU
+        // loopback - Kestrel yang didengarkan ke 0.0.0.0 tetap menjawab di
+        // 127.0.0.1 juga, jadi PC server tetap bisa memakai app-nya sendiri
+        // normal spt mode mandiri. listenUrl (dipakai ASPNETCORE_URLS, yaitu
+        // alamat yang benar2 "didengarkan" Kestrel) beda: 0.0.0.0 KHUSUS mode
+        // "server" supaya PC lain di jaringan yang sama bisa menyambung.
+        BaseUrl = $"http://127.0.0.1:{Port}";
+        var listenUrl = isServerMode ? $"http://0.0.0.0:{Port}" : BaseUrl;
 
         Directory.CreateDirectory(DataDirectory);
         var logDir = Path.Combine(DataDirectory, "logs");
@@ -75,7 +105,7 @@ public sealed class ServerProcessManager : IDisposable
         // membuat "../backup" salah naik ke luar folder DataMaster sama sekali.
         var appDataDir = Path.Combine(DataDirectory, "App_Data");
         Directory.CreateDirectory(appDataDir);
-        psi.EnvironmentVariables["ASPNETCORE_URLS"] = BaseUrl;
+        psi.EnvironmentVariables["ASPNETCORE_URLS"] = listenUrl;
         psi.EnvironmentVariables["ASPNETCORE_ENVIRONMENT"] = "Production";
         psi.EnvironmentVariables["ConnectionStrings__DataMaster"] = $"Data Source={Path.Combine(appDataDir, "datamaster.db")}";
 
@@ -93,16 +123,16 @@ public sealed class ServerProcessManager : IDisposable
         _process.BeginOutputReadLine();
         _process.BeginErrorReadLine();
 
-        return await WaitUntilHealthyAsync(ct);
+        return await WaitUntilHealthyAsync(ct, checkLocalProcessAlive: true, timeoutSeconds: 30);
     }
 
-    private async Task<bool> WaitUntilHealthyAsync(CancellationToken ct)
+    private async Task<bool> WaitUntilHealthyAsync(CancellationToken ct, bool checkLocalProcessAlive, int timeoutSeconds)
     {
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
-        var deadline = DateTime.UtcNow.AddSeconds(30);
+        var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
         while (DateTime.UtcNow < deadline && !ct.IsCancellationRequested)
         {
-            if (_process is { HasExited: true }) return false; // gagal start - jangan tunggu penuh 30 detik
+            if (checkLocalProcessAlive && _process is { HasExited: true }) return false; // gagal start - jangan tunggu penuh
             try
             {
                 using var resp = await http.GetAsync($"{BaseUrl}/healthz", ct);
@@ -110,7 +140,8 @@ public sealed class ServerProcessManager : IDisposable
             }
             catch
             {
-                // server belum siap menerima koneksi - coba lagi
+                // server belum siap menerima koneksi (atau, mode klien: PC server
+                // belum menyala/jaringan belum tersambung) - coba lagi
             }
             await Task.Delay(300, ct);
         }

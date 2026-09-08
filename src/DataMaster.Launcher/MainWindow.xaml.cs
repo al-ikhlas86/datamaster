@@ -36,7 +36,7 @@ public partial class MainWindow : Window
         // StatusChanged/ApplyAndRestart (lihat UpdateChecker_StatusChanged).
         _ = _updateChecker.CheckAndApplyAsync(_server, CancellationToken.None);
 
-        SetSplash("Menyiapkan server lokal...");
+        SetSplash(_server.IsKlien ? "Menyambung ke server Data Master di jaringan..." : "Menyiapkan server lokal...");
         var envDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DataMaster", "webview2-data");
         Directory.CreateDirectory(envDataDir);
         var env = await CoreWebView2Environment.CreateAsync(userDataFolder: envDataDir);
@@ -45,9 +45,18 @@ public partial class MainWindow : Window
         var ok = await _server.StartAsync(CancellationToken.None);
         if (!ok)
         {
-            SetSplash("Gagal menyalakan server lokal. Cek log di %LocalAppData%\\DataMaster\\logs.");
-            MessageBox.Show(this, "Server lokal Data Master gagal dinyalakan dalam waktu 30 detik. Periksa berkas log di %LocalAppData%\\DataMaster\\logs untuk rinciannya, lalu coba jalankan ulang aplikasi.",
-                "Data Master - Gagal Start", MessageBoxButton.OK, MessageBoxImage.Error);
+            if (_server.IsKlien)
+            {
+                SetSplash("Gagal menyambung ke server Data Master.");
+                MessageBox.Show(this, "Tidak dapat menyambung ke PC server Data Master di jaringan. Pastikan PC server sudah menyala & aplikasi Data Master-nya sudah terbuka, PC ini terhubung ke jaringan yang sama, dan alamat di appsettings.json (KlienServerUrl) masih benar - lalu coba buka ulang aplikasi ini.",
+                    "Data Master - Gagal Menyambung", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            else
+            {
+                SetSplash("Gagal menyalakan server lokal. Cek log di %LocalAppData%\\DataMaster\\logs.");
+                MessageBox.Show(this, "Server lokal Data Master gagal dinyalakan dalam waktu 30 detik. Periksa berkas log di %LocalAppData%\\DataMaster\\logs untuk rinciannya, lalu coba jalankan ulang aplikasi.",
+                    "Data Master - Gagal Start", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
             Close();
             return;
         }

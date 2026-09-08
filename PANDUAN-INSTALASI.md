@@ -116,6 +116,24 @@ folder kerja di komputer developer/IT).
 - **Git**, sudah login ke akun GitHub yang punya akses tulis ke repo
   `al-ikhlas86/datamaster-desktop`.
 
+### Kalau belum punya folder kodenya sama sekali
+
+Ini beda dengan bagian 1 di atas - di sini yang diambil adalah KODE SUMBER,
+bukan file `.zip` siap-pasang dari halaman Releases (zip Releases tidak
+bisa dibuka/diubah sebagai kode).
+
+```
+git clone https://github.com/al-ikhlas86/datamaster-desktop.git "D:\Data Master"
+```
+
+Butuh login GitHub (akun yang sudah diundang sbg kolaborator repo). Kalau
+tidak familiar dengan Git command line, cara termudah: buka halaman
+https://github.com/al-ikhlas86/datamaster-desktop di browser → tombol hijau
+"Code" → "Open with GitHub Desktop" (aplikasi GitHub Desktop, gratis,
+lebih ramah pemula) atau "Download ZIP" (tapi ini TIDAK ideal utk
+develop lanjutan krn tidak tersambung ke riwayat git - `git clone`/GitHub
+Desktop lebih disarankan).
+
 ### Menjalankan versi developer di komputer sendiri
 
 ```
@@ -176,7 +194,72 @@ karena tujuan proyek ini adalah 100% sama persis dengan yang lama.
 
 ---
 
-## 3. Rencana migrasi PC TU SD (tahap berikutnya, BELUM dikerjakan)
+## 3. Beberapa PC pakai 1 data yang sama (mis. 3 PC TU SD)
+
+Kalau cuma 1 PC per unit (kasus PC TU TK sekarang), LEWATI bagian ini -
+instalasi biasa di bagian 1 di atas sudah cukup, tiap PC otomatis berdiri
+sendiri ("mode mandiri" - server & database dia sendiri).
+
+Kalau ada BEBERAPA PC yang harus melihat/mengubah data YANG SAMA PERSIS
+(bukan salinan masing-masing - beneran 1 database yang sama, real-time,
+tanpa perlu internet, cukup 1 jaringan lokal/WiFi/kabel yang sama), pakai
+mode **server + klien**:
+
+- **1 PC jadi "server"** - PC inilah yang benar-benar menyimpan database.
+  Sebaiknya PC yang paling jarang dimatikan/direstart (PC 1 harus MENYALA &
+  aplikasinya TERBUKA setiap kali PC 2/3 mau dipakai - kalau PC 1 mati, PC
+  2/3 tidak bisa apa-apa).
+- **PC lainnya jadi "klien"** - jendela aplikasi mereka LANGSUNG menampilkan
+  apa yang ada di PC server, tanpa database sendiri sama sekali. Karena
+  benar-benar 1 database yang sama, akun login JUGA otomatis sama untuk
+  semua PC (tidak perlu diatur ulang per PC) - siapa saja yang punya
+  akun bisa login dari PC mana saja di antara ketiganya.
+
+### Setup PC server (PC 1)
+
+1. Pasang aplikasi seperti biasa (bagian 1 di atas).
+2. Cari tahu IP lokal PC ini di jaringan kantor (`ipconfig` di Command
+   Prompt, lihat baris "IPv4 Address", contoh `192.168.1.10`). **Minta staf
+   jaringan mereservasi IP ini di router (DHCP reservation)** supaya
+   alamatnya tidak berubah-ubah tiap PC dinyalakan ulang - kalau berubah,
+   PC klien akan kehilangan koneksi sampai alamatnya disetel ulang manual.
+3. Buka `appsettings.json` di sebelah `DataMaster.exe`, isi:
+   ```json
+   {
+     "Mode": "server",
+     "ServerPort": 5250
+   }
+   ```
+4. Izinkan port ini masuk lewat Windows Firewall PC ini (Control Panel →
+   Windows Defender Firewall → Pengaturan lanjutan → Inbound Rules → New
+   Rule → Port → TCP 5250 → Allow). Tanpa ini PC lain akan gagal konek
+   walau sudah 1 jaringan.
+5. Tutup & buka lagi `DataMaster.exe`.
+
+### Setup PC klien (PC 2, PC 3, dst)
+
+1. Pasang aplikasi seperti biasa (bagian 1 di atas) - TAPI setelah dibuka
+   pertama kali, JANGAN isi Setup Awal (tidak akan pernah dipakai, PC ini
+   tidak punya database sendiri). Tutup aplikasinya.
+2. Buka `appsettings.json` di sebelah `DataMaster.exe` PC ini, isi (ganti
+   IP sesuai IP PC server yang dicatat di atas):
+   ```json
+   {
+     "Mode": "klien",
+     "KlienServerUrl": "http://192.168.1.10:5250"
+   }
+   ```
+3. Buka lagi `DataMaster.exe` - sekarang jendelanya langsung menampilkan
+   data dari PC server, seolah-olah memakai aplikasi yang sama persis.
+
+Update otomatis (token GitHub, bagian 1 langkah 3) tetap perlu diisi di
+SEMUA PC (server maupun klien) - masing-masing tetap punya salinan
+program sendiri yang perlu diperbarui, cuma DATA-nya yang dipusatkan di
+PC server.
+
+---
+
+## 4. Rencana migrasi PC TU SD (tahap berikutnya, BELUM dikerjakan)
 
 PC TU SD sekarang masih pakai versi web PHP
 (`C:\xampp\htdocs\webarsipdata-master`, jalan lewat XAMPP + MySQL) dan
@@ -205,7 +288,40 @@ sudah dipastikan aman.
 
 ---
 
-## 4. Kontak & eskalasi
+## 5. Pertanyaan yang sering muncul
+
+**Fitur "Pulihkan Data" di menu Setting - apakah bisa dipakai menarik data
+dari web PHP yang lama?** Tidak. "Pulihkan Data" (restore) HANYA bisa
+membaca file cadangan yang dibuat SENDIRI oleh aplikasi desktop ini
+(tombol "Backup Sekarang" di menu yang sama, formatnya `.db` bawaan
+SQLite) - dia tidak tahu apa-apa soal database MySQL web PHP yang lama.
+Memindahkan data dari web PHP ke sini adalah proses TERPISAH (lihat
+bagian 4 di bawah, "alat migrasi" yang belum dibuat), bukan lewat tombol
+Pulihkan Data ini.
+
+**Kenapa saat instalasi tidak ada pilihan "Pendidikan/Perusahaan/Develop"?**
+"Pendidikan" vs "Perusahaan" itu 1 pengaturan (`AppSettings:InstallType`
+di `appsettings.json` sebelah `DataMaster.Web.exe`, bukan sebelah
+`DataMaster.exe`), bukan sesuatu yang ditanyakan pas instalasi - untuk
+sekolah ini nilainya SELALU "pendidikan" (default), tidak perlu diubah.
+"Develop" bukan pilihan instalasi sama sekali - itu artinya menjalankan
+KODE SUMBER dari folder `D:\Data Master` (lihat bagian 2), sepenuhnya
+terpisah dari file `.zip` hasil download di bagian 1.
+
+**Bagaimana Hub API (server pusat di VPS) tahu data yang masuk itu dari
+unit TK atau unit SD?** Bukan dari isi datanya, tapi dari TOKEN yang
+dipakai tiap instalasi utk mengirim data. Tiap unit (TK, SD, dst) didaftarkan
+sbg 1 baris "klien API" terpisah di server Hub API (`php spark
+api:create-client "Nama Unit" source <unit_id>`), masing-masing dapat token
+unik sendiri yang disetel di `AppSettings:HubApiToken` (`appsettings.json`
+sebelah `DataMaster.Web.exe`) instalasi bersangkutan. Begitu Data Master
+mengirim data pakai token TK, Hub API otomatis tahu itu milik unit TK
+(dari token-nya, bukan ditebak dari isi datanya) - data TK dan SD tidak
+akan pernah tercampur di server pusat selama tokennya beda.
+
+---
+
+## 6. Kontak & eskalasi
 
 Kalau ada error yang tidak dimengerti: catat langkah persis yang bikin
 error muncul, screenshot pesan errornya (kalau ada), lalu cek dulu apakah
