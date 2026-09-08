@@ -480,3 +480,9 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Database SQLite lokal (dev/runtime, per-instalasi - jangan ikut commit)
+*.db
+*.db-shm
+*.db-wal
+src/DataMaster.Web/App_Data/
