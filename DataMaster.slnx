@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DataMaster.Data/DataMaster.Data.csproj" />
+    <Project Path="src/DataMaster.Launcher/DataMaster.Launcher.csproj" />
+    <Project Path="src/DataMaster.Web/DataMaster.Web.csproj" />
+  </Folder>
+</Solution>
