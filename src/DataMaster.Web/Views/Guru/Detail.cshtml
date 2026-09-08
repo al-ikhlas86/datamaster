@@ -1,0 +1,32 @@
+@model DataMaster.Web.Models.Guru.GuruFormViewModel
+@{
+    ViewData["Title"] = "Detail Guru";
+}
+
+<h5 class="text-muted mb-3">@Model.Input.Nama</h5>
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <form asp-action="Update" asp-route-id="@Model.Input.GuruId" method="post">
+            <partial name="_Form" model="Model" />
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+                <a asp-action="Index" class="btn btn-outline-secondary">Kembali</a>
+            </div>
+        </form>
+    </div>
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header"><strong>Status Penugasan</strong></div>
+            <div class="card-body">
+                <dl class="row mb-0 small">
+                    <dt class="col-5">Wali Kelas</dt>
+                    <dd class="col-7">@(Model.NamaKelasWali ?? "Belum menjadi wali kelas manapun")</dd>
+                    <dt class="col-5">Ditambahkan</dt>
+                    <dd class="col-7">@(Model.CreatedAt?.ToString("dd MMM yyyy") ?? "-")</dd>
+                </dl>
+                <div class="text-muted small mt-2">Dihitung otomatis dari data wali kelas — bukan angka yang diketik manual.</div>
+            </div>
+        </div>
+    </div>
+</div>

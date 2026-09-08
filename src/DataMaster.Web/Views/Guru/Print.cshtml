@@ -1,0 +1,51 @@
+@model List<DataMaster.Web.Models.Guru.GuruPrintRow>
+@{
+    Layout = null;
+    string LabelJabatan(string j) => j switch { "guru_kelas" => "Guru Kelas", "guru_bidang" => "Guru Bidang", _ => "Karyawan" };
+}
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="utf-8" />
+    <title>Data Guru &amp; Pegawai - SDIT AL IKHLAS 86</title>
+    <style>
+        body { font-family: Arial, sans-serif; font-size: 11px; margin: 20px; }
+        h1, h2, p { text-align: center; margin: 2px 0; }
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+        th, td { border: 1px solid #333; padding: 4px 6px; text-align: left; }
+        th { background: #eee; }
+        .no-print { text-align: center; margin-bottom: 16px; }
+        @@media print { .no-print { display: none; } }
+    </style>
+</head>
+<body>
+    <div class="no-print">
+        <button onclick="window.print()">🖨 Cetak Sekarang</button>
+        <button onclick="window.close()">✕ Tutup</button>
+    </div>
+    <h1>SDIT AL IKHLAS 86</h1>
+    <h2>Daftar Data Guru &amp; Pegawai</h2>
+    <p>Dicetak pada: @DateTime.Now.ToString("dd MMMM yyyy HH:mm") | Total: @Model.Count orang</p>
+    <table>
+        <thead><tr><th>No</th><th>Nama Lengkap</th><th>NIP</th><th>JK</th><th>Jabatan</th><th>Kelas/Wali</th><th>Mata Pelajaran</th><th>No. HP</th><th>Alamat</th></tr></thead>
+        <tbody>
+        @if (Model.Count == 0)
+        {
+            <tr><td colspan="9" style="text-align:center">Tidak ada data.</td></tr>
+        }
+        else
+        {
+            var no = 1;
+            foreach (var g in Model)
+            {
+                <tr>
+                    <td>@(no++)</td><td>@g.Nama</td><td>@(g.Nip ?? "-")</td><td>@(g.JenisKelamin ?? "-")</td>
+                    <td>@LabelJabatan(g.Jabatan)</td><td>@(g.NamaKelasWali ?? "-")</td>
+                    <td>@(g.MataPelajaran ?? "-")</td><td>@(g.NoHandphone ?? "-")</td><td>@(g.Alamat ?? "-")</td>
+                </tr>
+            }
+        }
+        </tbody>
+    </table>
+</body>
+</html>

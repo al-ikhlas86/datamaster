@@ -22,7 +22,8 @@ supaya tahu persis sudah sampai mana dan apa langkah berikutnya.
 | Halaman/Controller: **PSB/Calon Siswa (CRUD, filter tingkat/status, Terima→auto-generate NIS→jadi Siswa, Tolak, hard-delete dgn proteksi)** | Selesai & teruji end-to-end — spec 01 §3.17-3.28 tuntas. Modul "Siswa & PSB" (spec 01) 100% selesai dibangun. |
 | Halaman/Controller: **Tahun Ajaran** (CRUD, aktifkan, delete-selalu-gagal) | Selesai & teruji end-to-end |
 | Halaman/Controller: **Kelas** (CRUD, arsip+proteksi siswa aktif, kelola siswa per kelas, cetak per-kelas/per-tingkat, format-nama-otomatis anti-double-prefix) + **Master Tingkat** (`KurikulumController`, hanya 3 method Tingkat - modul Kurikulum lengkap belum) | Selesai & teruji end-to-end. **LINGKUP BELUM LENGKAP disengaja**: fitur penetapan Wali Kelas (assignWaliKelas dari PenugasanMengajar.php) BELUM diporting krn butuh modul Guru dulu (belum ada) - kolom Wali Kelas sementara nonaktif/placeholder di UI. |
-| Halaman/Controller modul lain (Guru, Ekskul, Penugasan Mengajar, Kepala Sekolah, Kurikulum lengkap, Jadwal, Kalender, Akademik, Auth) | Belum dimulai — **Guru jadi PRIORITAS berikutnya** (banyak modul lain bergantung padanya: Wali Kelas, Kepala Sekolah, Jadwal Pelajaran) |
+| Halaman/Controller: **Guru & Pegawai** (CRUD, arsip dgn alasan keluar, import upsert 3-langkah, cetak) | Selesai & teruji end-to-end. **LINGKUP SENGAJA DIPERSEMPIT**: install_type "perusahaan" belum didukung (selalu berperilaku "pendidikan" — semua jabatan diizinkan); baca Wali Kelas dari tabel WaliKelas sudah benar (forward-compatible) tapi TIDAK ADA UI penetapan (menunggu PenugasanMengajar). |
+| Halaman/Controller modul lain (Ekskul, Penugasan Mengajar, Kepala Sekolah, Kurikulum lengkap, Jadwal, Kalender, Akademik, Auth) | Belum dimulai — **PenugasanMengajar (Guru Pengampu + assignWaliKelas) jadi PRIORITAS berikutnya** supaya kolom Wali Kelas di Guru/Kelas terisi sungguhan |
 | Sinkronisasi Hub API (port dari SyncPush.php) | Belum dimulai |
 | Launcher (splash, start/stop server, WebView2, auto-update) | Kerangka XAML splash sudah ada (`MainWindow.xaml`); `MainWindow.xaml.cs` (logic start server + WebView2 + auto-update) belum dimulai |
 | CI GitHub Actions (build+release, pola Presensi) | Belum dimulai |
@@ -106,6 +107,29 @@ supaya tahu persis sudah sampai mana dan apa langkah berikutnya.
   arsip kelas DITOLAK selama masih ada siswa aktif dgn pesan jumlah yang benar,
   keluarkan siswa lalu arsip berhasil, restore mengembalikan status aktif).
 - Tidak ada bug baru ditemukan di modul ini.
+
+## Catatan modul Guru & Pegawai
+
+- File: `Controllers/GuruController.cs`, `Models/Guru/GuruViewModels.cs`, `Views/Guru/*.cshtml`.
+  Pola SAMA PERSIS modul Siswa (index+search+pagination AJAX, import upsert 3-langkah
+  via session, arsip bukan hapus fisik) - baca kode Siswa dulu kalau mau memahami polanya.
+- **1 bug nyata ditemukan &amp; diperbaiki saat uji coba**: helper lokal `ToRowsAsync` menerima
+  `IQueryable&lt;Guru&gt;` lalu memanggil `.ToListAsync()` (ekstensi ASYNC EF Core) - ini SAH untuk
+  query yang datang dari `db.Guru...` (provider EF Core), TAPI query mode pencarian
+  membangun ulang `IQueryable` dari `List&lt;Guru&gt;` in-memory via `.AsQueryable()` (provider
+  LINQ-to-Objects biasa) - EF Core `.ToListAsync()` melempar
+  `InvalidOperationException: The source 'IQueryable' doesn't implement 'IAsyncEnumerable'`
+  begitu dipanggil di atas provider bukan-EF. **Pelajaran umum utk modul lain**: kalau
+  sebuah helper dipakai gantian utk data HASIL QUERY DB dan data HASIL FILTER IN-MEMORY,
+  jangan pakai satu tipe parameter `IQueryable` generik dgn `.ToListAsync()` di dalamnya -
+  pisahkan jadi 2 varian (satu terima `IQueryable` + `.ToListAsync()`, satu terima
+  `List&lt;T&gt;` sudah jadi), seperti pola `ToRowsFromDbAsync()`/`ToRowsAsync()` di sini.
+- Guard perubahan jabatan (menolak ubah jabatan guru yang masih tercatat wali kelas) sudah
+  diimplementasikan BENAR walau saat ini tidak akan pernah ter-trigger nyata (karena belum
+  ada cara menetapkan wali kelas) - forward-compatible, jangan dihapus/disederhanakan.
+- **Diuji end-to-end via HTTP nyata**: create, validasi No HP duplikat (scoped ke
+  status_aktif=true, persis spec), arsip dgn alasan keluar (`status_keluar`), import upsert
+  (1 baris baru + 1 baris koreksi gelar_terakhir saja, field lain tidak berubah).
 
 ## Prinsip wajib dipegang tiap sesi lanjutan
 

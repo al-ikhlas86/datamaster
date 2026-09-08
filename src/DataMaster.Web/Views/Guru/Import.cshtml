@@ -1,0 +1,37 @@
+@{
+    ViewData["Title"] = "Import Data Guru";
+}
+
+<h3 class="mb-3">Import Data Guru</h3>
+
+<div class="alert alert-info">
+    <strong>Urutan kolom wajib tetap:</strong> Nama | Jenis Kelamin (opsional) | Jabatan (opsional) | Gelar Terakhir (opsional) | No HP
+    <ul class="mb-0 mt-2">
+        <li>File ini bisa berisi campuran data baru &amp; koreksi data lama sekaligus - kalau No HP di suatu baris sudah dipakai data yang MASIH AKTIF, baris itu otomatis dianggap koreksi (kolom yang dikosongkan tidak akan diubah). No HP milik data yang sudah diarsipkan tetap bebas dipakai ulang untuk data baru.</li>
+        <li>Sebelum benar-benar tersimpan, akan ada halaman Preview yang menampilkan mana baris baru &amp; mana baris koreksi (beserta perubahannya) - Anda konfirmasi dulu baru diterapkan.</li>
+    </ul>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-5">
+        <div class="card"><div class="card-body text-center">
+            <p>Download template Excel untuk memudahkan input data guru</p>
+            <a asp-action="DownloadTemplate" class="btn btn-success btn-lg">Download Template XLSX</a>
+        </div></div>
+    </div>
+    <div class="col-md-7">
+        <div class="card"><div class="card-body">
+            <form asp-action="PreviewImport" method="post" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <label class="form-label">Pilih File Excel *</label>
+                    <input type="file" name="file" class="form-control" accept=".xlsx,.xls" required />
+                    <div class="form-text">Format file: .xlsx atau .xls (Max: 5MB)</div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-lg">Import Sekarang</button>
+                    <a asp-action="Index" class="btn btn-outline-secondary btn-lg">Batal</a>
+                </div>
+            </form>
+        </div></div>
+    </div>
+</div>

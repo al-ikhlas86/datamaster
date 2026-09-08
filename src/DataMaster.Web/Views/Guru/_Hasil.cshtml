@@ -1,0 +1,101 @@
+@model DataMaster.Web.Models.Guru.GuruIndexViewModel
+@{
+    string LabelJabatan(string j) => j switch { "guru_kelas" => "Guru Kelas", "guru_bidang" => "Guru Bidang", _ => "Karyawan" };
+}
+
+@if (Model.ImportErrors.Count > 0)
+{
+    <div class="alert alert-warning">
+        <strong>Import selesai dengan beberapa baris yang dilewati:</strong>
+        <ul class="mb-0">
+            @foreach (var e in Model.ImportErrors) { <li>@e</li> }
+        </ul>
+    </div>
+}
+
+<div class="d-flex align-items-center justify-content-between mb-2 d-none" id="bulkDeleteToolbar">
+    <span><span id="bulkDeleteCount">0</span> guru/pegawai dipilih</span>
+    <div class="d-flex align-items-center gap-2">
+        <select class="form-select form-select-sm" name="status_keluar" form="formBulkDelete">
+            <option value="">-- Tidak dipilih --</option>
+            <option value="purna_bakti">Purna Bakti / Pensiun</option>
+            <option value="resign">Resign / Mengundurkan Diri</option>
+            <option value="diberhentikan">Diberhentikan</option>
+        </select>
+        <button type="submit" form="formBulkDelete" class="btn btn-sm btn-danger">Hapus Terpilih</button>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead><tr><th style="width:2rem"><input type="checkbox" id="checkAll" /></th><th>No</th><th>Nama</th><th>JK</th><th>Jabatan</th><th>Kelas/Wali</th><th>No. HP</th><th>Aksi</th></tr></thead>
+        <tbody>
+        @if (Model.Rows.Count == 0)
+        {
+            <tr><td colspan="8" class="text-center text-muted py-4">
+                @if (Model.Keyword != "") { <text>Tidak ada guru/pegawai yang cocok dengan pencarian "@Model.Keyword".</text> }
+                else { <text>Belum ada data guru/pegawai. <a asp-action="Create">Tambah sekarang</a>.</text> }
+            </td></tr>
+        }
+        else
+        {
+            var no = (Model.Page - 1) * Model.PerPage + 1;
+            foreach (var g in Model.Rows)
+            {
+                <tr>
+                    <td><input type="checkbox" name="ids" value="@g.GuruId" form="formBulkDelete" class="js-row-check" /></td>
+                    <td>@(no++)</td>
+                    <td><a asp-action="Detail" asp-route-id="@g.GuruId">@g.Nama</a></td>
+                    <td>@(g.JenisKelamin ?? "-")</td>
+                    <td>@LabelJabatan(g.Jabatan)</td>
+                    <td>@(g.NamaKelasWali ?? "-")</td>
+                    <td>@(g.NoHandphone ?? "-")</td>
+                    <td>
+                        <a asp-action="Detail" asp-route-id="@g.GuruId" class="btn btn-sm btn-outline-info">Detail</a>
+                        <button type="button" class="btn btn-sm btn-outline-danger js-btn-hapus" data-nama="@g.Nama" data-id="@g.GuruId">Hapus</button>
+                    </td>
+                </tr>
+            }
+        }
+        </tbody>
+    </table>
+</div>
+
+@if (Model.Keyword == "" && Model.TotalPages > 1)
+{
+    var from = (Model.Page - 1) * Model.PerPage + 1;
+    var to = Math.Min(Model.Page * Model.PerPage, Model.Total);
+    <div class="d-flex justify-content-between align-items-center">
+        <span class="text-muted small">Menampilkan @from sampai @to dari @Model.Total data</span>
+        <nav><ul class="pagination pagination-sm mb-0">
+            @for (var p = 1; p <= Model.TotalPages; p++)
+            {
+                <li class="page-item @(p == Model.Page ? "active" : "")"><a class="page-link js-page-link" href="@Url.Action("Index", new { q = Model.Keyword, per_page = Model.PerPage, page = p })" data-page="@p">@p</a></li>
+            }
+        </ul></nav>
+    </div>
+}
+
+<form id="formHapusSatu" method="post" style="display:none">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="status_keluar" id="hapusSatuStatusKeluar" />
+</form>
+
+<div class="modal fade" id="modalHapusSatu" tabindex="-1">
+    <div class="modal-dialog"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Hapus Guru?</h5></div>
+        <div class="modal-body">
+            <p>Data guru <strong id="modalNamaGuru"></strong> akan dihapus secara permanen.</p>
+            <select class="form-select" id="modalStatusKeluar">
+                <option value="">-- Tidak dipilih --</option>
+                <option value="purna_bakti">Purna Bakti / Pensiun</option>
+                <option value="resign">Resign / Mengundurkan Diri</option>
+                <option value="diberhentikan">Diberhentikan</option>
+            </select>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+            <button type="button" class="btn btn-danger" id="btnKonfirmasiHapusSatu">Ya, Hapus</button>
+        </div>
+    </div></div>
+</div>

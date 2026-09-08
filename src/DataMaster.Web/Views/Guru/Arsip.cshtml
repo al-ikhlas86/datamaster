@@ -1,0 +1,38 @@
+@model List<DataMaster.Web.Models.Guru.GuruRow>
+@{
+    ViewData["Title"] = "Arsip Guru";
+    string LabelJabatan(string j) => j switch { "guru_kelas" => "Guru Kelas", "guru_bidang" => "Guru Bidang", _ => "Karyawan" };
+}
+
+<h3 class="mb-3">Arsip Guru &amp; Pegawai</h3>
+<p class="text-muted">Data yang sudah dinonaktifkan (bukan di-hapus). Buka Detail lalu centang "Aktif" untuk memulihkan.</p>
+
+<div class="card">
+    <div class="card-body">
+        <table class="table table-hover align-middle">
+            <thead><tr><th>No</th><th>Nama</th><th>NIP</th><th>JK</th><th>Jabatan</th><th>No. HP</th><th>Aksi</th></tr></thead>
+            <tbody>
+            @if (Model.Count == 0)
+            {
+                <tr><td colspan="7" class="text-center text-muted py-4">Belum ada guru/pegawai yang diarsipkan.</td></tr>
+            }
+            else
+            {
+                var no = 1;
+                foreach (var g in Model)
+                {
+                    <tr>
+                        <td>@(no++)</td>
+                        <td>@g.Nama</td>
+                        <td>@(g.Nip ?? "-")</td>
+                        <td>@(g.JenisKelamin ?? "-")</td>
+                        <td>@LabelJabatan(g.Jabatan)</td>
+                        <td>@(g.NoHandphone ?? "-")</td>
+                        <td><a asp-action="Detail" asp-route-id="@g.GuruId" class="btn btn-sm btn-outline-info">Pulihkan</a></td>
+                    </tr>
+                }
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

@@ -1,0 +1,69 @@
+@using DataMaster.Web.Models.Guru
+@model GuruImportPreviewSession
+@{
+    ViewData["Title"] = "Preview Import Guru";
+    string LabelJabatan(string? j) => j switch { "karyawan" => "Karyawan", _ => "Guru" };
+}
+
+<div class="card mb-3">
+    <div class="card-body">
+        <span class="badge bg-success">@Model.InsertCount Baru</span>
+        <span class="badge bg-warning text-dark">@Model.UpdateCount Diperbarui</span>
+        @if (Model.ErrorCount > 0) { <span class="badge bg-danger">@Model.ErrorCount Error</span> }
+        <p class="mt-2 mb-0">Periksa dulu hasil klasifikasi di bawah sebelum diterapkan ke database. Baris Diperbarui akan MENGOREKSI data yang sudah ada (No HP cocok dgn data yang masih aktif) - kolom yang tidak diisi di Excel TIDAK akan diubah.</p>
+    </div>
+</div>
+
+@if (Model.Errors.Count > 0)
+{
+    <div class="alert alert-warning">
+        <strong>Baris yang dilewati (error):</strong>
+        <ul class="mb-0">@foreach (var e in Model.Errors) { <li>@e</li> }</ul>
+    </div>
+}
+
+<div class="table-responsive mb-3">
+    <table class="table table-bordered align-middle">
+        <thead><tr><th>Baris</th><th>No HP</th><th>Nama</th><th>Status</th><th>Perubahan</th></tr></thead>
+        <tbody>
+        @foreach (var row in Model.Rows)
+        {
+            <tr>
+                <td>@row.RowNumber</td>
+                <td>@row.NoHandphone</td>
+                <td>@row.Nama</td>
+                <td>
+                    @if (row.Type == "insert") { <span class="badge bg-success">Baru</span> }
+                    else { <span class="badge bg-warning text-dark">Diperbarui</span> }
+                </td>
+                <td>
+                    @if (row.Type == "insert")
+                    {
+                        <span class="text-muted">Data baru, seluruh data pada file akan disimpan.</span>
+                    }
+                    else if (row.Diff.Count == 0)
+                    {
+                        <span class="text-muted">Tidak ada perubahan (data sama dengan yang tersimpan).</span>
+                    }
+                    else
+                    {
+                        <ul class="mb-0 small">
+                        @foreach (var d in row.Diff)
+                        {
+                            var lama = d.Field == "jabatan" ? LabelJabatan(d.Lama) : (d.Lama ?? "-");
+                            var baru = d.Field == "jabatan" ? LabelJabatan(d.Baru) : (d.Baru ?? "-");
+                            <li>@d.Label: <del class="text-danger">@lama</del> &rarr; <ins class="text-success">@baru</ins></li>
+                        }
+                        </ul>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+
+<form asp-action="ApplyImport" method="post" class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary">Terapkan Sekarang (@(Model.InsertCount + Model.UpdateCount) baris)</button>
+    <a asp-action="Import" class="btn btn-outline-secondary">Batal</a>
+</form>

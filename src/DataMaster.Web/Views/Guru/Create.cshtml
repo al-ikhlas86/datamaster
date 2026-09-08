@@ -1,0 +1,14 @@
+@model DataMaster.Web.Models.Guru.GuruFormViewModel
+@{
+    ViewData["Title"] = "Tambah Data Guru";
+}
+
+<h3 class="mb-3">Tambah Data Guru / Pegawai</h3>
+
+<form asp-action="Store" method="post">
+    <partial name="_Form" model="Model" />
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary btn-lg">Simpan Data Pegawai</button>
+        <a asp-action="Index" class="btn btn-outline-secondary btn-lg">Batal</a>
+    </div>
+</form>
