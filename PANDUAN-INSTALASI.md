@@ -259,32 +259,63 @@ PC server.
 
 ---
 
-## 4. Rencana migrasi PC TU SD (tahap berikutnya, BELUM dikerjakan)
+## 4. Migrasi PC TU SD (alat sudah siap & teruji, BELUM dijalankan ke data asli)
 
 PC TU SD sekarang masih pakai versi web PHP
 (`C:\xampp\htdocs\webarsipdata-master`, jalan lewat XAMPP + MySQL) dan
 **akan tetap begitu** sampai versi desktop C# ini terbukti stabil 100% di
 PC TU TK dulu (unit baru, tanpa data lama, jadi aman dites langsung dengan
-data sungguhan tanpa risiko).
+data sungguhan tanpa risiko) - baru setelah itu langkah di bawah ini
+dijalankan sungguhan ke data PC TU SD.
 
-Setelah PC TU TK terbukti aman berjalan beberapa waktu, langkah pemindahan
-PC TU SD adalah:
+Alat migrasinya (`src/DataMaster.MigrationTool`, folder develop) sudah
+dibangun & sudah diuji nyata (bukan cuma dibaca kodenya) - dijalankan ke
+salinan database MySQL PHP di laptop develop, hasilnya **100% cocok di
+SEMUA 19 tabel data sekolah** (termasuk 2.300 baris Jadwal Pelajaran),
+termasuk verifikasi isi datanya (bukan cuma jumlah baris) dan seluruh
+relasi antar tabel (Wali Kelas, Guru Pengampu, dst) tetap benar setelah
+ID-nya diterjemahkan ulang.
 
-1. Bikin alat migrasi satu-arah: baca database MySQL PHP yang sekarang
-   dipakai PC TU SD (30 tabel, termasuk siswa/guru/kelas/jadwal/kurikulum/
-   dst), tulis ulang ke database SQLite aplikasi desktop ini - alat ini
-   BELUM dibuat, jadi jangan mulai proses pemindahan data PC TU SD sebelum
-   alat ini ada & sudah dites dengan salinan data (bukan langsung ke data
-   asli).
-2. Install aplikasi desktop ini di PC TU SD (langkah sama seperti bagian 1
-   di atas, tapi database masih kosong).
-3. Jalankan alat migrasi SEKALI, verifikasi jumlah baris & isi data cocok
-   antara MySQL lama vs SQLite baru untuk tiap tabel.
-4. Baru setelah dicek benar-benar cocok, web PHP di PC TU SD dimatikan dan
-   TU mulai pakai aplikasi desktop sepenuhnya.
+**Sengaja TIDAK memindahkan**: tabel `users` (akun login) - password lama
+PHP tidak bisa dipakai di aplikasi baru (algoritma beda), jadi akun dibuat
+ulang lewat Setup Awal setelah migrasi (lihat langkah 4). `system_settings`
+juga tidak dipindah - itu murni pengaturan operasional, bukan data sekolah.
 
-Jangan hapus/matikan web PHP PC TU SD sebelum langkah 3-4 selesai dan
-sudah dipastikan aman.
+Langkah migrasi PC TU SD sungguhan (dilakukan HANYA setelah PC TU TK
+terbukti aman berjalan beberapa waktu):
+
+1. Backup database MySQL PC TU SD (`mysqldump webarsipdata_db > backup.sql`
+   atau lewat phpMyAdmin - Export). Simpan salinan ini terpisah, JANGAN
+   dihapus sampai migrasi benar-benar dipastikan sukses.
+2. Pasang salinan backup itu ke MySQL manapun yang bisa diakses alat
+   migrasi (boleh di PC TU SD itu sendiri, atau di komputer developer -
+   yang penting BUKAN database yang sedang dipakai live, pakai salinannya).
+3. Jalankan alat migrasi dari folder develop:
+   ```
+   cd "D:\Data Master"
+   dotnet run --project src/DataMaster.MigrationTool -- --mysql "Server=localhost;Database=webarsipdata_db;User=root;Password=xxx;" --sqlite "C:\lokasi\datamaster_sd.db"
+   ```
+   Baca LAPORAN HASIL MIGRASI di akhir - semua baris harus "OK" (jumlah
+   SQLite = MySQL persis). Kalau ada yang "dilewati", baca peringatan di
+   atasnya sebelum lanjut - JANGAN pakai hasilnya kalau ada yang janggal.
+4. Salin folder dokumen upload PHP (foto/KK/akta siswa, dst) ke
+   `App_Data/uploads/dokumen` instalasi desktop - alat migrasi cuma
+   memindahkan NAMA file di database, bukan berkas fisiknya.
+5. Pasang aplikasi desktop di PC TU SD (langkah sama seperti bagian 1),
+   tapi PAKAI file `datamaster_sd.db` hasil migrasi tadi sebagai databasenya
+   (timpa `App_Data/datamaster.db` yang kosong bawaan instalasi baru).
+6. Buka aplikasinya - karena tabel Users sengaja tidak ikut migrasi, akan
+   muncul halaman Setup Awal seperti PC baru - buat akun admin dengan
+   password baru.
+7. Cek visual satu-persatu di menu Kepala Sekolah, Guru Pengampu, dan Wali
+   Kelas - datanya sudah pasti benar (sudah diverifikasi), tapi tetap
+   patut dilihat langsung sebelum benar-benar dipakai sehari-hari.
+8. Baru setelah semua dicek dan TU merasa yakin, web PHP di PC TU SD
+   dimatikan dan TU mulai pakai aplikasi desktop sepenuhnya.
+
+Jangan hapus/matikan web PHP PC TU SD sebelum langkah 7-8 selesai dan
+sudah dipastikan aman. Backup dari langkah 1 disimpan sampai yakin migrasi
+sukses total, baru boleh dihapus.
 
 ---
 
