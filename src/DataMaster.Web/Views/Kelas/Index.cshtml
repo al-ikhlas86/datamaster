@@ -82,9 +82,24 @@
     </div>
 </form>
 
-<div class="row g-3 mb-3">
-    <div class="col-md-6"><div class="card text-center"><div class="card-body"><div class="text-muted small">Total Kelas</div><div class="fs-4 fw-bold">@Model.TotalKelas</div></div></div></div>
-    <div class="col-md-6"><div class="card text-center"><div class="card-body"><div class="text-muted small">Total Siswa Terdaftar di Kelas</div><div class="fs-4 fw-bold">@Model.TotalSiswa</div></div></div></div>
+<div class="row g-3 mb-3 align-items-center">
+    <div class="col-md-4"><div class="card text-center"><div class="card-body"><div class="text-muted small">Total Kelas</div><div class="fs-4 fw-bold">@Model.TotalKelas</div></div></div></div>
+    <div class="col-md-4"><div class="card text-center"><div class="card-body"><div class="text-muted small">Total Siswa Terdaftar di Kelas</div><div class="fs-4 fw-bold">@Model.TotalSiswa</div></div></div></div>
+    <div class="col-md-4">
+        <label class="form-label small text-uppercase text-muted mb-1">Wali Kelas Tahun Ajaran</label>
+        <select class="form-select" id="pilihTahunAjaran" onchange="window.location.href='@Url.Action("Index")?tahun='+this.value">
+            @foreach (var (id, nama) in Model.TahunAjaranList)
+            {
+                var label = nama + (id == Model.TahunAjaranAktif ? " (aktif sekarang)" : "");
+                if (id == Model.TahunAjaranId) { <option value="@id" selected>@label</option> }
+                else { <option value="@id">@label</option> }
+            }
+        </select>
+        @if (Model.TahunAjaranId != Model.TahunAjaranAktif)
+        {
+            <div class="form-text text-warning">Bukan tahun aktif - perubahan tidak memengaruhi tahun berjalan.</div>
+        }
+    </div>
 </div>
 
 @foreach (var grup in Model.PerTingkat)
@@ -96,12 +111,29 @@
         </div>
         <div class="card-body">
             <table class="table table-sm align-middle mb-0">
-                <thead><tr><th>Nama Kelas</th><th>Jumlah Siswa</th><th>Status</th><th>Aksi</th></tr></thead>
+                <thead><tr><th>Nama Kelas</th><th>Wali Kelas</th><th>Jumlah Siswa</th><th>Status</th><th>Aksi</th></tr></thead>
                 <tbody>
                 @foreach (var k in grup.KelasList)
                 {
-                    <tr>
+                    var slots = Model.WaliPerKelas.GetValueOrDefault(k.KelasId, []);
+                    var idsCsv = string.Join(",", slots.Select(s => s.GuruId));
+                    <tr id="kelas-@k.KelasId">
                         <td><a asp-action="Detail" asp-route-id="@k.KelasId">@k.NamaKelas</a></td>
+                        <td style="min-width:260px">
+                            <div class="js-wali-wrapper" data-kelas-id="@k.KelasId" data-guru-ids="@idsCsv">
+                                <div class="js-wali-chips d-flex flex-wrap gap-1 mb-1">
+                                    @foreach (var s in slots)
+                                    {
+                                        <span class="badge bg-info text-dark js-wali-chip" data-guru-id="@s.GuruId">@s.Nama <a href="#" class="text-dark js-wali-remove" style="text-decoration:none">&times;</a></span>
+                                    }
+                                </div>
+                                <div class="position-relative">
+                                    <input type="text" class="form-control form-control-sm js-wali-input" placeholder="+ tambah wali..." autocomplete="off" />
+                                    <div class="list-group position-absolute w-100 shadow-sm js-wali-saran" style="z-index:1050;display:none;max-height:200px;overflow-y:auto;"></div>
+                                </div>
+                                <div class="text-danger small js-wali-error" style="display:none"></div>
+                            </div>
+                        </td>
                         <td><span class="badge bg-secondary">@k.TotalSiswa</span></td>
                         <td>
                             @if (k.IsActive)
@@ -145,5 +177,92 @@
                 if (!confirm('Hapus tingkat ' + this.dataset.nama + '?')) e.preventDefault();
             });
         });
+
+        // Penetapan Wali Kelas - autosave via AJAX per perubahan, TANPA tombol Simpan
+        // & TANPA reload (persis 02-guru-kelas-struktur.md §5.3/§12 poin 2).
+        (function () {
+            var URL_CARI = @Html.Raw(Json.Serialize(Url.Action("CariGuruKelas", "PenugasanMengajar")));
+            var URL_SIMPAN = @Html.Raw(Json.Serialize(Url.Action("AssignWaliKelas", "PenugasanMengajar")));
+            var TAHUN = @Model.TahunAjaranId;
+            var TOKEN = document.querySelector('input[name="__RequestVerificationToken"]').value;
+
+            function simpan(wrapper) {
+                var ids = wrapper.dataset.guruIds.split(',').filter(Boolean);
+                var body = new URLSearchParams();
+                body.append('__RequestVerificationToken', TOKEN);
+                body.append('kelas_id', wrapper.dataset.kelasId);
+                body.append('tahun_ajaran_id', TAHUN);
+                ids.forEach(function (id) { body.append('guru_id', id); });
+                var errBox = wrapper.querySelector('.js-wali-error');
+                fetch(URL_SIMPAN, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString() })
+                    .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+                    .then(function (res) {
+                        if (res.ok) { errBox.style.display = 'none'; }
+                        else { errBox.textContent = res.j.message || 'Gagal menyimpan.'; errBox.style.display = ''; }
+                    })
+                    .catch(function () { errBox.textContent = 'Gagal menyimpan - periksa koneksi.'; errBox.style.display = ''; });
+            }
+
+            function tambahChip(wrapper, guruId, nama) {
+                var ids = wrapper.dataset.guruIds.split(',').filter(Boolean);
+                if (ids.indexOf(String(guruId)) !== -1) return;
+                ids.push(String(guruId));
+                wrapper.dataset.guruIds = ids.join(',');
+                var chips = wrapper.querySelector('.js-wali-chips');
+                var span = document.createElement('span');
+                span.className = 'badge bg-info text-dark js-wali-chip';
+                span.dataset.guruId = guruId;
+                span.innerHTML = nama.replace(/&/g, '&amp;').replace(/</g, '&lt;') + ' <a href="#" class="text-dark js-wali-remove" style="text-decoration:none">&times;</a>';
+                chips.appendChild(span);
+                simpan(wrapper);
+            }
+
+            document.querySelectorAll('.js-wali-wrapper').forEach(function (wrapper) {
+                var input = wrapper.querySelector('.js-wali-input');
+                var saran = wrapper.querySelector('.js-wali-saran');
+                var timer = null;
+
+                function cari() {
+                    clearTimeout(timer);
+                    var kata = input.value.trim();
+                    timer = setTimeout(function () {
+                        var params = new URLSearchParams({ q: kata, kecuali: 0, tahun: TAHUN });
+                        fetch(URL_CARI + '?' + params.toString()).then(function (r) { return r.json(); }).then(function (list) {
+                            if (list.length === 0) {
+                                saran.innerHTML = '<div class="list-group-item small text-muted">Tidak ada nama cocok.</div>';
+                            } else {
+                                saran.innerHTML = list.map(function (g) {
+                                    return '<button type="button" class="list-group-item list-group-item-action small js-wali-pilih" data-id="' + g.guru_id + '" data-nama="' + String(g.nama).replace(/"/g, '&quot;') + '">' + g.nama + '</button>';
+                                }).join('');
+                            }
+                            saran.style.display = '';
+                        });
+                    }, 150);
+                }
+                input.addEventListener('focus', cari);
+                input.addEventListener('input', cari);
+                input.addEventListener('blur', function () { setTimeout(function () { saran.style.display = 'none'; }, 150); });
+
+                saran.addEventListener('mousedown', function (e) {
+                    var btn = e.target.closest('.js-wali-pilih');
+                    if (!btn) return;
+                    e.preventDefault();
+                    tambahChip(wrapper, btn.dataset.id, btn.dataset.nama);
+                    input.value = '';
+                    saran.style.display = 'none';
+                });
+
+                wrapper.querySelector('.js-wali-chips').addEventListener('mousedown', function (e) {
+                    var link = e.target.closest('.js-wali-remove');
+                    if (!link) return;
+                    e.preventDefault();
+                    var chip = link.closest('.js-wali-chip');
+                    var ids = wrapper.dataset.guruIds.split(',').filter(function (id) { return id && id !== chip.dataset.guruId; });
+                    wrapper.dataset.guruIds = ids.join(',');
+                    chip.remove();
+                    simpan(wrapper);
+                });
+            });
+        })();
     </script>
 }

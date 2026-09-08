@@ -90,6 +90,42 @@ public class KurikulumController(DataMasterDbContext db) : Controller
         TempData["message"] = $"Tingkat \"{t.Nama}\" dihapus.";
         return TujuanTingkat(kembali_ke);
     }
+
+    // Route absolut (bukan di bawah "kurikulum/tingkat") - tambah cepat Mata Pelajaran
+    // dipakai oleh halaman Guru Pengampu selama modul Kurikulum lengkap (Mata Pelajaran/
+    // Alokasi JP/Jam Belajar) belum diporting - lihat 03-akademik-jadwal.md §3 TAB1 & §5.1.
+    [HttpPost("/kurikulum/mata-pelajaran/store")]
+    public async Task<IActionResult> StoreMapel(string? kode, string? nama, string? kelompok, int urutan, string? kembali_ke)
+    {
+        var k = string.IsNullOrWhiteSpace(kode) ? null : kode.Trim().ToUpperInvariant();
+        var kel = string.IsNullOrWhiteSpace(kelompok) ? null : kelompok.Trim();
+        var n = (nama ?? "").Trim();
+
+        var errors = new List<string>();
+        if (n == "") errors.Add("Nama mata pelajaran wajib diisi.");
+        else if (n.Length < 2) errors.Add("Nama mata pelajaran minimal 2 karakter.");
+        else if (n.Length > 100) errors.Add("Nama mata pelajaran maksimal 100 karakter.");
+        else if (await db.MataPelajaran.AnyAsync(m => m.Nama == n)) errors.Add("Mata pelajaran ini sudah ada.");
+        if (k is not null)
+        {
+            if (k.Length > 10) errors.Add("Kode maksimal 10 karakter.");
+            else if (await db.MataPelajaran.AnyAsync(m => m.Kode == k)) errors.Add("Kode ini sudah dipakai mata pelajaran lain.");
+        }
+
+        if (errors.Count > 0)
+        {
+            TempData["error"] = string.Join(" ", errors);
+            return RedirectBack(kembali_ke);
+        }
+
+        db.MataPelajaran.Add(new MataPelajaran { Nama = n, Kode = k, Kelompok = kel, Urutan = urutan });
+        await db.SaveChangesAsync();
+        TempData["message"] = $"Mata pelajaran \"{n}\" ditambahkan.";
+        return RedirectBack(kembali_ke);
+    }
+
+    private IActionResult RedirectBack(string? kembaliKe) =>
+        kembaliKe == "penugasan-mengajar" ? RedirectToAction("Index", "PenugasanMengajar") : RedirectToAction("Index", "PenugasanMengajar");
 }
 
 public class TingkatRowInput

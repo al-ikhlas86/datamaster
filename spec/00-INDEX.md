@@ -22,8 +22,9 @@ supaya tahu persis sudah sampai mana dan apa langkah berikutnya.
 | Halaman/Controller: **PSB/Calon Siswa (CRUD, filter tingkat/status, Terima→auto-generate NIS→jadi Siswa, Tolak, hard-delete dgn proteksi)** | Selesai & teruji end-to-end — spec 01 §3.17-3.28 tuntas. Modul "Siswa & PSB" (spec 01) 100% selesai dibangun. |
 | Halaman/Controller: **Tahun Ajaran** (CRUD, aktifkan, delete-selalu-gagal) | Selesai & teruji end-to-end |
 | Halaman/Controller: **Kelas** (CRUD, arsip+proteksi siswa aktif, kelola siswa per kelas, cetak per-kelas/per-tingkat, format-nama-otomatis anti-double-prefix) + **Master Tingkat** (`KurikulumController`, hanya 3 method Tingkat - modul Kurikulum lengkap belum) | Selesai & teruji end-to-end. **LINGKUP BELUM LENGKAP disengaja**: fitur penetapan Wali Kelas (assignWaliKelas dari PenugasanMengajar.php) BELUM diporting krn butuh modul Guru dulu (belum ada) - kolom Wali Kelas sementara nonaktif/placeholder di UI. |
-| Halaman/Controller: **Guru & Pegawai** (CRUD, arsip dgn alasan keluar, import upsert 3-langkah, cetak) | Selesai & teruji end-to-end. **LINGKUP SENGAJA DIPERSEMPIT**: install_type "perusahaan" belum didukung (selalu berperilaku "pendidikan" — semua jabatan diizinkan); baca Wali Kelas dari tabel WaliKelas sudah benar (forward-compatible) tapi TIDAK ADA UI penetapan (menunggu PenugasanMengajar). |
-| Halaman/Controller modul lain (Ekskul, Penugasan Mengajar, Kepala Sekolah, Kurikulum lengkap, Jadwal, Kalender, Akademik, Auth) | Belum dimulai — **PenugasanMengajar (Guru Pengampu + assignWaliKelas) jadi PRIORITAS berikutnya** supaya kolom Wali Kelas di Guru/Kelas terisi sungguhan |
+| Halaman/Controller: **Guru & Pegawai** (CRUD, arsip dgn alasan keluar, import upsert 3-langkah, cetak) | Selesai & teruji end-to-end. **LINGKUP SENGAJA DIPERSEMPIT**: install_type "perusahaan" belum didukung (selalu berperilaku "pendidikan" — semua jabatan diizinkan). |
+| Halaman/Controller: **Penugasan Mengajar "Guru Pengampu"** (nomor urut+deteksi bentrok, tautan guru↔mapel dgn tingkat, AJAX tanpa-reload) + **Wali Kelas** (autocomplete+autosave AJAX di halaman Kelas, sinkronisasi otomatis jabatan guru_kelas↔guru_bidang, guard tolak-ubah-jabatan) | Selesai & teruji end-to-end — CELAH yang didokumentasikan di modul Guru/Kelas sebelumnya kini TERTUTUP (kolom Wali Kelas terisi sungguhan). Termasuk `WaliKelasService` (port `WaliKelasModel.php`) dan tambahan cepat `KurikulumController.StoreMapel` (MataPelajaran belum punya CRUD sendiri). |
+| Halaman/Controller modul lain (Ekskul, Kepala Sekolah, Kurikulum lengkap - Alokasi JP/Jam Belajar, Jadwal Pelajaran, Kalender Akademik, Akademik/Kenaikan Kelas, Auth) | Belum dimulai — **Kepala Sekolah jadi kandidat prioritas berikutnya** (pola sangat mirip Wali Kelas, sudah ada skema+spec lengkap §6) |
 | Sinkronisasi Hub API (port dari SyncPush.php) | Belum dimulai |
 | Launcher (splash, start/stop server, WebView2, auto-update) | Kerangka XAML splash sudah ada (`MainWindow.xaml`); `MainWindow.xaml.cs` (logic start server + WebView2 + auto-update) belum dimulai |
 | CI GitHub Actions (build+release, pola Presensi) | Belum dimulai |
@@ -130,6 +131,34 @@ supaya tahu persis sudah sampai mana dan apa langkah berikutnya.
 - **Diuji end-to-end via HTTP nyata**: create, validasi No HP duplikat (scoped ke
   status_aktif=true, persis spec), arsip dgn alasan keluar (`status_keluar`), import upsert
   (1 baris baru + 1 baris koreksi gelar_terakhir saja, field lain tidak berubah).
+
+## Catatan modul Penugasan Mengajar (Guru Pengampu + Wali Kelas)
+
+- File: `Services/WaliKelasService.cs` (port `WaliKelasModel.php` - dipakai BERSAMA oleh
+  `GuruController` (baca status wali utk guard+tampilan) dan `KelasController`/
+  `PenugasanMengajarController` (baca+tulis assignment) - JANGAN duplikasi logic tetapkan/
+  tetapkanSemua di tempat lain, semua tulis WAJIB lewat service ini persis PHP asli yang
+  semua tulis lewat 1 model yang sama), `Controllers/PenugasanMengajarController.cs`,
+  `Models/PenugasanMengajar/PenugasanMengajarViewModels.cs`,
+  `Views/PenugasanMengajar/Index.cshtml`. UI Wali Kelas SENDIRI ada di
+  `Views/Kelas/Index.cshtml` (combobox multi-slot autosave), BUKAN di halaman Guru
+  Pengampu - persis arsitektur route PHP asli (endpoint di controller Penugasan Mengajar,
+  tapi UI-nya di halaman Kelas).
+- **MataPelajaran belum punya CRUD sendiri** (modul Kurikulum lengkap belum diporting) -
+  ditambahkan `KurikulumController.StoreMapel` (tambah cepat) supaya Guru Pengampu bisa
+  dipakai. Ini SEMENTARA - saat modul Kurikulum lengkap dibangun, method ini akan
+  digabung ke situ (jangan kaget menemukan `StoreMapel` "nyempil" di controller yang
+  namanya nyaris sama dgn method Tingkat).
+- **Diuji end-to-end via HTTP nyata, mencakup SEMUA invarian kritis**: autocomplete
+  cari-guru-kelas, assign wali kelas via AJAX (autosave tanpa reload), **sinkronisasi
+  otomatis jabatan guru_bidang→guru_kelas saat ditetapkan jadi wali**, **guard PENTING:
+  menolak ubah jabatan guru yang masih tercatat wali kelas** (pesan verbatim persis spec),
+  kosongkan wali kelas (jabatan kembali ke guru_bidang otomatis), tambah mata pelajaran,
+  tautkan guru↔mapel dgn nomor urut via AJAX, **deteksi bentrok nomor urut** (pesan
+  verbatim persis spec "Nomor 35 sudah dipakai oleh..."), hapus tautan mapel.
+- Tidak ada bug baru ditemukan di modul ini - kemungkinan besar krn `WaliKelasService`
+  ditulis SANGAT dekat dgn spec §11 (activeTahunAjaranId/getKelasByGuru/tetapkanSemua/
+  sinkronJabatanGuru dgn urutan operasi PERSIS sama).
 
 ## Prinsip wajib dipegang tiap sesi lanjutan
 

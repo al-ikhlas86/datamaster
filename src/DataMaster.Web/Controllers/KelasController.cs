@@ -3,23 +3,25 @@ using DataMaster.Data;
 using DataMaster.Data.Entities;
 using DataMaster.Web.Models.Kelas;
 using DataMaster.Web.Models.Siswa;
+using DataMaster.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataMaster.Web.Controllers;
 
 // Port 1:1 dari app/Controllers/Kelas.php - lihat 02-guru-kelas-struktur.md §7.
-// CATATAN LINGKUP: fitur penetapan Wali Kelas (assignWaliKelas, autocomplete guru)
-// BELUM diporting di sini - itu bagian dari modul PenugasanMengajar/Guru yang belum
-// dibangun (butuh data Guru dulu). Kolom "Wali Kelas" di UI untuk sementara kosong.
-// SEMUA fungsi lain (CRUD kelas, arsip, kelola siswa per kelas, cetak, Master
-// Tingkat) sudah lengkap 1:1 sesuai spec.
+// Penetapan Wali Kelas (assignWaliKelas, autocomplete guru) dilayani endpoint di
+// PenugasanMengajarController (persis arsitektur PHP asli - lihat §5.3), View Index
+// di sini hanya merender combobox-nya & memanggil endpoint tsb via JS.
 [Route("kelas")]
-public class KelasController(DataMasterDbContext db) : Controller
+public class KelasController(DataMasterDbContext db, WaliKelasService waliKelas) : Controller
 {
     [HttpGet("")]
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(int? tahun)
     {
+        var aktifId = await db.TahunAjaran.Where(t => t.IsActive).Select(t => t.TahunAjaranId).FirstOrDefaultAsync();
+        var taId = tahun ?? aktifId;
+
         var kelasList = await db.Kelas
             .Select(k => new
             {
@@ -46,6 +48,12 @@ public class KelasController(DataMasterDbContext db) : Controller
             .ThenBy(g => g.Kode)
             .ToList();
 
+        var waliPerKelas = taId > 0
+            ? (await waliKelas.GetSemuaDikelompokkanAsync(taId)).ToDictionary(kv => kv.Key, kv => kv.Value.Select(s => new WaliKelasSlot { GuruId = s.GuruId, Nama = s.Nama }).ToList())
+            : new Dictionary<int, List<WaliKelasSlot>>();
+
+        var tahunAjaranList = await db.TahunAjaran.OrderByDescending(t => t.Nama).Select(t => new { t.TahunAjaranId, t.Nama }).ToListAsync();
+
         var vm = new KelasIndexViewModel
         {
             PerTingkat = perTingkat,
@@ -54,6 +62,10 @@ public class KelasController(DataMasterDbContext db) : Controller
             SemuaTingkat = await db.Tingkat.OrderBy(t => t.Urutan).ThenBy(t => t.Kode)
                 .Select(t => new TingkatRow { TingkatId = t.TingkatId, Kode = t.Kode, Nama = t.Nama, Urutan = t.Urutan, IsActive = t.IsActive })
                 .ToListAsync(),
+            WaliPerKelas = waliPerKelas,
+            TahunAjaranId = taId,
+            TahunAjaranAktif = aktifId,
+            TahunAjaranList = tahunAjaranList.Select(x => (x.TahunAjaranId, x.Nama)).ToList(),
         };
         return View(vm);
     }

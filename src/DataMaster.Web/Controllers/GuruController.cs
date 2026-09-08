@@ -19,7 +19,7 @@ namespace DataMaster.Web.Controllers;
 // belum dibangun - jadi kolom ini akan selalu kosong sampai modul PenugasanMengajar
 // dibuat, TAPI logic baca & guard di sini sudah benar sejak sekarang (forward-compatible).
 [Route("guru")]
-public class GuruController(DataMasterDbContext db) : Controller
+public class GuruController(DataMasterDbContext db, WaliKelasService waliKelas) : Controller
 {
     private static readonly int[] AllowedPerPage = [50, 100, 150, 200];
     private static readonly string[] StatusKeluarValid = ["purna_bakti", "resign", "diberhentikan"];
@@ -34,8 +34,7 @@ public class GuruController(DataMasterDbContext db) : Controller
     {
         var taId = await GetTahunAktifIdAsync();
         if (taId is null) return null;
-        return await db.WaliKelas.Where(w => w.GuruId == guruId && w.TahunAjaranId == taId)
-            .Select(w => w.Kelas.NamaKelas).FirstOrDefaultAsync();
+        return (await waliKelas.GetKelasByGuruAsync(guruId, taId))?.NamaKelas;
     }
 
     // ---------------------------------------------------------------- Index

@@ -26,12 +26,22 @@ public class TingkatRow
     public bool IsActive { get; set; }
 }
 
+public class WaliKelasSlot
+{
+    public int GuruId { get; set; }
+    public required string Nama { get; set; }
+}
+
 public class KelasIndexViewModel
 {
     public List<TingkatGroup> PerTingkat { get; set; } = [];
     public int TotalKelas { get; set; }
     public int TotalSiswa { get; set; }
     public List<TingkatRow> SemuaTingkat { get; set; } = [];
+    public Dictionary<int, List<WaliKelasSlot>> WaliPerKelas { get; set; } = [];
+    public int TahunAjaranId { get; set; }
+    public int TahunAjaranAktif { get; set; }
+    public List<(int Id, string Nama)> TahunAjaranList { get; set; } = [];
 }
 
 public class KelasDetailViewModel

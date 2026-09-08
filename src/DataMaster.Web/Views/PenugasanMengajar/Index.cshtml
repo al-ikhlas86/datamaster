@@ -1,0 +1,209 @@
+@model DataMaster.Web.Models.PenugasanMengajar.PenugasanMengajarIndexViewModel
+@{
+    ViewData["Title"] = "Guru Pengampu";
+    string LabelJabatan(string j) => j == "guru_kelas" ? "Guru Kelas" : "Guru Bidang";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Guru Pengampu</h3>
+</div>
+
+<div class="accordion mb-3" id="accMapel">
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#panelMapel">Tambah Mata Pelajaran Baru</button>
+        </h2>
+        <div id="panelMapel" class="accordion-collapse collapse" data-bs-parent="#accMapel">
+            <div class="accordion-body">
+                <form asp-controller="Kurikulum" asp-action="StoreMapel" method="post" class="row g-2">
+                    <input type="hidden" name="kembali_ke" value="penugasan-mengajar" />
+                    <div class="col-md-2"><input type="text" name="kode" class="form-control" placeholder="Kode" maxlength="10" /></div>
+                    <div class="col-md-4"><input type="text" name="nama" class="form-control" placeholder="Nama Mata Pelajaran *" required /></div>
+                    <div class="col-md-3"><input type="text" name="kelompok" class="form-control" placeholder="Kelompok" /></div>
+                    <div class="col-md-3"><button type="submit" class="btn btn-primary w-100">Tambah</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (Model.MapelDropdown.Count == 0)
+{
+    <div class="alert alert-warning">Belum ada mata pelajaran. Tambahkan dulu lewat panel di atas.</div>
+}
+
+<div class="card">
+    <div class="card-body">
+        <table class="table table-hover align-middle">
+            <thead><tr><th style="width:5rem">Nomor</th><th>Nama</th><th>Mata Pelajaran</th><th style="width:8rem">Aksi</th></tr></thead>
+            <tbody>
+            @if (Model.GuruWithMapel.Count == 0)
+            {
+                <tr><td colspan="4" class="text-center text-muted py-4">Belum ada guru aktif (Guru Kelas/Guru Bidang).</td></tr>
+            }
+            else
+            {
+                foreach (var g in Model.GuruWithMapel)
+                {
+                    <tr id="guru-@g.GuruId" data-guru-id="@g.GuruId">
+                        <td>
+                            <span class="badge bg-secondary js-nomor-tampil" data-asli="@g.NomorUrut">@(g.NomorUrut?.ToString() ?? "-")</span>
+                            <input type="number" class="form-control form-control-sm js-nomor-input d-none" value="@g.NomorUrut" min="1" style="width:70px" />
+                        </td>
+                        <td>@g.Nama<div class="text-muted small">@LabelJabatan(g.Jabatan)</div></td>
+                        <td>
+                            <div class="js-mapel-list d-flex flex-wrap gap-1 mb-1">
+                                @foreach (var m in g.Mapel)
+                                {
+                                    <span class="badge bg-light text-dark border">
+                                        @m.Nama @(m.Tingkat is null ? "(Semua Tingkat)" : $"(Tingkat {m.Tingkat})")
+                                        <form asp-action="RemoveMapelGuru" asp-route-id="@m.GuruMataPelajaranId" method="post" class="d-inline form-hapus-mapel" data-nama="@m.Nama">
+                                            <button type="submit" class="btn btn-sm btn-link p-0 text-danger">&times;</button>
+                                        </form>
+                                    </span>
+                                }
+                            </div>
+                            <div class="js-mapel-baru-area d-none"></div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary js-btn-tambah-mapel d-none">+ Tambah mata pelajaran</button>
+                            <div class="js-baris-error text-danger small mt-1"></div>
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-outline-primary js-btn-edit">Edit</button>
+                            <button type="button" class="btn btn-sm btn-primary js-btn-simpan d-none">Simpan</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary js-btn-batal d-none">Batal</button>
+                        </td>
+                    </tr>
+                }
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<template id="tplMapelBaruRow">
+    <div class="input-group input-group-sm mb-1 js-mapel-baru-row">
+        <select class="form-select js-mapel-select">
+            <option value="">-- pilih mapel --</option>
+            @foreach (var m in Model.MapelDropdown)
+            {
+                <option value="@m.MataPelajaranId">@m.Nama</option>
+            }
+        </select>
+        <select class="form-select js-tingkat-select">
+            <option value="">Semua Tingkat</option>
+            @foreach (var t in Model.TingkatOptions)
+            {
+                <option value="@t.Kode">@t.Label</option>
+            }
+        </select>
+        <button type="button" class="btn btn-outline-danger js-hapus-baris-baru">&times;</button>
+    </div>
+</template>
+
+@section Scripts {
+    <script>
+        (function () {
+            var URL_UPDATE_BASE = @Html.Raw(Json.Serialize(Url.Content("~/penugasan-mengajar/guru/")));
+            var TOKEN = document.querySelector('input[name="__RequestVerificationToken"]').value;
+
+            document.querySelectorAll('.form-hapus-mapel').forEach(function (f) {
+                f.addEventListener('submit', function (e) {
+                    if (!confirm('Tautan ke ' + this.dataset.nama + ' akan dihapus.')) e.preventDefault();
+                });
+            });
+
+            document.querySelectorAll('tbody tr[data-guru-id]').forEach(function (row) {
+                var guruId = row.dataset.guruId;
+                var nomorTampil = row.querySelector('.js-nomor-tampil');
+                var nomorInput = row.querySelector('.js-nomor-input');
+                var mapelList = row.querySelector('.js-mapel-list');
+                var mapelBaruArea = row.querySelector('.js-mapel-baru-area');
+                var btnTambahMapel = row.querySelector('.js-btn-tambah-mapel');
+                var btnEdit = row.querySelector('.js-btn-edit');
+                var btnSimpan = row.querySelector('.js-btn-simpan');
+                var btnBatal = row.querySelector('.js-btn-batal');
+                var errBox = row.querySelector('.js-baris-error');
+                var tpl = document.getElementById('tplMapelBaruRow');
+
+                function setEditMode(on) {
+                    nomorTampil.classList.toggle('d-none', on);
+                    nomorInput.classList.toggle('d-none', !on);
+                    btnTambahMapel.classList.toggle('d-none', !on);
+                    btnEdit.classList.toggle('d-none', on);
+                    btnSimpan.classList.toggle('d-none', !on);
+                    btnBatal.classList.toggle('d-none', !on);
+                }
+
+                btnEdit.addEventListener('click', function () { setEditMode(true); });
+                btnBatal.addEventListener('click', function () {
+                    nomorInput.value = nomorTampil.dataset.asli || '';
+                    mapelBaruArea.innerHTML = '';
+                    mapelBaruArea.classList.add('d-none');
+                    errBox.textContent = '';
+                    setEditMode(false);
+                });
+
+                btnTambahMapel.addEventListener('click', function () {
+                    var node = tpl.content.cloneNode(true);
+                    mapelBaruArea.appendChild(node);
+                    mapelBaruArea.classList.remove('d-none');
+                    mapelBaruArea.querySelectorAll('.js-hapus-baris-baru').forEach(function (btn) {
+                        if (btn.dataset.bound) return;
+                        btn.dataset.bound = '1';
+                        btn.addEventListener('click', function () { this.closest('.js-mapel-baru-row').remove(); });
+                    });
+                });
+
+                function buatBadgeMapel(nama, tingkat, id) {
+                    var span = document.createElement('span');
+                    span.className = 'badge bg-light text-dark border';
+                    var labelTingkat = tingkat ? ('(Tingkat ' + tingkat + ')') : '(Semua Tingkat)';
+                    span.textContent = nama + ' ' + labelTingkat + ' ';
+                    var form = document.createElement('form');
+                    form.method = 'post';
+                    form.className = 'd-inline form-hapus-mapel';
+                    form.action = '@Url.Content("~/penugasan-mengajar/guru-mapel/")' + id + '/delete';
+                    form.setAttribute('data-nama', nama);
+                    form.innerHTML = '<input type="hidden" name="__RequestVerificationToken" value="' + TOKEN + '" /><button type="submit" class="btn btn-sm btn-link p-0 text-danger">&times;</button>';
+                    form.addEventListener('submit', function (e) { if (!confirm('Tautan ke ' + nama + ' akan dihapus.')) e.preventDefault(); });
+                    span.appendChild(form);
+                    return span;
+                }
+
+                btnSimpan.addEventListener('click', function () {
+                    var body = new URLSearchParams();
+                    body.append('__RequestVerificationToken', TOKEN);
+                    body.append('nomor_urut', nomorInput.value || '');
+                    var i = 0;
+                    mapelBaruArea.querySelectorAll('.js-mapel-baru-row').forEach(function (r) {
+                        var mapelId = r.querySelector('.js-mapel-select').value;
+                        if (!mapelId) return;
+                        body.append('mapel_baru[' + i + '].MataPelajaranId', mapelId);
+                        body.append('mapel_baru[' + i + '].Tingkat', r.querySelector('.js-tingkat-select').value);
+                        i++;
+                    });
+
+                    fetch(URL_UPDATE_BASE + guruId + '/update', {
+                        method: 'POST',
+                        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: body.toString(),
+                    }).then(function (r) { return r.json(); }).then(function (res) {
+                        if (res.nomorUrut !== null && res.nomorUrut !== undefined) {
+                            nomorTampil.textContent = res.nomorUrut;
+                            nomorTampil.dataset.asli = res.nomorUrut;
+                        }
+                        (res.mapelBaru || []).forEach(function (m) {
+                            mapelList.appendChild(buatBadgeMapel(m.nama, m.tingkat, m.id));
+                        });
+                        mapelBaruArea.innerHTML = '';
+                        mapelBaruArea.classList.add('d-none');
+                        errBox.textContent = (res.errors && res.errors.length > 0) ? res.errors.join(' ') : '';
+                        // TIDAK toggle keluar mode edit, TIDAK scroll - persis §5.4.
+                    }).catch(function () {
+                        errBox.textContent = 'Gagal menyimpan - periksa koneksi.';
+                    });
+                });
+            });
+        })();
+    </script>
+}

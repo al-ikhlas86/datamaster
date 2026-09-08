@@ -35,6 +35,7 @@ builder.Services.AddDbContext<DataMasterDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DataMaster")));
 builder.Services.AddScoped<DocumentStorageService>();
 builder.Services.AddScoped<PsbService>();
+builder.Services.AddScoped<WaliKelasService>();
 
 var app = builder.Build();
 
