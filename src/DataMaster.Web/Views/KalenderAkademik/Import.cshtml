@@ -1,0 +1,48 @@
+@{
+    ViewData["Title"] = "Import Kalender Akademik";
+    var taId = (int)ViewBag.TahunAjaranId;
+    var taNama = (string)ViewBag.TahunAjaranNama;
+}
+
+<h3 class="mb-3">Import Kalender Akademik</h3>
+<p class="text-muted">Import untuk tahun ajaran: <strong>@taNama</strong></p>
+
+@* Catatan: PHP asli punya teks instruksi yang BASI di halaman ini (menyebut "urutan
+   kolom wajib" & format YYYY-MM-DD saja) padahal controller-nya sudah mendukung
+   format tanggal gaya Indonesia yang jauh lebih fleksibel - lihat 03-akademik-jadwal.md
+   §6 (ketidaksesuaian dokumentasi). Di sini kita tampilkan instruksi yang BENAR
+   (sesuai perilaku controller sesungguhnya), bukan replikasi teks basi itu. *@
+<div class="alert alert-info">
+    <ul class="mb-0">
+        <li>Kolom "Tanggal" boleh ditulis seperti di kalender sekolah: "10 Juli 2026", "13-17 Juli 2026", "25 Mar-03 April 2027", "21 Des - 02 Jan 2027" (lintas tahun otomatis), "18 & 25 Juli 2026" (dua acara terpisah), atau format lama "2026-07-13".</li>
+        <li>Kolom "Tanggal Selesai" boleh dikosongkan - isi hanya kalau memakai format lama 2 kolom.</li>
+        <li>Kolom "Libur" isi "ya" jika hari itu tidak ada kegiatan belajar, selain itu "tidak".</li>
+        <li>Tanggal yang tidak dikenali/ambigu, atau di luar rentang wajar tahun ajaran ini, akan dilewati dan dilaporkan - bukan ditebak.</li>
+        <li>Import bersifat menambah, bukan mengganti. Agenda lama tidak terhapus, dan baris yang sudah pernah masuk tidak akan terduplikat.</li>
+    </ul>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-5">
+        <div class="card"><div class="card-body text-center">
+            <p>Download template Excel untuk memudahkan input kalender akademik</p>
+            <a asp-action="DownloadTemplate" class="btn btn-success btn-lg">Download Template XLSX</a>
+        </div></div>
+    </div>
+    <div class="col-md-7">
+        <div class="card"><div class="card-body">
+            <form asp-action="ProcessImport" method="post" enctype="multipart/form-data">
+                <input type="hidden" name="tahun_ajaran_id" value="@taId" />
+                <div class="mb-3">
+                    <label class="form-label">Pilih File Excel *</label>
+                    <input type="file" name="file" class="form-control" accept=".xlsx,.xls" required />
+                    <div class="form-text">Format file: .xlsx atau .xls (Max: 5MB)</div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-lg">Import Sekarang</button>
+                    <a asp-action="Index" asp-route-tahun="@taId" class="btn btn-outline-secondary btn-lg">Batal</a>
+                </div>
+            </form>
+        </div></div>
+    </div>
+</div>

@@ -1,0 +1,246 @@
+@using System.Text.Json
+@model DataMaster.Web.Models.KalenderAkademik.KalenderIndexViewModel
+@{
+    ViewData["Title"] = "Kalender Akademik";
+    var jsonAgenda = JsonSerializer.Serialize(Model.Agenda.Select(a => new
+    {
+        id = a.KalenderAkademikId,
+        judul = a.Judul,
+        kategori = a.Kategori,
+        warna = a.Warna ?? "#0d6efd",
+        mulai = a.TanggalMulai.ToString("yyyy-MM-dd"),
+        selesai = a.TanggalSelesai?.ToString("yyyy-MM-dd"),
+        waktu = a.Waktu,
+        sasaran = a.Sasaran,
+        libur = a.IsLibur,
+        keterangan = a.Keterangan,
+    }));
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Kalender Akademik</h3>
+    <a asp-action="Import" asp-route-tahun="@Model.TahunAjaranId" class="btn btn-outline-secondary">Import Excel</a>
+</div>
+
+<div class="mb-3" style="max-width:320px">
+    <select class="form-select" onchange="window.location.href='@Url.Action("Index")?tahun='+this.value">
+        @foreach (var (id, nama) in Model.TahunAjaranList)
+        {
+            if (id == Model.TahunAjaranId) { <option value="@id" selected>@nama</option> }
+            else { <option value="@id">@nama</option> }
+        }
+    </select>
+</div>
+
+@if (TempData["import_errors"] is string errJson)
+{
+    <div class="alert alert-warning">
+        <strong>Baris yang dilewati:</strong>
+        <ul class="mb-0">
+            @foreach (var e in JsonSerializer.Deserialize<List<string>>(errJson) ?? [])
+            {
+                <li>@e</li>
+            }
+        </ul>
+    </div>
+}
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnBulanSebelum">&lsaquo;</button>
+                <strong id="labelBulan"></strong>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnBulanBerikut">&rsaquo;</button>
+            </div>
+            <div class="card-body">
+                <div id="kalenderGrid" class="d-grid" style="grid-template-columns:repeat(7,1fr);gap:2px;"></div>
+                <div id="detailTanggal" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-header"><strong>Tambah Agenda</strong></div>
+            <div class="card-body">
+                <form asp-action="Store" method="post">
+                    <input type="hidden" name="tahun_ajaran_id" value="@Model.TahunAjaranId" />
+                    <div class="mb-2"><label class="form-label small">Nama Kegiatan *</label><input type="text" name="judul" class="form-control form-control-sm" required /></div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6"><label class="form-label small">Mulai *</label><input type="date" name="tanggal_mulai" class="form-control form-control-sm" required /></div>
+                        <div class="col-6"><label class="form-label small">Selesai</label><input type="date" name="tanggal_selesai" class="form-control form-control-sm" /></div>
+                    </div>
+                    <div class="mb-2"><label class="form-label small">Kategori</label><input type="text" name="kategori" class="form-control form-control-sm" list="kategoriList" id="inputKategori" /></div>
+                    <datalist id="kategoriList">
+                        @foreach (var k in Model.KategoriList) { <option value="@k"></option> }
+                    </datalist>
+                    <div class="mb-2"><label class="form-label small">Warna</label><input type="color" name="warna" class="form-control form-control-sm form-control-color" id="inputWarna" value="#198754" /></div>
+                    <div class="mb-2"><label class="form-label small">Waktu</label><input type="text" name="waktu" class="form-control form-control-sm" placeholder="08.00 - 11.00" /></div>
+                    <div class="mb-2"><label class="form-label small">Sasaran</label><input type="text" name="sasaran" class="form-control form-control-sm" placeholder="Kelas 1-6" /></div>
+                    <div class="mb-2"><label class="form-label small">Keterangan</label><textarea name="keterangan" class="form-control form-control-sm" rows="2"></textarea></div>
+                    <div class="form-check mb-2">
+                        <input type="checkbox" name="is_libur" value="true" class="form-check-input" id="chkLibur" />
+                        <label class="form-check-label" for="chkLibur">Hari libur (tidak ada kegiatan belajar)</label>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Tambah Agenda</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@{
+    var warnaSaranJson = JsonSerializer.Serialize(Model.WarnaSaran);
+}
+
+<h5 class="mt-4">Daftar Agenda &amp; Libur</h5>
+<div class="d-flex gap-2 mb-2">
+    <button type="button" class="btn btn-sm btn-outline-secondary" id="btnBukaSemua">Buka Semua</button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" id="btnTutupSemua">Tutup Semua</button>
+</div>
+
+@if (Model.Agenda.Count == 0)
+{
+    <div class="alert alert-secondary">Belum ada agenda. Tambahkan lewat form di samping, atau import dari Excel.</div>
+}
+else
+{
+    var perBulan = Model.Agenda.GroupBy(a => new { a.TanggalMulai.Year, a.TanggalMulai.Month }).OrderBy(g => g.Key.Year).ThenBy(g => g.Key.Month);
+    var idx = 0;
+    foreach (var grup in perBulan)
+    {
+        idx++;
+        var namaBulan = new DateOnly(grup.Key.Year, grup.Key.Month, 1).ToString("MMMM yyyy");
+        <div class="accordion mb-2 js-bulan-accordion" id="accBulan@(idx)">
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#panelBulan@(idx)">@namaBulan (@grup.Count())</button>
+                </h2>
+                <div id="panelBulan@(idx)" class="accordion-collapse collapse" data-bs-parent="#accBulan@(idx)">
+                    <div class="accordion-body p-0">
+                        <table class="table table-sm mb-0">
+                            <thead><tr><th>Tanggal</th><th>Kegiatan</th><th>Kategori</th><th>Sasaran</th><th>Aksi</th></tr></thead>
+                            <tbody>
+                            @foreach (var a in grup.OrderBy(a => a.TanggalMulai))
+                            {
+                                <tr>
+                                    <td>@a.TanggalMulai.ToString("dd MMM yyyy")@(a.TanggalSelesai is not null ? $" s/d {a.TanggalSelesai:dd MMM yyyy}" : "")</td>
+                                    <td>
+                                        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:@(a.Warna ?? "#6c757d")"></span>
+                                        @a.Judul
+                                        @if (a.IsLibur) { <span class="badge bg-danger ms-1">Libur</span> }
+                                        @if (!string.IsNullOrEmpty(a.Waktu)) { <span class="text-muted small"> &middot; @a.Waktu</span> }
+                                        @if (!string.IsNullOrEmpty(a.Keterangan)) { <div class="fst-italic text-muted small">@a.Keterangan</div> }
+                                    </td>
+                                    <td>@(a.Kategori ?? "-")</td>
+                                    <td>@(a.Sasaran ?? "-")</td>
+                                    <td>
+                                        <form asp-action="Delete" asp-route-id="@a.KalenderAkademikId" asp-route-tahun_ajaran_id="@Model.TahunAjaranId" method="post" class="js-form-hapus-agenda" data-judul="@a.Judul">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">Hapus</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@section Scripts {
+    <script>
+        var AGENDA = @Html.Raw(jsonAgenda);
+        var WARNA_SARAN = @Html.Raw(warnaSaranJson);
+
+        document.querySelectorAll('.js-form-hapus-agenda').forEach(function (f) {
+            f.addEventListener('submit', function (e) {
+                if (!confirm('Agenda \'' + this.dataset.judul + '\' akan dihapus.')) e.preventDefault();
+            });
+        });
+
+        document.getElementById('inputKategori').addEventListener('input', function () {
+            var warna = WARNA_SARAN[this.value];
+            if (warna) document.getElementById('inputWarna').value = warna;
+        });
+
+        document.getElementById('btnBukaSemua').addEventListener('click', function () {
+            document.querySelectorAll('.accordion-collapse').forEach(function (el) { new bootstrap.Collapse(el, { toggle: false }).show(); });
+        });
+        document.getElementById('btnTutupSemua').addEventListener('click', function () {
+            document.querySelectorAll('.accordion-collapse').forEach(function (el) { new bootstrap.Collapse(el, { toggle: false }).hide(); });
+        });
+
+        (function () {
+            var today = new Date();
+            var current = new Date(today.getFullYear(), today.getMonth(), 1);
+
+            // Pindah ke bulan agenda terdekat kalau hari ini tidak ada agenda.
+            var adaHariIni = AGENDA.some(function (a) {
+                var m = a.mulai, s = a.selesai || a.mulai;
+                var todayStr = today.toISOString().slice(0, 10);
+                return todayStr >= m && todayStr <= s;
+            });
+            if (!adaHariIni && AGENDA.length > 0) {
+                var sorted = AGENDA.slice().sort(function (a, b) { return a.mulai.localeCompare(b.mulai); });
+                var todayStr = today.toISOString().slice(0, 10);
+                var terdekat = sorted.find(function (a) { return a.mulai >= todayStr; }) || sorted[sorted.length - 1];
+                var d = new Date(terdekat.mulai);
+                current = new Date(d.getFullYear(), d.getMonth(), 1);
+            }
+
+            var namaBulan = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+            var namaHari = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
+
+            function render() {
+                document.getElementById('labelBulan').textContent = namaBulan[current.getMonth()] + ' ' + current.getFullYear();
+                var grid = document.getElementById('kalenderGrid');
+                grid.innerHTML = '';
+                namaHari.forEach(function (h) {
+                    var el = document.createElement('div');
+                    el.className = 'text-center small text-muted fw-semibold';
+                    el.textContent = h;
+                    grid.appendChild(el);
+                });
+                var firstDay = new Date(current.getFullYear(), current.getMonth(), 1);
+                var startOffset = firstDay.getDay();
+                var daysInMonth = new Date(current.getFullYear(), current.getMonth() + 1, 0).getDate();
+                var todayStr = today.toISOString().slice(0, 10);
+
+                for (var i = 0; i < startOffset; i++) {
+                    var empty = document.createElement('div');
+                    grid.appendChild(empty);
+                }
+                for (var d = 1; d <= daysInMonth; d++) {
+                    var dateStr = current.getFullYear() + '-' + String(current.getMonth() + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+                    var matches = AGENDA.filter(function (a) { return dateStr >= a.mulai && dateStr <= (a.selesai || a.mulai); });
+                    var isLibur = matches.some(function (a) { return a.libur; });
+                    var cell = document.createElement('div');
+                    cell.className = 'text-center small py-1 rounded';
+                    cell.style.cursor = matches.length ? 'pointer' : 'default';
+                    cell.textContent = d;
+                    if (dateStr === todayStr) cell.style.border = '2px solid #0d6efd';
+                    if (isLibur) { cell.classList.add('bg-danger-subtle', 'text-danger', 'fw-bold'); }
+                    else if (matches.length) { cell.classList.add('bg-primary-subtle', 'text-primary', 'fw-semibold'); }
+                    (function (dateStr, matches) {
+                        cell.addEventListener('click', function () {
+                            var detail = document.getElementById('detailTanggal');
+                            if (matches.length === 0) { detail.innerHTML = ''; return; }
+                            detail.innerHTML = '<strong>' + dateStr + '</strong><ul class="mb-0">' + matches.map(function (a) {
+                                return '<li>' + a.judul + (a.libur ? ' <span class="badge bg-danger">Libur</span>' : '') + (a.waktu ? ' &middot; ' + a.waktu : '') + '</li>';
+                            }).join('') + '</ul>';
+                        });
+                    })(dateStr, matches);
+                    grid.appendChild(cell);
+                }
+            }
+
+            document.getElementById('btnBulanSebelum').addEventListener('click', function () { current.setMonth(current.getMonth() - 1); render(); });
+            document.getElementById('btnBulanBerikut').addEventListener('click', function () { current.setMonth(current.getMonth() + 1); render(); });
+            render();
+        })();
+    </script>
+}

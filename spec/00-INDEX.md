@@ -26,7 +26,8 @@ supaya tahu persis sudah sampai mana dan apa langkah berikutnya.
 | Halaman/Controller: **Penugasan Mengajar "Guru Pengampu"** (nomor urut+deteksi bentrok, tautan guru↔mapel dgn tingkat, AJAX tanpa-reload) + **Wali Kelas** (autocomplete+autosave AJAX di halaman Kelas, sinkronisasi otomatis jabatan guru_kelas↔guru_bidang, guard tolak-ubah-jabatan) | Selesai & teruji end-to-end — CELAH yang didokumentasikan di modul Guru/Kelas sebelumnya kini TERTUTUP (kolom Wali Kelas terisi sungguhan). Termasuk `WaliKelasService` (port `WaliKelasModel.php`) dan tambahan cepat `KurikulumController.StoreMapel` (MataPelajaran belum punya CRUD sendiri). |
 | Halaman/Controller: **Kepala Sekolah** (autocomplete tanpa filter eksklusif, tetapkan/kosongkan per-tahun-ajaran, reload penuh setelah AJAX - beda sengaja dari Wali Kelas/Guru Pengampu) | Selesai & teruji end-to-end. |
 | Halaman/Controller: **Ekskul** (CRUD, arsip, kelola peserta) | Selesai & teruji end-to-end. **Modul "Guru, Kelas, Struktur" (spec 02) kini 100% SELESAI dibangun.** |
-| Halaman/Controller modul lain (Kurikulum lengkap - Mata Pelajaran/Alokasi JP/Jam Belajar, Jadwal Pelajaran, Kalender Akademik, Akademik/Kenaikan Kelas, Auth/Manajemen Pengguna, Dashboard) | Belum dimulai — spec 03 (Akademik/Jadwal) dan sebagian besar spec 04 (Infra/Auth) tersisa. **Kalender Akademik jadi kandidat berikutnya** (independen, parser tanggal Indonesia sudah ada di `IndonesianDateService`). |
+| Halaman/Controller: **Kalender Akademik** (CRUD, kalender visual, import Excel dgn parser tanggal Indonesia fleksibel, validasi anti-salah-tahun) | Selesai & teruji end-to-end, TERMASUK uji regresi bug historis "strtotime salah tahun" (§7) — "7 Juni 2027" terverifikasi ke-parse sebagai 2027, bukan mundur ke 2026. |
+| Halaman/Controller modul lain (Kurikulum lengkap - Mata Pelajaran CRUD penuh/Alokasi JP/Jam Belajar, Jadwal Pelajaran, Akademik/Kenaikan Kelas, Auth/Manajemen Pengguna, Dashboard) | Belum dimulai. **Akademik (Kenaikan Kelas/Kelulusan/Arsip/Rekap Lulusan) jadi kandidat berikutnya** (independen, tidak perlu Jadwal Pelajaran). Jadwal Pelajaran sebaiknya PALING TERAKHIR dari spec 03 karena kompleksitas tertinggi (grid kode "35K", cek bentrok guru, import kolom dinamis). |
 | Sinkronisasi Hub API (port dari SyncPush.php) | Belum dimulai |
 | Launcher (splash, start/stop server, WebView2, auto-update) | Kerangka XAML splash sudah ada (`MainWindow.xaml`); `MainWindow.xaml.cs` (logic start server + WebView2 + auto-update) belum dimulai |
 | CI GitHub Actions (build+release, pola Presensi) | Belum dimulai |
@@ -197,6 +198,36 @@ supaya tahu persis sudah sampai mana dan apa langkah berikutnya.
 
 **Modul "Guru, Kelas, Tahun Ajaran, Penugasan Mengajar, Kepala Sekolah, Ekskul"
 (spec 02) kini 100% SELESAI dibangun dan teruji end-to-end.**
+
+## Catatan modul Kalender Akademik
+
+- File: `Controllers/KalenderAkademikController.cs`,
+  `Models/KalenderAkademik/KalenderAkademikViewModels.cs`,
+  `Views/KalenderAkademik/*.cshtml`. Memakai `IndonesianDateService` yang SUDAH ADA
+  dari modul Siswa (`ParseIndonesianDate`/`ParseIndonesianDateRange`) - TIDAK menulis
+  ulang parser tanggal, cukup panggil service yang sama.
+- **`RentangWajarAsync()`** (private di controller, port `rentangWajar()` PHP) adalah
+  INTI fitur anti-salah-tahun - divalidasi di SEMUA jalur tulis (Store, Update, tiap
+  periode hasil ProcessImport). Nama TA harus format persis "YYYY/YYYY" atau validasi
+  DILEWATI (null) - APA ADANYA dari PHP asli.
+- **Keputusan desain eksplisit didokumentasikan**: `Views/KalenderAkademik/Import.cshtml`
+  SENGAJA TIDAK meniru teks instruksi PHP asli yang basi/tidak sesuai perilaku
+  sesungguhnya (lihat 03-akademik-jadwal.md §6 "KETIDAKSESUAIAN DOKUMENTASI") -
+  di sini ditulis instruksi yang benar-benar mencerminkan parser fleksibel yang
+  diimplementasikan, sesuai rekomendasi eksplisit spec ("ikuti PERILAKU SESUNGGUHNYA,
+  bukan teks halaman import lama").
+- Kalender visual (grid bulan, klik tanggal→detail, badge libur/kegiatan, auto-pindah
+  ke bulan agenda terdekat) diimplementasikan fungsional lengkap via JS vanilla dari
+  data JSON yang di-embed di halaman (bukan AJAX per bulan, sama seperti PHP asli).
+- **Diuji end-to-end via HTTP nyata, TERMASUK uji regresi bug historis**: tambah
+  agenda dalam rentang wajar (diterima), tambah agenda di luar rentang wajar/salah
+  tahun (DITOLAK dgn pesan verbatim), import Excel dgn 5 format tanggal Indonesia
+  berbeda (rentang 1 bulan, "&" dua tanggal terpisah, tanggal tunggal, DAN yang
+  PALING PENTING: **"7 Juni 2027" diverifikasi ke-parse sebagai tahun 2027** - bug
+  historis PHP asli `strtotime()` yang membuatnya salah baca jadi 2026 TIDAK terulang
+  di implementasi C# ini), serta 1 baris ambigu ("Okt/Nov 2026") yang benar-benar
+  DITOLAK bukan ditebak.
+- Tidak ada bug baru ditemukan di modul ini.
 
 ## Prinsip wajib dipegang tiap sesi lanjutan
 
