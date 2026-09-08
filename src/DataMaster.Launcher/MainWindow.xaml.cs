@@ -20,6 +20,7 @@ public partial class MainWindow : Window
         Loaded += MainWindow_Loaded;
         Closing += MainWindow_Closing;
         _server.ServerExitedUnexpectedly += Server_ExitedUnexpectedly;
+        _updateChecker.StatusChanged += UpdateChecker_StatusChanged;
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -30,7 +31,10 @@ public partial class MainWindow : Window
     private async Task InisialisasiAsync()
     {
         SetSplash("Memeriksa pembaruan...");
-        _ = CekPembaruanLatarBelakangAsync(); // tidak memblokir start server
+        // Tidak memblokir start server - kalau ADA pembaruan, UpdateChecker
+        // sendiri yang akan mematikan _server & menutup aplikasi lewat
+        // StatusChanged/ApplyAndRestart (lihat UpdateChecker_StatusChanged).
+        _ = _updateChecker.CheckAndApplyAsync(_server, CancellationToken.None);
 
         SetSplash("Menyiapkan server lokal...");
         var envDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DataMaster", "webview2-data");
@@ -56,26 +60,23 @@ public partial class MainWindow : Window
         };
     }
 
-    private async Task CekPembaruanLatarBelakangAsync()
+    // Dipanggil UpdateChecker saat status unduh/pasang berubah - null berarti
+    // "sembunyikan lagi" (gagal/dibatalkan). Splash overlay dipaksa tampil lagi
+    // supaya pesan "JANGAN TUTUP APLIKASI" terlihat meski browser sudah kadung
+    // tampil - pelajaran nyata dari Presensi (lihat komentar UpdateChecker.cs).
+    private void UpdateChecker_StatusChanged(string? status)
     {
-        var info = await _updateChecker.CekAsync(CancellationToken.None);
-        if (info.AdaPembaruan)
+        Dispatcher.Invoke(() =>
         {
-            Dispatcher.Invoke(() =>
+            if (status is null)
             {
-                // Notifikasi ringan, TIDAK memblokir - unduh+pasang otomatis belum
-                // diimplementasikan (lihat catatan di UpdateChecker.cs). Klik buka
-                // halaman rilis GitHub di browser default utk unduh manual.
-                var hasil = MessageBox.Show(this,
-                    $"Versi baru Data Master tersedia ({info.VersiTerbaru}, versi terpasang saat ini {info.VersiTerpasang}).\n\nBuka halaman unduhan sekarang?",
-                    "Pembaruan Tersedia", MessageBoxButton.YesNo, MessageBoxImage.Information);
-                if (hasil == MessageBoxResult.Yes && info.UrlRilis is not null)
-                {
-                    try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(info.UrlRilis) { UseShellExecute = true }); }
-                    catch { /* biarkan - bukan operasi kritis */ }
-                }
-            });
-        }
+                if (Browser.Visibility == Visibility.Visible) SplashOverlay.Visibility = Visibility.Collapsed;
+                return;
+            }
+            Browser.Visibility = Visibility.Collapsed;
+            SplashOverlay.Visibility = Visibility.Visible;
+            SplashStatus.Text = status;
+        });
     }
 
     private void Server_ExitedUnexpectedly()

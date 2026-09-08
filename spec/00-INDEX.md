@@ -32,8 +32,8 @@ supaya tahu persis sudah sampai mana dan apa langkah berikutnya.
 | Halaman/Controller: **Jadwal Pelajaran** (grid per-kelas kode "35K", parser `bacaKode()`, deteksi bentrok guru lintas kelas, salin TA sama/beda, Piket replace-all, Cetak semua kelas, Per Guru+beban, import Excel dgn pencocokan kolom dinamis+prioritas kolom-tak-dikenal) | Selesai & teruji end-to-end. **Spec 03 (Kurikulum, Jadwal Pelajaran, Kalender Akademik, Akademik) kini 100% SELESAI dibangun.** |
 | Halaman/Controller: **Auth (Login/Setup Awal/Logout, cookie auth, RBAC role admin, rate-limit login bertahap) + Dashboard (Pendidikan+Perusahaan, panel Langkah Persiapan Awal) + Setting (profil+password+backup manual+jadwal backup+restore) + DevPreview** | Selesai & teruji end-to-end. **LINGKUP DIPERSEMPIT SENGAJA (didokumentasikan)**: fitur "Lupa Password via email" TIDAK diporting (PHP asli sendiri kemungkinan besar tidak fungsional tanpa SMTP - lihat 04-infra-auth-sync.md §6/§21); `allowRegistration=false` PHP diganti "Setup Awal" 1x saat tabel Users kosong (CLI `spark auth:create_user` tidak masuk akal utk distribusi desktop end-user - lihat catatan modul di bawah); cakupan `role:admin` PHP yang SPOTTY (cuma sebagian controller di `Filters.php`) diganti proteksi KONSISTEN: SEMUA controller wajib login (global filter), controller yang PHP asli tandai `role:admin` (Siswa/CalonSiswa/Guru/Kelas/TahunAjaran/Akademik/User) tetap `[Authorize(Roles="admin")]` - superset lebih aman, bukan replikasi celah. Sinkronisasi Hub API (SyncPush) & BackupCloud (upload terenkripsi ke awan) BELUM diporting - lihat baris terpisah di bawah. |
 | Halaman/Controller: **Sinkronisasi Hub API** (`HubApiSyncService` - port `SyncPush.php`, 11 entitas push + pull keputusan PSB, fingerprint hemat-jaringan, full-snapshot vs non-full) **+ Backup Awan terenkripsi** (`BackupCloudHostedService` - port `BackupCloud.php`, AES-256-CBC+PBKDF2, antrian+rotasi+upload) | Selesai & **diuji end-to-end terhadap instance hub-api LOKAL SUNGGUHAN** (`C:\xampp\htdocs\hub-api`, MySQL asli, bukan mock) - lihat catatan modul di bawah untuk rincian & 1 bug nyata ditemukan+diperbaiki. |
-| Launcher (splash, start/stop server sbg proses anak, WebView2, restart-otomatis-setelah-restore, cek pembaruan) | Selesai & **diuji end-to-end sungguhan** (proses nyata di-start/di-stop, bukan cuma baca kode) - lihat catatan modul di bawah untuk rincian & 1 bug nyata ditemukan+diperbaiki. **LINGKUP DIPERSEMPIT SENGAJA**: unduh+pasang pembaruan OTOMATIS belum diimplementasikan (baru cek+notifikasi+tautan manual) - bergantung pipeline CI/CD yang belum ada, lihat baris di bawah. |
-| CI GitHub Actions (build+release, pola Presensi) | Belum dimulai |
+| Launcher (splash, start/stop server sbg proses anak, WebView2, restart-otomatis-setelah-restore, **auto-update penuh: cek+unduh+pasang+restart via GitHub Release API**) | Selesai & **diuji end-to-end sungguhan** (proses nyata di-start/di-stop, publish self-contained win-x64 SUNGGUHAN dijalankan & di-shutdown bersih, bukan cuma baca kode) - lihat catatan modul di bawah untuk rincian, adaptasi dari pola proyek saudara Presensi yang sudah terbukti di lapangan, dan 2 bug nyata ditemukan+diperbaiki. |
+| CI GitHub Actions (`.github/workflows/build.yml`, pola Presensi: tag `v*` → publish 2 proyek win-x64 self-contained digabung 1 folder → zip → GitHub Release, workflow_dispatch utk build uji manual, cleanup run lama) | Selesai (belum pernah dijalankan sungguhan di GitHub - push tag pertama akan jadi uji coba nyata pertama, SENGAJA tidak dipicu sesi ini krn memakai kuota Actions storage bersama & menerbitkan Release permanen, keputusan yang butuh persetujuan eksplisit). Publish lokal 2 proyek + smoke-test hasil publish SUDAH diverifikasi sungguhan (lihat catatan modul Launcher). |
 | Uji coba sbg PC TU TK (token Hub API baru, unit_id=2) | Belum dimulai |
 
 ## Catatan modul Siswa (contoh pola yang WAJIB diikuti modul-modul berikutnya)
@@ -575,16 +575,33 @@ SELESAI dibangun dan teruji end-to-end.**
   baru) - transparan bagi pengguna, tidak perlu menutup-buka aplikasi manual.
   Dibedakan dari "user menutup window sendiri" via flag `_intentionalStop`/
   `_closingIntentionally` supaya tidak salah restart setelah ditutup betulan.
-- **Auto-update LINGKUP DIPERSEMPIT SENGAJA (didokumentasikan)**: `UpdateChecker`
-  HANYA membandingkan versi terpasang (dari `AssemblyVersion`) terhadap tag rilis
-  GitHub terbaru (`api.github.com/repos/.../releases/latest`) dan menawarkan
-  tautan manual ke halaman rilis - TIDAK mengunduh+memasang otomatis. Alasan:
-  unduh+pasang otomatis butuh pipeline CI/CD yang menerbitkan aset rilis
-  terstruktur (belum dibangun - lihat baris CI GitHub Actions di tabel status),
-  DAN pola "update.lock dgn stale-timeout" PHP (§12, bug nyata 2026-09-02 - lock
-  tanpa batas waktu bikin sistem macet total kalau proses update terhenti
-  ditengah) WAJIB direplikasi persis begitu bagian unduh+pasang dikerjakan -
-  belum relevan sebelum ada yang benar2 diunduh+dipasang.
+- **Auto-update PENUH (cek+unduh+pasang+restart)** - `UpdateChecker.cs` adalah
+  ADAPTASI LANGSUNG dari `D:\Presensi\src\Presensi\Services\UpdateService.cs`
+  (proyek saudara, pola SUDAH TERBUKTI jalan di lapangan di PC sekolah
+  sungguhan) - BUKAN ditulis dari nol: cek versi terpasang vs tag rilis GitHub
+  terbaru lewat REST API (repo `datamaster-desktop` PRIVAT - URL publik
+  `releases/latest/download/...` TERBUKTI SELALU 404 tanpa kredensial utk repo
+  privat, dibuktikan Presensi 2026-09-01 bukan asumsi), token disimpan di
+  `LauncherConfig`/`appsettings.json` SEBELAH .exe (BUKAN ditanam di kode -
+  fine-grained PAT scope "Contents: Read-only" khusus repo ini, kosong = cek
+  dilewati diam2), unduh asset via endpoint API khusus (`Accept:
+  application/octet-stream`, BUKAN URL unduh generik), ekstrak ke folder
+  SEMENTARA (aman dilakukan SAAT APP MASIH JALAN, tidak menyentuh file terkunci),
+  lalu skrip `.bat` helper menunggu PID Launcher benar2 keluar (loop `tasklist`)
+  sebelum `xcopy` menimpa folder instalasi & menyalakan ulang exe.
+  **Penyesuaian dari pola Presensi** (yang cuma py 1 proses/1 exe): SEBELUM
+  memicu shutdown, `server.StopIntentionally()` dipanggil dulu utk mematikan
+  proses ANAK `DataMaster.Web` (yang filenya di `web/` ikut ditimpa xcopy) -
+  tanpa ini file DLL proses anak masih terkunci saat xcopy jalan.
+  **Pola "update.lock dgn stale-timeout" PHP (§12) SENGAJA TIDAK direplikasi
+  literal** - loop `tasklist` menunggu PID adalah mekanisme YANG LEBIH BAIK
+  utk masalah yang sama (tidak ada ambiguitas "basi setelah berapa lama": kalau
+  PID sudah tidak ada, memang sudah tidak ada, titik, tidak perlu heuristik
+  timeout sama sekali) - dicatat di sini sbg keputusan desain, bukan celah.
+  Status "JANGAN TUTUP APLIKASI" ditampilkan di splash overlay (dipaksa tampil
+  lagi meski browser sudah kadung terlihat) - pelajaran NYATA dari Presensi:
+  unduhan besar tanpa tanda visual apa pun bikin user mengira "tidak terjadi
+  apa-apa" lalu menutup app di tengah unduhan, unduhan hangus percuma.
 - **1 bug nyata ditemukan & diperbaiki SAAT uji restart end-to-end** (bukan cuma
   baca kode - Launcher benar2 dijalankan sbg proses Windows sungguhan, restore
   dipicu via HTTP nyata, restart diverifikasi via proses+port+HTTP nyata):
@@ -622,12 +639,27 @@ SELESAI dibangun dan teruji end-to-end.**
   restore utuh selamat lewat siklus restart), dan penutupan window (`CloseMainWindow()`
   via WM_CLOSE asli, bukan `Stop-Process -Force`) dikonfirmasi mematikan KEDUA
   proses (Launcher + child web) bersih tanpa proses menggantung (`Get-Process`
-  kosong setelahnya).
+  kosong setelahnya). **CI/CD (`.github/workflows/build.yml`, pola Presensi)
+  diuji SEBAGIAN sungguhan**: kedua perintah `dotnet publish` (Launcher +
+  DataMaster.Web self-contained win-x64) dijalankan LOKAL persis argumen yang
+  sama dgn workflow, hasil publish diverifikasi strukturnya cocok 100% dgn
+  yang dicari `ServerProcessManager.LocateServerExecutable()`
+  (`DataMaster.Launcher.exe` di root + `web/DataMaster.Web.exe`), DAN exe hasil
+  publish SUNGGUHAN itu (bukan hasil `dotnet run` dev) dijalankan nyata -
+  `/healthz` merespons, proses anak bernama asli `DataMaster.Web.exe` (bukan
+  generic `dotnet.exe` spt mode dev) ter-spawn benar, shutdown bersih. **Yang
+  BELUM diuji**: workflow GitHub Actions itu sendiri belum pernah benar2
+  dijalankan di GitHub (push tag pertama akan jadi uji coba nyata pertama) -
+  SENGAJA tidak dipicu sesi ini krn push tag akan memakai kuota Actions storage
+  bersama akun & menerbitkan GitHub Release PERMANEN, keputusan yang
+  berdampak/terlihat di luar sesi kerja ini dan butuh persetujuan eksplisit
+  user dulu, bukan sesuatu yang aman dilakukan otonom begitu saja.
 
-**Fase berikutnya: CI/CD GitHub Actions (build+publish+release, pola Presensi) -
-diperlukan sebelum unduh+pasang pembaruan otomatis bisa dikerjakan bermakna. Setelah
-itu: uji coba sungguhan sbg PC TU TK (token Hub API produksi baru, unit_id=2)
-sebelum dianggap siap dipakai nyata di lapangan.**
+**Fase berikutnya: push tag `v1.0.0` pertama (setelah user setuju) utk menguji
+alur CI/CD+auto-update end-to-end SUNGGUHAN dari GitHub sampai ke PC, isi
+`LauncherConfig.GithubToken` dgn fine-grained PAT scope Contents:Read-only.
+Setelah itu: uji coba sungguhan sbg PC TU TK (token Hub API produksi baru,
+unit_id=2) sebelum dianggap siap dipakai nyata di lapangan.**
 
 ## Prinsip wajib dipegang tiap sesi lanjutan
 
