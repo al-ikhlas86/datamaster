@@ -55,9 +55,13 @@ public class GuruController(DataMasterDbContext db, WaliKelasService waliKelas) 
 
         async Task<List<GuruRow>> ToRowsAsync(List<Data.Entities.Guru> guruList)
         {
+            // Bug nyata KEMBAR dgn Print() (lihat catatan di sana) - .Include(w =>
+            // w.Kelas) WAJIB sebelum ToDictionaryAsync, kalau tidak NRE begitu ADA
+            // baris WaliKelas yang cocok filter (tidak pernah ter-trigger sebelum
+            // ada wali kelas ter-assign, makanya luput dari uji coba awal).
             var waliMap = taId is null
                 ? new Dictionary<int, string>()
-                : await db.WaliKelas.Where(w => w.TahunAjaranId == taId && guruList.Select(g => g.GuruId).Contains(w.GuruId))
+                : await db.WaliKelas.Include(w => w.Kelas).Where(w => w.TahunAjaranId == taId && guruList.Select(g => g.GuruId).Contains(w.GuruId))
                     .ToDictionaryAsync(w => w.GuruId, w => w.Kelas.NamaKelas);
             return guruList.Select(g => new GuruRow
             {
@@ -280,9 +284,15 @@ public class GuruController(DataMasterDbContext db, WaliKelasService waliKelas) 
     {
         var taId = await GetTahunAktifIdAsync();
         var guruList = await db.Guru.Where(g => g.StatusAktif).OrderBy(g => g.Nama).ToListAsync();
+        // Bug nyata ditemukan (2026-09-08, testing menyeluruh): ToDictionaryAsync
+        // BUKAN operator yg bisa diterjemahkan EF Core ke SQL - baris WaliKelas
+        // ditarik dulu TANPA include, baru value-selector "w.Kelas.NamaKelas"
+        // dievaluasi di SISI CLIENT dimana w.Kelas MASIH null (navigasi tidak
+        // pernah di-Include) -> NullReferenceException nyata setiap kali ADA wali
+        // kelas ter-assign. Fix: .Include(w => w.Kelas) SEBELUM ditarik ke memori.
         var waliMap = taId is null
             ? new Dictionary<int, string>()
-            : await db.WaliKelas.Where(w => w.TahunAjaranId == taId).ToDictionaryAsync(w => w.GuruId, w => w.Kelas.NamaKelas);
+            : await db.WaliKelas.Include(w => w.Kelas).Where(w => w.TahunAjaranId == taId).ToDictionaryAsync(w => w.GuruId, w => w.Kelas.NamaKelas);
 
         var rows = guruList.Select(g => new GuruPrintRow
         {
