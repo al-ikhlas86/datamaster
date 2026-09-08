@@ -27,7 +27,8 @@ supaya tahu persis sudah sampai mana dan apa langkah berikutnya.
 | Halaman/Controller: **Kepala Sekolah** (autocomplete tanpa filter eksklusif, tetapkan/kosongkan per-tahun-ajaran, reload penuh setelah AJAX - beda sengaja dari Wali Kelas/Guru Pengampu) | Selesai & teruji end-to-end. |
 | Halaman/Controller: **Ekskul** (CRUD, arsip, kelola peserta) | Selesai & teruji end-to-end. **Modul "Guru, Kelas, Struktur" (spec 02) kini 100% SELESAI dibangun.** |
 | Halaman/Controller: **Kalender Akademik** (CRUD, kalender visual, import Excel dgn parser tanggal Indonesia fleksibel, validasi anti-salah-tahun) | Selesai & teruji end-to-end, TERMASUK uji regresi bug historis "strtotime salah tahun" (§7) — "7 Juni 2027" terverifikasi ke-parse sebagai 2027, bukan mundur ke 2026. |
-| Halaman/Controller modul lain (Kurikulum lengkap - Mata Pelajaran CRUD penuh/Alokasi JP/Jam Belajar, Jadwal Pelajaran, Akademik/Kenaikan Kelas, Auth/Manajemen Pengguna, Dashboard) | Belum dimulai. **Akademik (Kenaikan Kelas/Kelulusan/Arsip/Rekap Lulusan) jadi kandidat berikutnya** (independen, tidak perlu Jadwal Pelajaran). Jadwal Pelajaran sebaiknya PALING TERAKHIR dari spec 03 karena kompleksitas tertinggi (grid kode "35K", cek bentrok guru, import kolom dinamis). |
+| Halaman/Controller: **Akademik** (Kenaikan Kelas, Kelulusan, Arsip Historis, Rekap Lulusan) | Selesai & teruji end-to-end. **Spec 03 kini HANYA menyisakan: Kurikulum lengkap (Mata Pelajaran CRUD penuh/Alokasi JP/Jam Belajar) dan Jadwal Pelajaran (paling kompleks, disengaja ditunda paling akhir).** |
+| Halaman/Controller modul lain (Kurikulum lengkap, Jadwal Pelajaran, Auth/Manajemen Pengguna, Dashboard, Sync Hub API, Launcher) | Belum dimulai — spec 04 (Infra/Auth) juga masih tersisa penuh. |
 | Sinkronisasi Hub API (port dari SyncPush.php) | Belum dimulai |
 | Launcher (splash, start/stop server, WebView2, auto-update) | Kerangka XAML splash sudah ada (`MainWindow.xaml`); `MainWindow.xaml.cs` (logic start server + WebView2 + auto-update) belum dimulai |
 | CI GitHub Actions (build+release, pola Presensi) | Belum dimulai |
@@ -227,6 +228,33 @@ supaya tahu persis sudah sampai mana dan apa langkah berikutnya.
   historis PHP asli `strtotime()` yang membuatnya salah baca jadi 2026 TIDAK terulang
   di implementasi C# ini), serta 1 baris ambigu ("Okt/Nov 2026") yang benar-benar
   DITOLAK bukan ditebak.
+- Tidak ada bug baru ditemukan di modul ini.
+
+## Catatan modul Akademik (Kenaikan Kelas, Kelulusan, Arsip, Rekap Lulusan)
+
+- File: `Controllers/AkademikController.cs`, `Models/Akademik/AkademikViewModels.cs`,
+  `Views/Akademik/*.cshtml`. BEDA TOTAL cakupan dari Kurikulum/Jadwal/Kalender - modul
+  ini murni proses akhir tahun ajaran (kenaikan kelas & kelulusan) + arsip historisnya.
+- **Perilaku SENGAJA "vestigial" direplikasi apa adanya**: `ArsipBulkDelete`/
+  `RekapBulkDelete` TIDAK PERNAH benar-benar menghapus apapun - toolbar bulk-delete
+  di UI cuma hiasan, endpoint SELALU balas pesan penolakan verbatim ("Riwayat akademik
+  tidak dapat dihapus karena dipakai sebagai arsip permanen." / "Rekap lulusan tidak
+  dapat dihapus karena dipakai sebagai arsip permanen."). JANGAN "perbaiki" ini jadi
+  benar-benar menghapus.
+- **Invarian penting direplikasi persis**: proses Kelulusan MENGECEK dulu apakah
+  riwayat siswa+TA sudah ada (mis. siswa itu sebelumnya "naik" di TA yang sama, proses
+  dalam sesi kerja yang sama) - kalau ADA, di-UPDATE jadi status "lulus" (bukan insert
+  baris baru, cegah duplikat unique(SiswaId,TahunAjaranId)); kalau BELUM, baru insert.
+- **Penyesuaian skema (didokumentasikan, bukan penyimpangan diam-diam)**: PHP asli
+  menyimpan literal `0` untuk `kelas_id` riwayat kalau siswa tidak punya kelas saat
+  lulus (kolom NOT NULL tanpa FK). Skema C# di sini men-declare `RiwayatAkademik.KelasId`
+  sbg nullable sejak awal (lihat komentar entity) - jadi dipakai `null` di kondisi yang
+  sama, representasi lebih benar tanpa mengubah perilaku yang terlihat user.
+- **Diuji end-to-end via HTTP nyata**: proses naik kelas (siswa pindah kelas, status
+  tetap aktif, riwayat "naik" tercatat), proses kelulusan (status jadi lulus, kelas_id
+  jadi null, riwayat "lulus" tercatat), Arsip menampilkan badge yang benar ("Naik ke
+  {kelas tujuan}" / "Lulus"), Rekap Lulusan menampilkan lulusan, dan bulk-delete
+  DITOLAK dgn pesan verbatim persis.
 - Tidak ada bug baru ditemukan di modul ini.
 
 ## Prinsip wajib dipegang tiap sesi lanjutan

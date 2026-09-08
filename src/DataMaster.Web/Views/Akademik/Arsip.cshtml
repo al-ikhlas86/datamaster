@@ -1,0 +1,92 @@
+@model DataMaster.Web.Models.Akademik.AkademikArsipViewModel
+@{
+    ViewData["Title"] = "Arsip Historis Akademik";
+}
+
+<h3 class="mb-3">Arsip Historis Akademik</h3>
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-md-4">
+        <select name="tahun_ajaran_id" class="form-select" required onchange="this.form.submit()">
+            <option value="">-- Pilih Tahun Ajaran --</option>
+            @foreach (var (id, nama) in Model.TahunAjaranList)
+            {
+                if (id == Model.TahunAjaranId) { <option value="@id" selected>@nama</option> }
+                else { <option value="@id">@nama</option> }
+            }
+        </select>
+    </div>
+    <div class="col-md-4">
+        <select name="kelas_id" class="form-select" onchange="this.form.submit()">
+            <option value="">Semua Kelas</option>
+            @foreach (var k in Model.KelasList)
+            {
+                if (k.KelasId == Model.KelasId) { <option value="@k.KelasId" selected>@k.NamaKelas</option> }
+                else { <option value="@k.KelasId">@k.NamaKelas</option> }
+            }
+        </select>
+    </div>
+    <div class="col-md-4">
+        <select name="status" class="form-select" onchange="this.form.submit()">
+            <option value="">Semua Status</option>
+            @foreach (var s in new[] { "aktif", "naik", "lulus" })
+            {
+                if (s == Model.Status) { <option value="@s" selected>@s</option> }
+                else { <option value="@s">@s</option> }
+            }
+        </select>
+    </div>
+</form>
+
+<form asp-action="ArsipBulkDelete" method="post">
+    <div class="d-flex justify-content-end mb-2">
+        <button type="submit" class="btn btn-sm btn-outline-danger">Hapus Terpilih</button>
+    </div>
+    <div class="card">
+        <div class="card-body">
+            <table class="table table-hover align-middle">
+                <thead><tr><th style="width:2rem"></th><th>No</th><th>NIS</th><th>Nama</th><th>JK</th><th>Kelas</th><th>Status</th><th>Aksi</th></tr></thead>
+                <tbody>
+                @if (Model.TahunAjaranId <= 0)
+                {
+                    <tr><td colspan="8" class="text-center text-muted py-4">Pilih tahun ajaran untuk melihat riwayat.</td></tr>
+                }
+                else if (Model.Riwayat.Count == 0)
+                {
+                    <tr><td colspan="8" class="text-center text-muted py-4">Tidak ada riwayat untuk filter ini.</td></tr>
+                }
+                else
+                {
+                    var no = 1;
+                    foreach (var r in Model.Riwayat)
+                    {
+                        <tr>
+                            <td><input type="checkbox" name="ids" value="@r.SiswaId" /></td>
+                            <td>@(no++)</td>
+                            <td>@r.Nis</td>
+                            <td>@r.Nama</td>
+                            <td>@r.JenisKelamin</td>
+                            <td>@(r.NamaKelas ?? "-")</td>
+                            <td>
+                                @if (r.Status == "naik")
+                                {
+                                    <span class="badge bg-info text-dark">Naik ke @(r.KelasTujuanNama ?? "-")</span>
+                                }
+                                else if (r.Status == "lulus")
+                                {
+                                    <span class="badge bg-success">Lulus</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">@r.Status</span>
+                                }
+                            </td>
+                            <td><a asp-controller="Siswa" asp-action="Detail" asp-route-id="@r.SiswaId" class="btn btn-sm btn-outline-info">Detail</a></td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</form>

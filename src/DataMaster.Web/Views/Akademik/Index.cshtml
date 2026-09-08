@@ -1,0 +1,150 @@
+@model DataMaster.Web.Models.Akademik.AkademikIndexViewModel
+@{
+    ViewData["Title"] = "Akademik";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">
+        Akademik
+        @if (Model.AdaTahunAktif)
+        {
+            <span class="badge bg-primary ms-2">TA Aktif: @Model.TahunAktifNama</span>
+        }
+    </h3>
+    <div>
+        <a asp-action="Arsip" class="btn btn-outline-secondary">Arsip Historis</a>
+        <a asp-action="RekapLulusan" class="btn btn-outline-secondary">Rekap Lulusan</a>
+    </div>
+</div>
+
+@if (!Model.AdaTahunAktif)
+{
+    <div class="alert alert-warning"><strong>Tidak ada Tahun Ajaran aktif.</strong> Atur Tahun Ajaran terlebih dahulu.</div>
+}
+else if (Model.KelompokSiswa.Count == 0)
+{
+    <div class="alert alert-secondary">Tidak ada siswa aktif ditemukan.</div>
+}
+else
+{
+    <ul class="nav nav-tabs mb-3" id="akademikTabs">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabNaik">Kenaikan Kelas</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabLulus">Kelulusan</button></li>
+    </ul>
+
+    <div class="tab-content">
+        <div class="tab-pane fade show active" id="tabNaik">
+            <form asp-action="ProsesNaikKelas" method="post" id="formNaikKelas">
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <p class="text-muted small">Pilih siswa dan kelas tujuan lalu tekan Enter atau klik tombol Proses Naik Kelas untuk konfirmasi pilihan.</p>
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-6">
+                                <label class="form-label">Kelas Tujuan *</label>
+                                <select name="kelas_tujuan" class="form-select" required>
+                                    <option value="">-- Pilih Kelas --</option>
+                                    @foreach (var k in Model.KelasList)
+                                    {
+                                        <option value="@k.KelasId">@k.NamaKelas</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <button type="submit" class="btn btn-primary">Proses Naik Kelas</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                @foreach (var grup in Model.KelompokSiswa)
+                {
+                    <div class="card mb-2">
+                        <div class="card-header">
+                            <input type="checkbox" class="js-select-all-naik form-check-input me-2" data-target="naik-@(grup.KelasId?.ToString() ?? "none")" />
+                            <strong>@grup.NamaKelas</strong> <span class="text-muted small">(@grup.SiswaList.Count siswa)</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-sm mb-0">
+                                <thead><tr><th style="width:2rem"></th><th>NIS</th><th>Nama</th><th>JK</th></tr></thead>
+                                <tbody>
+                                @foreach (var s in grup.SiswaList)
+                                {
+                                    <tr>
+                                        <td><input type="checkbox" name="siswa_ids" value="@s.SiswaId" class="form-check-input js-naik-@(grup.KelasId?.ToString() ?? "none")" /></td>
+                                        <td>@s.Nis</td>
+                                        <td>@s.Nama</td>
+                                        <td><span class="badge @(s.JenisKelamin == "L" ? "bg-primary" : "bg-danger")">@s.JenisKelamin</span></td>
+                                    </tr>
+                                }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+            </form>
+        </div>
+
+        <div class="tab-pane fade" id="tabLulus">
+            <form asp-action="ProsesKelulusan" method="post" id="formKelulusan">
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <p class="text-muted small">Pilih siswa yang akan diluluskan. Data diarsipkan pada TA @Model.TahunAktifNama. Pilih siswa dan tekan Enter atau klik tombol Proses Kelulusan untuk konfirmasi pilihan.</p>
+                        <button type="submit" class="btn btn-success">Proses Kelulusan</button>
+                    </div>
+                </div>
+
+                @foreach (var grup in Model.KelompokSiswa)
+                {
+                    <div class="card mb-2">
+                        <div class="card-header">
+                            <input type="checkbox" class="js-select-all-lulus form-check-input me-2" data-target="lulus-@(grup.KelasId?.ToString() ?? "none")" />
+                            <strong>@grup.NamaKelas</strong> <span class="text-muted small">(@grup.SiswaList.Count siswa)</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-sm mb-0">
+                                <thead><tr><th style="width:2rem"></th><th>NIS</th><th>Nama</th><th>JK</th></tr></thead>
+                                <tbody>
+                                @foreach (var s in grup.SiswaList)
+                                {
+                                    <tr>
+                                        <td><input type="checkbox" name="siswa_ids" value="@s.SiswaId" class="form-check-input js-lulus-@(grup.KelasId?.ToString() ?? "none")" /></td>
+                                        <td>@s.Nis</td>
+                                        <td>@s.Nama</td>
+                                        <td><span class="badge @(s.JenisKelamin == "L" ? "bg-primary" : "bg-danger")">@s.JenisKelamin</span></td>
+                                    </tr>
+                                }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+            </form>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script>
+        document.querySelectorAll('.js-select-all-naik').forEach(function (chk) {
+            chk.addEventListener('change', function () {
+                document.querySelectorAll('.js-naik-' + this.dataset.target.replace('naik-', '')).forEach(function (c) { c.checked = chk.checked; });
+            });
+        });
+        document.querySelectorAll('.js-select-all-lulus').forEach(function (chk) {
+            chk.addEventListener('change', function () {
+                document.querySelectorAll('.js-lulus-' + this.dataset.target.replace('lulus-', '')).forEach(function (c) { c.checked = chk.checked; });
+            });
+        });
+
+        document.getElementById('formNaikKelas')?.addEventListener('submit', function (e) {
+            var n = this.querySelectorAll('input[name="siswa_ids"]:checked').length;
+            if (n === 0) { alert('Pilih minimal satu siswa.'); e.preventDefault(); return; }
+            if (!confirm(n + ' siswa akan dinaikkan kelas.')) e.preventDefault();
+        });
+        document.getElementById('formKelulusan')?.addEventListener('submit', function (e) {
+            var n = this.querySelectorAll('input[name="siswa_ids"]:checked').length;
+            if (n === 0) { alert('Pilih minimal satu siswa.'); e.preventDefault(); return; }
+            if (!confirm(n + ' siswa akan diluluskan dan diarsipkan.')) e.preventDefault();
+        });
+    </script>
+}

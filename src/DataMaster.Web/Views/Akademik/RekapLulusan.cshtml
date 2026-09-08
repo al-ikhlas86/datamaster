@@ -1,0 +1,59 @@
+@model DataMaster.Web.Models.Akademik.RekapLulusanViewModel
+@{
+    ViewData["Title"] = "Rekap Lulusan";
+}
+
+<h3 class="mb-3">Rekap Lulusan</h3>
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-md-4">
+        <select name="tahun_ajaran_id" class="form-select" required onchange="this.form.submit()">
+            <option value="">-- Pilih Tahun Ajaran --</option>
+            @foreach (var (id, nama) in Model.TahunAjaranList)
+            {
+                if (id == Model.TahunAjaranId) { <option value="@id" selected>@nama</option> }
+                else { <option value="@id">@nama</option> }
+            }
+        </select>
+    </div>
+</form>
+
+<form asp-action="RekapBulkDelete" method="post">
+    <div class="d-flex justify-content-end mb-2">
+        <button type="submit" class="btn btn-sm btn-outline-danger">Hapus Terpilih</button>
+    </div>
+    <div class="card">
+        <div class="card-body">
+            <table class="table table-hover align-middle">
+                <thead><tr><th style="width:2rem"></th><th>No</th><th>NIS</th><th>Nama</th><th>JK</th><th>Kelas Terakhir</th><th>Asal Sekolah</th><th>Aksi</th></tr></thead>
+                <tbody>
+                @if (Model.TahunAjaranId <= 0)
+                {
+                    <tr><td colspan="7" class="text-center text-muted py-4">Pilih tahun ajaran untuk melihat rekap lulusan.</td></tr>
+                }
+                else if (Model.Lulusan.Count == 0)
+                {
+                    <tr><td colspan="7" class="text-center text-muted py-4">Belum ada lulusan pada tahun ajaran ini.</td></tr>
+                }
+                else
+                {
+                    var no = 1;
+                    foreach (var l in Model.Lulusan)
+                    {
+                        <tr>
+                            <td><input type="checkbox" name="ids" value="@l.SiswaId" /></td>
+                            <td>@(no++)</td>
+                            <td>@l.Nis</td>
+                            <td>@l.Nama</td>
+                            <td>@l.JenisKelamin</td>
+                            <td>@(l.KelasTerakhir ?? "-")</td>
+                            <td>@(l.AsalSekolah ?? "-")</td>
+                            <td><a asp-controller="Siswa" asp-action="Detail" asp-route-id="@l.SiswaId" class="btn btn-sm btn-outline-info">Detail</a></td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</form>
