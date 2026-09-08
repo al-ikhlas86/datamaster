@@ -1,0 +1,69 @@
+/*
+ * Perbaikan kecil untuk theme.min.css (bukan bug baru dari fitur
+ * tertentu - celah-celah ini sudah ada di theme aslinya, ketahuan
+ * lewat penggunaan nyata):
+ *
+ * 1. Mode gelap: .form-select di-set warna teks putih, tapi popup
+ *    <option> bawaan browser tidak ikut di-dark-mode-kan theme -
+ *    hasilnya teks putih di atas latar putih (tidak kebaca).
+ * 2. Mode gelap: .swal2-popup latar belakangnya di-set gelap, tapi
+ *    warna teks judul & isi (.swal2-title / .swal2-html-container)
+ *    tidak ikut di-override - teks gelap di atas latar gelap.
+ * 3. Mode gelap: ikon centang SweetAlert2 (sukses) memakai teknik
+ *    "masking" dengan latar putih solid (.swal2-success-circular-line-*,
+ *    .swal2-success-fix) supaya nyatu ke popup putih - begitu popup-nya
+ *    kita gelapkan, mask putih itu jadi kelihatan sebagai bercak putih
+ *    di sekitar centang. Disamakan ke warna latar popup gelap.
+ * 4. Sidebar: .navbar-content tingginya fixed (calc(100vh - 80px)) dari
+ *    theme, tanpa overflow - begitu isi menu bertambah/ada blok baru
+ *    (mis. selector preview tipe instalasi), bagian bawah menu (Akun)
+ *    bisa terpotong tanpa cara scroll ke sana. Dibuat scroll sendiri.
+ * 5. Bar loading biru di pojok atas layar tiap pindah halaman itu
+ *    Pace.js (ikut ter-bundle di vendors.min.js) - murni efek visual
+ *    simulasi loading, tidak ada fungsi lain. Disembunyikan di sini
+ *    (bukan dihapus dari vendors.min.js) supaya tidak perlu bongkar
+ *    file vendor ter-minify yang bisa tertimpa kalau tema di-update.
+ * 6. Kedip saat toggle mode gelap/terang: theme.min.css punya ratusan
+ *    aturan "transition:all" durasi beda-beda (0.15s-5s) di banyak
+ *    elemen sekaligus - begitu class app-skin-dark dipasang/dilepas,
+ *    tiap elemen selesai bertransisi di waktu berbeda-beda, kelihatan
+ *    seperti kedip/gelombang alih-alih satu perubahan yang rapi.
+ *    html.theme-switching (dipasang sebentar oleh templates/index.php
+ *    persis saat tombol diklik) mematikan semua transition di momen
+ *    itu saja, supaya perubahannya jadi instan & rapi - transisi
+ *    hover/animasi lain di luar momen itu tidak terpengaruh.
+ */
+
+html.theme-switching,
+html.theme-switching * {
+    transition: none !important;
+}
+
+html.app-skin-dark select option {
+    background-color: #fff;
+    color: #212529;
+}
+
+html.app-skin-dark .swal2-popup .swal2-title {
+    color: #fff !important;
+}
+
+html.app-skin-dark .swal2-popup .swal2-html-container {
+    color: #b1c2d9 !important;
+}
+
+html.app-skin-dark .swal2-success-circular-line-left,
+html.app-skin-dark .swal2-success-circular-line-right,
+html.app-skin-dark .swal2-success-fix {
+    background-color: #0f172a !important;
+}
+
+.navbar-content {
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.pace .pace-progress,
+.pace .pace-activity {
+    display: none !important;
+}

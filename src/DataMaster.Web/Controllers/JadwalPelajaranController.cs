@@ -163,35 +163,75 @@ public class JadwalPelajaranController(DataMasterDbContext db) : Controller
         return (petaMapel, petaGuru);
     }
 
-    // simpanSlot: guruId truthy -> cek bentrok guru dulu. Return null=sukses, else pesan error.
-    private async Task<string?> SimpanSlotAsync(int ta, string semester, int kelasId, int jamPelajaranId, int mapelId, int? guruId)
+    // SlotBatch: engine in-memory utk simpan/hapus BANYAK slot jadwal sekaligus
+    // TANPA query+SaveChanges per sel - ditemukan via audit performa (2026-09-08):
+    // pola lama (SimpanSlotAsync/HapusSlotAsync dipanggil per sel di dalam loop
+    // StoreGrid/ProcessImport) bisa menghasilkan RATUSAN round-trip DB utk 1
+    // grid/import (mis. grid 7 hari x 10 jam = ~70 sel x 2-3 query = ~150-200
+    // round-trip). Sekarang: SATU query muat-semua di awal, proses SELURUHNYA
+    // in-memory (termasuk deteksi bentrok ANTAR BARIS dlm batch yg sama - PENTING
+    // utk ProcessImport yg bisa punya 2 baris beda kelas assign guru yg sama ke
+    // jam yg sama DALAM SATU FILE, harus tetap terdeteksi walau belum ter-commit
+    // ke DB), lalu SATU SaveChangesAsync di akhir. Pesan error & perilaku 100%
+    // SAMA PERSIS versi lama - ini murni optimasi jumlah query, bukan perubahan
+    // logic/hasil.
+    private sealed class SlotBatch(List<Data.Entities.JadwalPelajaran> semuaJadwalTaSem, Dictionary<int, string> mapelNama, Dictionary<int, string> kelasNama, int ta, Semester semesterEnum)
     {
-        if (guruId is not null)
+        private readonly Dictionary<(int KelasId, int JamPelajaranId), Data.Entities.JadwalPelajaran> _existing = semuaJadwalTaSem.ToDictionary(j => (j.KelasId, j.JamPelajaranId));
+        private readonly Dictionary<(int GuruId, int JamPelajaranId), (int KelasId, string KelasNama, string MapelNama)> _bentrokIndex =
+            semuaJadwalTaSem.Where(j => j.GuruId is not null)
+                .ToDictionary(j => (j.GuruId!.Value, j.JamPelajaranId), j => (j.KelasId, kelasNama.GetValueOrDefault(j.KelasId, "?"), mapelNama.GetValueOrDefault(j.MataPelajaranId, "?")));
+        private readonly List<Data.Entities.JadwalPelajaran> _toAdd = [];
+        private readonly List<Data.Entities.JadwalPelajaran> _toRemove = [];
+
+        // null = sukses, else pesan error bentrok (format PERSIS versi lama).
+        public string? Simpan(int kelasId, int jamPelajaranId, int mapelId, int? guruId)
         {
-            var bentrok = await db.JadwalPelajaran.Include(j => j.Kelas).Include(j => j.MataPelajaran)
-                .FirstOrDefaultAsync(j => j.GuruId == guruId && j.JamPelajaranId == jamPelajaranId && j.Semester.ToString() == semester && j.TahunAjaranId == ta && j.KelasId != kelasId);
-            if (bentrok is not null)
-                return $"Guru tersebut sudah mengajar {bentrok.MataPelajaran.Nama} di kelas {bentrok.Kelas.NamaKelas} pada jam yang sama.";
+            if (guruId is not null && _bentrokIndex.TryGetValue((guruId.Value, jamPelajaranId), out var bentrok) && bentrok.KelasId != kelasId)
+                return $"Guru tersebut sudah mengajar {bentrok.MapelNama} di kelas {bentrok.KelasNama} pada jam yang sama.";
+
+            if (_existing.TryGetValue((kelasId, jamPelajaranId), out var row))
+            {
+                row.MataPelajaranId = mapelId;
+                row.GuruId = guruId;
+            }
+            else
+            {
+                row = new Data.Entities.JadwalPelajaran { TahunAjaranId = ta, Semester = semesterEnum, KelasId = kelasId, JamPelajaranId = jamPelajaranId, MataPelajaranId = mapelId, GuruId = guruId };
+                _existing[(kelasId, jamPelajaranId)] = row;
+                _toAdd.Add(row);
+            }
+
+            // Update index SEKARANG (bukan hanya di akhir) - supaya baris BERIKUTNYA
+            // dlm batch yg sama ikut melihat perubahan ini (deteksi bentrok antar
+            // baris dlm 1 file import, bukan cuma terhadap data lama di DB).
+            if (guruId is not null) _bentrokIndex[(guruId.Value, jamPelajaranId)] = (kelasId, kelasNama.GetValueOrDefault(kelasId, "?"), mapelNama.GetValueOrDefault(mapelId, "?"));
+
+            return null;
         }
 
-        var existing = await db.JadwalPelajaran.FirstOrDefaultAsync(j => j.TahunAjaranId == ta && j.Semester.ToString() == semester && j.KelasId == kelasId && j.JamPelajaranId == jamPelajaranId);
-        if (existing is not null)
+        public void Hapus(int kelasId, int jamPelajaranId)
         {
-            existing.MataPelajaranId = mapelId;
-            existing.GuruId = guruId;
+            if (!_existing.TryGetValue((kelasId, jamPelajaranId), out var row)) return;
+            _existing.Remove((kelasId, jamPelajaranId));
+            if (_toAdd.Remove(row)) return; // baru ditambahkan dlm batch ini, batal tanpa sentuh DB
+            _toRemove.Add(row);
         }
-        else
+
+        public async Task SimpanSemuaAsync(DataMasterDbContext db)
         {
-            db.JadwalPelajaran.Add(new Data.Entities.JadwalPelajaran { TahunAjaranId = ta, Semester = Enum.Parse<Semester>(semester), KelasId = kelasId, JamPelajaranId = jamPelajaranId, MataPelajaranId = mapelId, GuruId = guruId });
+            if (_toAdd.Count > 0) db.JadwalPelajaran.AddRange(_toAdd);
+            if (_toRemove.Count > 0) db.JadwalPelajaran.RemoveRange(_toRemove);
+            if (_toAdd.Count > 0 || _toRemove.Count > 0) await db.SaveChangesAsync();
         }
-        await db.SaveChangesAsync();
-        return null;
     }
 
-    private async Task HapusSlotAsync(int ta, string semester, int kelasId, int jamPelajaranId)
+    private async Task<SlotBatch> BangunSlotBatchAsync(int ta, string semester)
     {
-        var existing = await db.JadwalPelajaran.FirstOrDefaultAsync(j => j.TahunAjaranId == ta && j.Semester.ToString() == semester && j.KelasId == kelasId && j.JamPelajaranId == jamPelajaranId);
-        if (existing is not null) { db.JadwalPelajaran.Remove(existing); await db.SaveChangesAsync(); }
+        var semuaJadwal = await db.JadwalPelajaran.Where(j => j.TahunAjaranId == ta && j.Semester.ToString() == semester).ToListAsync();
+        var mapelNama = await db.MataPelajaran.ToDictionaryAsync(m => m.MataPelajaranId, m => m.Nama);
+        var kelasNama = await db.Kelas.ToDictionaryAsync(k => k.KelasId, k => k.NamaKelas);
+        return new SlotBatch(semuaJadwal, mapelNama, kelasNama, ta, Enum.Parse<Semester>(semester));
     }
 
     // -------------------------------------------------------------- StoreGrid (simpanGrid)
@@ -207,6 +247,7 @@ public class JadwalPelajaranController(DataMasterDbContext db) : Controller
 
         var (petaMapel, petaGuru) = await BangunPetaAsync();
         var jamMaster = await db.JamPelajaran.Where(j => j.TahunAjaranId == tahun_ajaran_id).ToDictionaryAsync(j => j.JamPelajaranId);
+        var batch = await BangunSlotBatchAsync(tahun_ajaran_id, semester);
 
         int tersimpan = 0, dihapus = 0;
         var errors = new List<string>();
@@ -221,16 +262,18 @@ public class JadwalPelajaranController(DataMasterDbContext db) : Controller
 
             if (mapelId is null)
             {
-                await HapusSlotAsync(tahun_ajaran_id, semester, kelas_id, jamId);
+                batch.Hapus(kelas_id, jamId);
                 dihapus++;
             }
             else
             {
-                var slotErr = await SimpanSlotAsync(tahun_ajaran_id, semester, kelas_id, jamId, mapelId.Value, guruId);
+                var slotErr = batch.Simpan(kelas_id, jamId, mapelId.Value, guruId);
                 if (slotErr is not null) errors.Add($"{posisi}: {slotErr}");
                 else tersimpan++;
             }
         }
+
+        await batch.SimpanSemuaAsync(db);
 
         if (errors.Count > 0) TempData["import_errors"] = JsonSerializer.Serialize(errors);
         TempData["message"] = $"{tersimpan} slot tersimpan, {dihapus} dikosongkan." + (errors.Count > 0 ? " Beberapa sel dilewati - lihat rincian di atas." : "");
@@ -603,6 +646,7 @@ Baris yang bentrok jam gurunya akan dilewati dan dilaporkan - jadwal lama tidak 
             return GagalRedirect("Tidak ada kolom kelas yang dikenali. Pastikan baris HARI dan baris nama kelas tidak diubah, dan unduh ulang template kalau data kelas berubah.");
 
         var (petaMapel, petaGuru) = await BangunPetaAsync();
+        var batch = await BangunSlotBatchAsync(tahun_ajaran_id, semester);
         int tersimpan = 0, dilewati = 0;
         var errors = new List<string>();
 
@@ -627,11 +671,13 @@ Baris yang bentrok jam gurunya akan dilewati dan dilaporkan - jadwal lama tidak 
                 if (err is not null) { errors.Add($"{posisi}: {err}"); dilewati++; continue; }
                 if (mapelId is null) continue; // sel kosong (setelah normalisasi) -> skip diam-diam
 
-                var slotErr = await SimpanSlotAsync(tahun_ajaran_id, semester, info.Kelas.KelasId, jam.JamPelajaranId, mapelId.Value, guruId);
+                var slotErr = batch.Simpan(info.Kelas.KelasId, jam.JamPelajaranId, mapelId.Value, guruId);
                 if (slotErr is not null) { errors.Add($"{posisi}: {slotErr}"); dilewati++; }
                 else tersimpan++;
             }
         }
+
+        await batch.SimpanSemuaAsync(db);
 
         if (kolomTakDikenal.Count > 0)
             errors.Insert(0, "KOLOM DILEWATI (seluruh isinya tidak ikut masuk): " + string.Join("; ", kolomTakDikenal));

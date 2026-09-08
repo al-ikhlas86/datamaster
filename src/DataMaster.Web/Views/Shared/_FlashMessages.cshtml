@@ -1,24 +1,17 @@
-@* Port dari flashdata CI4 ("message"/"error"/"warning") - sekali baca lalu hilang,
-   sama seperti TempData ASP.NET Core. Dirender global di layout supaya semua
-   controller cukup set TempData["message"]/["error"]/["warning"] seperti PHP asli. *@
+@using System.Text.Json
+@* Port dari flashdata CI4 ("message"/"error"/"warning") dirender via SweetAlert2 -
+   PERSIS pola app/Views/templates/index.php (bukan div alert Bootstrap polos).
+   String di-encode via JsonSerializer (setara esc($msg,'js') PHP) - aman dari
+   JS-injection walau pesan mengandung kutip/backslash (mis. nama siswa/guru). *@
 @if (TempData["message"] is string msg)
 {
-    <div class="alert alert-success alert-dismissible fade show" role="alert">
-        @msg
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-}
-@if (TempData["error"] is string err)
-{
-    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-        @err
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
+    <script>Swal.fire({ icon: 'success', title: 'Berhasil', text: @Html.Raw(JsonSerializer.Serialize(msg)), timer: 3000, showConfirmButton: false });</script>
 }
 @if (TempData["warning"] is string warn)
 {
-    <div class="alert alert-warning alert-dismissible fade show" role="alert">
-        @warn
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
+    <script>Swal.fire({ icon: 'warning', title: 'Peringatan', text: @Html.Raw(JsonSerializer.Serialize(warn)) });</script>
+}
+@if (TempData["error"] is string err)
+{
+    <script>Swal.fire({ icon: 'error', title: 'Gagal', text: @Html.Raw(JsonSerializer.Serialize(err)) });</script>
 }

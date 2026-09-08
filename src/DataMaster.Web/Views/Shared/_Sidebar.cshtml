@@ -1,0 +1,199 @@
+@using DataMaster.Web.Services
+@inject InstallTypeService InstallTypeSvc
+@{
+    // Port 1:1 dari app/Views/templates/sidebar.php - urutan & pengelompokan
+    // caption ("Menu Utama"/"Data Master"/"Data Kelas"/"Akademik"/"Arsip"/"Akun")
+    // SAMA PERSIS PHP asli, JANGAN diubah urutannya tanpa cek ulang sidebar.php.
+    var path = Context.Request.Path.Value?.Trim('/').ToLowerInvariant() ?? "";
+    bool Aktif(string prefix) => path == prefix || path.StartsWith(prefix + "/");
+    var isPendidikan = InstallTypeSvc.IsPendidikanModuleActive();
+    var isPerusahaanMenu = !isPendidikan;
+}
+<nav class="nxl-navigation">
+    <div class="navbar-wrapper">
+        <div class="m-header">
+            <a asp-controller="Home" asp-action="Index" class="b-brand">
+                <div class="logo logo-lg logo-full d-flex align-items-center gap-2">
+                    <img src="~/assets/images/logo-abbr.png" alt="Al-Ikhlas 86" class="flex-shrink-0" style="max-height:34px;width:auto;">
+                    <span class="brand-text fw-bold text-truncate" style="font-size:13px;line-height:1.2;max-width:140px;">Data Master Al-Ikhlas 86</span>
+                </div>
+                <div class="logo logo-sm logo-abbr">
+                    <img src="~/assets/images/logo-abbr.png" alt="DM" style="max-height:32px;width:auto;">
+                </div>
+            </a>
+        </div>
+
+        <div class="navbar-content">
+            <div style="padding: 14px 20px; border-bottom: 1px solid rgba(0,0,0,0.06);">
+                @if (InstallTypeSvc.InstallType() == "pengembang")
+                {
+                    <label class="form-label fw-semibold" style="font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:#8a94a6;">Preview Tampilan (Pengembang)</label>
+                    <form asp-controller="DevPreview" asp-action="Set" method="post">
+                        <select name="type" class="form-select form-select-sm" onchange="this.form.submit()">
+                            @if (InstallTypeSvc.EffectiveInstallType() == "pendidikan")
+                            {
+                                <option value="pendidikan" selected>Pendidikan</option>
+                                <option value="perusahaan">Perusahaan</option>
+                            }
+                            else
+                            {
+                                <option value="pendidikan">Pendidikan</option>
+                                <option value="perusahaan" selected>Perusahaan</option>
+                            }
+                        </select>
+                    </form>
+                }
+                else
+                {
+                    <label class="form-label fw-semibold" style="font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:#8a94a6;">Tipe Instalasi</label>
+                    <div class="fw-semibold">@(char.ToUpper(InstallTypeSvc.InstallType()[0]) + InstallTypeSvc.InstallType()[1..])</div>
+                }
+            </div>
+
+            <ul class="nxl-navbar">
+
+                <li class="nxl-item nxl-caption"><label>Menu Utama</label></li>
+                <li class="nxl-item @(path == "" ? "active" : "")">
+                    <a asp-controller="Home" asp-action="Index" class="nxl-link">
+                        <span class="nxl-micon"><i class="feather-airplay"></i></span>
+                        <span class="nxl-mtext">Dashboard</span>
+                    </a>
+                </li>
+
+                <li class="nxl-item nxl-caption"><label>Data Master</label></li>
+                @if (isPendidikan)
+                {
+                    <li class="nxl-item @(Aktif("siswa") && !Aktif("siswa/arsip") ? "active" : "")">
+                        <a asp-controller="Siswa" asp-action="Index" class="nxl-link">
+                            <span class="nxl-micon"><i class="feather-book-open"></i></span>
+                            <span class="nxl-mtext">Data Siswa</span>
+                        </a>
+                    </li>
+                    <li class="nxl-item @(Aktif("calon-siswa") ? "active" : "")">
+                        <a asp-controller="CalonSiswa" asp-action="Index" class="nxl-link">
+                            <span class="nxl-micon"><i class="feather-user-check"></i></span>
+                            <span class="nxl-mtext">Calon Siswa</span>
+                        </a>
+                    </li>
+                }
+                <li class="nxl-item @(Aktif("guru") && path != "guru/arsip" ? "active" : "")">
+                    <a asp-controller="Guru" asp-action="Index" class="nxl-link">
+                        <span class="nxl-micon"><i class="feather-users"></i></span>
+                        <span class="nxl-mtext">@(isPerusahaanMenu ? "Data Pegawai" : "Data Guru")</span>
+                    </a>
+                </li>
+
+                @if (isPendidikan)
+                {
+                    <li class="nxl-item nxl-caption"><label>Data Kelas</label></li>
+                    <li class="nxl-item @(Aktif("kelas") ? "active" : "")">
+                        <a asp-controller="Kelas" asp-action="Index" class="nxl-link">
+                            <span class="nxl-micon"><i class="feather-grid"></i></span>
+                            <span class="nxl-mtext">Kelola Kelas</span>
+                        </a>
+                    </li>
+                    <li class="nxl-item @(Aktif("akademik") && path != "akademik/arsip" && path != "akademik/rekap-lulusan" ? "active" : "")">
+                        <a asp-controller="Akademik" asp-action="Index" class="nxl-link">
+                            <span class="nxl-micon"><i class="feather-trending-up"></i></span>
+                            <span class="nxl-mtext">Kenaikan &amp; Kelulusan</span>
+                        </a>
+                    </li>
+
+                    <li class="nxl-item nxl-caption"><label>Akademik</label></li>
+                    <li class="nxl-item @(Aktif("tahun-ajaran") ? "active" : "")">
+                        <a asp-controller="TahunAjaran" asp-action="Index" class="nxl-link">
+                            <span class="nxl-micon"><i class="feather-calendar"></i></span>
+                            <span class="nxl-mtext">Tahun Ajaran</span>
+                        </a>
+                    </li>
+                    <li class="nxl-item @(Aktif("kurikulum") ? "active" : "")">
+                        <a asp-controller="Kurikulum" asp-action="Index" class="nxl-link">
+                            <span class="nxl-micon"><i class="feather-book-open"></i></span>
+                            <span class="nxl-mtext">Kurikulum &amp; Jam Belajar</span>
+                        </a>
+                    </li>
+                    <li class="nxl-item @(Aktif("penugasan-mengajar") ? "active" : "")">
+                        <a asp-controller="PenugasanMengajar" asp-action="Index" class="nxl-link">
+                            <span class="nxl-micon"><i class="feather-user-check"></i></span>
+                            <span class="nxl-mtext">Guru Pengampu</span>
+                        </a>
+                    </li>
+                    <li class="nxl-item @(Aktif("kepala-sekolah") ? "active" : "")">
+                        <a asp-controller="KepalaSekolah" asp-action="Index" class="nxl-link">
+                            <span class="nxl-micon"><i class="feather-award"></i></span>
+                            <span class="nxl-mtext">Kepala Sekolah</span>
+                        </a>
+                    </li>
+                    <li class="nxl-item @(Aktif("ekskul") ? "active" : "")">
+                        <a asp-controller="Ekskul" asp-action="Index" class="nxl-link">
+                            <span class="nxl-micon"><i class="feather-award"></i></span>
+                            <span class="nxl-mtext">Ekskul</span>
+                        </a>
+                    </li>
+                    <li class="nxl-item @(Aktif("jadwal-pelajaran") ? "active" : "")">
+                        <a asp-controller="JadwalPelajaran" asp-action="Index" class="nxl-link">
+                            <span class="nxl-micon"><i class="feather-grid"></i></span>
+                            <span class="nxl-mtext">Jadwal Pelajaran</span>
+                        </a>
+                    </li>
+                    <li class="nxl-item @(Aktif("kalender-akademik") ? "active" : "")">
+                        <a asp-controller="KalenderAkademik" asp-action="Index" class="nxl-link">
+                            <span class="nxl-micon"><i class="feather-calendar"></i></span>
+                            <span class="nxl-mtext">Kalender Akademik</span>
+                        </a>
+                    </li>
+                }
+
+                <li class="nxl-item nxl-caption"><label>Arsip</label></li>
+                @if (isPendidikan)
+                {
+                    <li class="nxl-item @(path == "siswa/arsip" ? "active" : "")">
+                        <a asp-controller="Siswa" asp-action="Arsip" class="nxl-link">
+                            <span class="nxl-micon"><i class="feather-archive"></i></span>
+                            <span class="nxl-mtext">Arsip Siswa</span>
+                        </a>
+                    </li>
+                    <li class="nxl-item @(path == "guru/arsip" ? "active" : "")">
+                        <a asp-controller="Guru" asp-action="Arsip" class="nxl-link">
+                            <span class="nxl-micon"><i class="feather-archive"></i></span>
+                            <span class="nxl-mtext">Arsip Guru &amp; Pegawai</span>
+                        </a>
+                    </li>
+                }
+                else
+                {
+                    <li class="nxl-item @(path == "guru/arsip" ? "active" : "")">
+                        <a asp-controller="Guru" asp-action="Arsip" class="nxl-link">
+                            <span class="nxl-micon"><i class="feather-archive"></i></span>
+                            <span class="nxl-mtext">Arsip Pegawai</span>
+                        </a>
+                    </li>
+                }
+                @if (isPendidikan)
+                {
+                    <li class="nxl-item @(path == "akademik/arsip" ? "active" : "")">
+                        <a asp-controller="Akademik" asp-action="Arsip" class="nxl-link">
+                            <span class="nxl-micon"><i class="feather-archive"></i></span>
+                            <span class="nxl-mtext">Arsip Historis</span>
+                        </a>
+                    </li>
+                    <li class="nxl-item @(path == "akademik/rekap-lulusan" ? "active" : "")">
+                        <a asp-controller="Akademik" asp-action="RekapLulusan" class="nxl-link">
+                            <span class="nxl-micon"><i class="feather-award"></i></span>
+                            <span class="nxl-mtext">Rekap Lulusan</span>
+                        </a>
+                    </li>
+                }
+
+                <li class="nxl-item nxl-caption"><label>Akun</label></li>
+                <li class="nxl-item @(path == "user" ? "active" : "")">
+                    <a asp-controller="User" asp-action="Index" class="nxl-link">
+                        <span class="nxl-micon"><i class="feather-settings"></i></span>
+                        <span class="nxl-mtext">Setting</span>
+                    </a>
+                </li>
+
+            </ul>
+        </div>
+    </div>
+</nav>

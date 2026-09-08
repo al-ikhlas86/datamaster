@@ -6,54 +6,69 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Setup Awal - Data Master</title>
-    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Setup Awal - Sistem Arsip Data SDIT AL IKHLAS 86</title>
+    <link rel="shortcut icon" type="image/x-icon" href="~/assets/images/logo-abbr.png">
+    <link rel="stylesheet" type="text/css" href="~/assets/css/bootstrap.min.css">
+    <link rel="stylesheet" type="text/css" href="~/assets/vendors/css/vendors.min.css">
+    <link rel="stylesheet" type="text/css" href="~/assets/css/theme.min.css">
 </head>
-<body class="bg-light">
-<div class="container" style="max-width:460px;margin-top:6vh">
-    <div class="text-center mb-4">
-        <h3>Data Master</h3>
-        <p class="text-muted">Al-Ikhlas 86 &mdash; Setup Awal</p>
-    </div>
-    <div class="card shadow-sm">
-        <div class="card-body p-4">
-            <h5 class="card-title mb-1">Buat Akun Admin</h5>
-            <p class="text-muted small mb-3">Belum ada akun sama sekali di aplikasi ini. Buat akun admin pertama untuk mulai memakai Data Master. Setelah ini, akun baru lain hanya bisa dibuat oleh admin yang sudah masuk.</p>
-            @if (!ViewData.ModelState.IsValid)
-            {
-                <div class="alert alert-danger">
-                    <ul class="mb-0">
-                        @foreach (var err in ViewData.ModelState.Values.SelectMany(v => v.Errors))
-                        {
-                            <li>@err.ErrorMessage</li>
-                        }
-                    </ul>
+<body>
+    <main class="auth-cover-wrapper">
+        <div class="auth-cover-content-inner">
+            <div class="auth-cover-content-wrapper">
+                <div class="auth-img">
+                    <img src="~/assets/images/logo-abbr.png" alt="Logo" class="img-fluid mx-auto d-block" style="width: 100%; max-width: 420px;">
                 </div>
-            }
-            <form asp-controller="Auth" asp-action="Setup" method="post">
-                <div class="mb-3">
-                    <label class="form-label">Email *</label>
-                    <input type="email" name="Email" class="form-control" value="@Model.Email" required autofocus />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Username (opsional)</label>
-                    <input type="text" name="Username" class="form-control" value="@Model.Username" maxlength="30" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Kata Sandi *</label>
-                    <input type="password" name="Password" class="form-control" minlength="8" required />
-                    <div class="form-text">Minimal 8 karakter.</div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Konfirmasi Kata Sandi *</label>
-                    <input type="password" name="PasswordKonfirmasi" class="form-control" minlength="8" required />
-                </div>
-                <button type="submit" class="btn btn-primary w-100">Buat Akun Admin</button>
-            </form>
+            </div>
         </div>
-    </div>
-</div>
+        <div class="auth-cover-sidebar-inner">
+            <div class="auth-cover-card-wrapper">
+                <div class="auth-cover-card p-sm-5">
+                    <h2 class="fs-20 fw-bolder mb-1">Setup Awal</h2>
+                    <h4 class="fs-13 fw-bold mb-2">Data Master SDIT AL IKHLAS 86</h4>
+                    <p class="fs-12 fw-medium text-muted">Belum ada akun sama sekali di aplikasi ini. Buat akun admin pertama untuk mulai memakai Data Master. Setelah ini, akun baru lain hanya bisa dibuat oleh admin yang sudah masuk.</p>
+
+                    @if (!ViewData.ModelState.IsValid)
+                    {
+                        <div class="alert alert-danger">
+                            <ul class="mb-0">
+                                @foreach (var err in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                                {
+                                    <li>@err.ErrorMessage</li>
+                                }
+                            </ul>
+                        </div>
+                    }
+
+                    <form asp-controller="Auth" asp-action="Setup" method="post" class="w-100 mt-3">
+                        <div class="mb-3">
+                            <label class="form-label">Email *</label>
+                            <input type="email" name="Email" class="form-control" value="@Model.Email" required autofocus>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Username (opsional)</label>
+                            <input type="text" name="Username" class="form-control" value="@Model.Username" maxlength="30">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Kata Sandi *</label>
+                            <input type="password" name="Password" class="form-control" minlength="8" required>
+                            <div class="form-text">Minimal 8 karakter.</div>
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label">Konfirmasi Kata Sandi *</label>
+                            <input type="password" name="PasswordKonfirmasi" class="form-control" minlength="8" required>
+                        </div>
+                        <button type="submit" class="btn btn-lg btn-primary w-100">Buat Akun Admin</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </main>
+    <script src="~/assets/vendors/js/vendors.min.js"></script>
+    <script src="~/assets/js/common-init.min.js"></script>
+    <script src="~/assets/js/theme-customizer-init.min.js"></script>
 </body>
 </html>

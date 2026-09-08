@@ -1,0 +1,107 @@
+@using System.Security.Claims
+@using DataMaster.Data
+@inject DataMasterDbContext Db
+@{
+    // Port 1:1 dari app/Views/templates/topbar.php. Data user (username/email/foto)
+    // tidak ada di cookie claims (sengaja tipis, cuma id+nama+role) - diambil
+    // sekali per request lewat query ringan by PK (indexed, instan).
+    string username = "", email = "", userImage = "default.png";
+    if (User.Identity?.IsAuthenticated == true && int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var uid))
+    {
+        var u = await Db.Users.FindAsync(uid);
+        if (u is not null) { username = u.Username ?? u.Email; email = u.Email; userImage = u.UserImage ?? "default.png"; }
+    }
+}
+<header class="nxl-header">
+    <div class="header-wrapper">
+
+        <div class="header-left d-flex align-items-center gap-4">
+            <a href="javascript:void(0);" class="nxl-head-mobile-toggler" id="mobile-collapse">
+                <div class="hamburger hamburger--arrowturn">
+                    <div class="hamburger-box">
+                        <div class="hamburger-inner"></div>
+                    </div>
+                </div>
+            </a>
+            <div class="nxl-navigation-toggle">
+                <a href="javascript:void(0);" id="menu-mini-button" class="nxl-head-link">
+                    <i class="feather-align-left"></i>
+                </a>
+                <a href="javascript:void(0);" id="menu-expend-button" class="nxl-head-link" style="display:none;">
+                    <i class="feather-arrow-right"></i>
+                </a>
+            </div>
+
+            <div class="d-none d-lg-flex align-items-center">
+                <span id="topbarGreeting" class="nxl-head-link p-0 fw-semibold text-truncate d-inline-flex align-items-center" style="max-width: 360px;" data-username="@username">
+                    <i id="topbarGreetingIcon" class="feather-clock me-2"></i>
+                    <span id="topbarGreetingText"></span>
+                </span>
+            </div>
+        </div>
+
+        <div class="header-right ms-auto">
+            <div class="d-flex align-items-center">
+
+                <div class="nxl-h-item dark-light-theme d-flex">
+                    <a href="javascript:void(0);" class="nxl-head-link me-0 dark-button" title="Mode Gelap">
+                        <i class="feather-moon"></i>
+                    </a>
+                    <a href="javascript:void(0);" class="nxl-head-link me-0 light-button" style="display:none;" title="Mode Terang">
+                        <i class="feather-sun"></i>
+                    </a>
+                </div>
+
+                <div class="dropdown nxl-h-item">
+                    @{
+                        var imgPath = Url.Content("~/img/" + userImage);
+                        var fallback = Url.Content("~/assets/images/avatar/undefined.png");
+                    }
+                    <a href="javascript:void(0);" data-bs-toggle="dropdown" role="button" data-bs-auto-close="outside" class="nxl-head-link me-0">
+                        <img src="@imgPath" alt="@username" class="img-fluid user-avtar rounded-circle" style="width:36px;height:36px;object-fit:cover;" onerror="this.src='@fallback'">
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-end nxl-h-dropdown nxl-user-dropdown">
+                        <div class="dropdown-header">
+                            <div class="d-flex align-items-center gap-3">
+                                <img src="@imgPath" alt="@username" class="img-fluid user-avtar rounded-circle" style="width:44px;height:44px;object-fit:cover;" onerror="this.src='@fallback'">
+                                <div>
+                                    <h6 class="mb-0 fw-bold">@username</h6>
+                                    <span class="fs-12 fw-medium text-muted">@email</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="dropdown-divider"></div>
+                        <a asp-controller="User" asp-action="Index" class="dropdown-item">
+                            <i class="feather-settings me-2"></i><span>Setting</span>
+                        </a>
+                        <div class="dropdown-divider"></div>
+                        <a asp-controller="Auth" asp-action="Logout" class="dropdown-item text-danger" id="btnLogout">
+                            <i class="feather-log-out me-2"></i><span>Logout</span>
+                        </a>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+</header>
+
+<script>
+    (function () {
+        var el = document.getElementById('topbarGreeting');
+        if (!el) return;
+        var textEl = document.getElementById('topbarGreetingText');
+        var iconEl = document.getElementById('topbarGreetingIcon');
+        if (!textEl) return;
+        var username = el.getAttribute('data-username') || '';
+        var hour = new Date().getHours();
+        var greet, iconClass;
+        if (hour >= 4 && hour < 11) { greet = 'Selamat Pagi'; iconClass = 'feather-sun'; }
+        else if (hour >= 11 && hour < 15) { greet = 'Selamat Siang'; iconClass = 'feather-sun'; }
+        else if (hour >= 15 && hour < 18) { greet = 'Selamat Sore'; iconClass = 'feather-sun'; }
+        else { greet = 'Selamat Malam'; iconClass = 'feather-moon'; }
+        if (iconEl && iconClass) iconEl.className = iconClass + ' me-2';
+        textEl.textContent = username ? (greet + ', ' + username) : greet;
+    })();
+</script>

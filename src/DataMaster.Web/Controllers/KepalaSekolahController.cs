@@ -9,6 +9,14 @@ namespace DataMaster.Web.Controllers;
 // Port 1:1 dari app/Controllers/KepalaSekolah.php - lihat 02-guru-kelas-struktur.md §6.
 public class KepalaSekolahIndexViewModel
 {
+    // Ditemukan via audit "tidak ada BUG" (2026-09-08): sebelumnya Index() langsung
+    // panggil kepsek.ActiveTahunAjaranIdAsync() TANPA proteksi - kalau database
+    // sungguh2 kosong (instalasi baru, belum sempat bikin Tahun Ajaran), method itu
+    // throw InvalidOperationException tak tertangani -> halaman crash 500 mentah ke
+    // user. Modul lain (Dashboard, Akademik) sudah benar menangani kondisi ini
+    // dgn state kosong yang ramah - KepalaSekolah SATU2NYA yang luput. Diperbaiki
+    // dgn flag AdaTahunAjaran, pola sama persis DashboardPendidikanViewModel.
+    public bool AdaTahunAjaran { get; set; }
     public KepalaSekolahSaatIni? SaatIni { get; set; }
     public int TahunAjaranId { get; set; }
     public int TahunAjaranAktif { get; set; }
@@ -21,12 +29,19 @@ public class KepalaSekolahController(DataMasterDbContext db, KepalaSekolahServic
     [HttpGet("")]
     public async Task<IActionResult> Index(int? tahun)
     {
-        var aktifId = await kepsek.ActiveTahunAjaranIdAsync();
-        var taId = tahun ?? aktifId;
+        var aktifId = await db.TahunAjaran.Where(t => t.IsActive).Select(t => t.TahunAjaranId).FirstOrDefaultAsync();
         var tahunAjaranList = await db.TahunAjaran.OrderByDescending(t => t.Nama).Select(t => new { t.TahunAjaranId, t.Nama }).ToListAsync();
+
+        if (tahunAjaranList.Count == 0)
+        {
+            return View(new KepalaSekolahIndexViewModel { AdaTahunAjaran = false });
+        }
+
+        var taId = tahun is > 0 ? tahun.Value : (aktifId > 0 ? aktifId : tahunAjaranList[0].TahunAjaranId);
 
         var vm = new KepalaSekolahIndexViewModel
         {
+            AdaTahunAjaran = true,
             SaatIni = await kepsek.GetSaatIniAsync(taId),
             TahunAjaranId = taId,
             TahunAjaranAktif = aktifId,
@@ -54,7 +69,12 @@ public class KepalaSekolahController(DataMasterDbContext db, KepalaSekolahServic
     [HttpPost("tetapkan")]
     public async Task<IActionResult> Tetapkan(int guru_id, int? tahun_ajaran_id)
     {
-        var ta = tahun_ajaran_id ?? await kepsek.ActiveTahunAjaranIdAsync();
+        var ta = tahun_ajaran_id ?? await db.TahunAjaran.Where(t => t.IsActive).Select(t => t.TahunAjaranId).FirstOrDefaultAsync();
+        if (ta <= 0)
+        {
+            TempData["error"] = "Tahun ajaran belum dipilih/aktif.";
+            return RedirectToAction(nameof(Index));
+        }
         var guru = await db.Guru.FindAsync(guru_id);
         if (guru is null || !guru.StatusAktif)
         {
@@ -70,7 +90,12 @@ public class KepalaSekolahController(DataMasterDbContext db, KepalaSekolahServic
     [HttpPost("kosongkan")]
     public async Task<IActionResult> Kosongkan(int? tahun_ajaran_id)
     {
-        var ta = tahun_ajaran_id ?? await kepsek.ActiveTahunAjaranIdAsync();
+        var ta = tahun_ajaran_id ?? await db.TahunAjaran.Where(t => t.IsActive).Select(t => t.TahunAjaranId).FirstOrDefaultAsync();
+        if (ta <= 0)
+        {
+            TempData["error"] = "Tahun ajaran belum dipilih/aktif.";
+            return RedirectToAction(nameof(Index));
+        }
         await kepsek.KosongkanAsync(ta);
         TempData["message"] = "Kepala Sekolah dikosongkan.";
         return RedirectToAction(nameof(Index), new { tahun = ta });

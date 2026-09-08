@@ -242,10 +242,26 @@ public class DatabaseBackupService(DataMasterDbContext db, IConfiguration config
         // restore yang keliru tidak menghilangkan data lama tanpa jejak sama sekali.
         var pengaman = Path.Combine(BackupDir(), $"pra_restore_{DateTime.Now:yyyy-MM-dd_HHmmss}.db");
         await db.Database.ExecuteSqlAsync($"VACUUM INTO {pengaman}");
+        RotasiPraRestore();
 
         SqliteConnection.ClearAllPools();
         await File.WriteAllBytesAsync(dbPath, isi);
 
         lifetime.StopApplication();
+    }
+
+    // Snapshot pengaman TIDAK PUNYA rotasi sama sekali di versi awal - kalau
+    // restore dilakukan berulang kali (mis. sesi uji coba/pemulihan berkali-kali),
+    // berkas ini menumpuk SELAMANYA di folder backup/ yang sama, terpisah dari
+    // kuota rotasi "manual_*.db" (RotasiManual() cuma menyaring prefix itu, tidak
+    // menghitung "pra_restore_*"). Bug nyata ditemukan lewat audit "no queue
+    // buildup" terpisah - bukan dari uji restore end-to-end sebelumnya (yang
+    // hanya restore SEKALI, tidak sempat mengungkap penumpukan berulang).
+    private const int PraRestoreMaks = 5;
+
+    private void RotasiPraRestore()
+    {
+        var files = Directory.GetFiles(BackupDir(), "pra_restore_*.db").OrderByDescending(f => f).ToList();
+        foreach (var f in files.Skip(PraRestoreMaks)) { try { File.Delete(f); } catch { /* biarkan, coba lagi siklus berikutnya */ } }
     }
 }

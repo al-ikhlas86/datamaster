@@ -291,36 +291,49 @@ public class KurikulumController(DataMasterDbContext db) : Controller
             TempData["error"] = "Tahun ajaran belum dipilih.";
             return RedirectToAction(nameof(Index));
         }
+        // Ditemukan via audit performa (2026-09-08): versi lama query+SaveChanges
+        // PER SEL matriks (bisa ratusan sel utk matriks penuh) - sekarang SATU
+        // query muat-semua + proses in-memory + SATU SaveChanges di akhir.
+        var peta = await MuatPetaAlokasiAsync(tahun_ajaran_id);
         var n = 0;
         foreach (var (tingkatKode, mapelMap) in alokasi)
         {
             foreach (var (mapelIdStr, jp) in mapelMap)
             {
                 if (!int.TryParse(mapelIdStr, out var mapelId)) continue;
-                await SimpanSelAsync(tahun_ajaran_id, tingkatKode, mapelId, jp);
+                SimpanSelInMemory(peta, tahun_ajaran_id, tingkatKode, mapelId, jp);
                 n++;
             }
         }
+        await db.SaveChangesAsync();
         TempData["message"] = $"Alokasi kurikulum disimpan ({n} sel diperiksa).";
         return Back("alokasi", tahun_ajaran_id);
     }
 
-    private async Task SimpanSelAsync(int ta, string tingkatKode, int mapelId, int jp)
+    private async Task<Dictionary<(string TingkatKode, int MataPelajaranId), KurikulumAlokasi>> MuatPetaAlokasiAsync(int ta) =>
+        (await db.KurikulumAlokasi.Where(a => a.TahunAjaranId == ta).ToListAsync()).ToDictionary(a => (a.TingkatKode, a.MataPelajaranId));
+
+    // Versi in-memory dari SimpanSelAsync lama - Remove/Add tetap lewat db (perlu
+    // tracking EF), tapi TANPA query/SaveChanges di dalam method ini sendiri;
+    // caller (SimpanAlokasi/ProcessImportAlokasi) yang panggil SaveChangesAsync
+    // SEKALI di akhir setelah semua sel diproses.
+    private void SimpanSelInMemory(Dictionary<(string TingkatKode, int MataPelajaranId), KurikulumAlokasi> peta, int ta, string tingkatKode, int mapelId, int jp)
     {
-        var existing = await db.KurikulumAlokasi.FirstOrDefaultAsync(a => a.TahunAjaranId == ta && a.TingkatKode == tingkatKode && a.MataPelajaranId == mapelId);
+        var key = (tingkatKode, mapelId);
         if (jp <= 0)
         {
-            if (existing is not null) db.KurikulumAlokasi.Remove(existing);
+            if (peta.TryGetValue(key, out var existing)) { db.KurikulumAlokasi.Remove(existing); peta.Remove(key); }
         }
-        else if (existing is not null)
+        else if (peta.TryGetValue(key, out var existing2))
         {
-            existing.JpPerMinggu = jp;
+            existing2.JpPerMinggu = jp;
         }
         else
         {
-            db.KurikulumAlokasi.Add(new KurikulumAlokasi { TahunAjaranId = ta, TingkatKode = tingkatKode, MataPelajaranId = mapelId, JpPerMinggu = jp });
+            var baru = new KurikulumAlokasi { TahunAjaranId = ta, TingkatKode = tingkatKode, MataPelajaranId = mapelId, JpPerMinggu = jp };
+            db.KurikulumAlokasi.Add(baru);
+            peta[key] = baru;
         }
-        await db.SaveChangesAsync();
     }
 
     [HttpPost("alokasi/salin")]
@@ -387,6 +400,7 @@ Baris dgn tingkat/mapel yang tidak dikenali akan DILEWATI dan dilaporkan.";
 
         var tingkatValid = (await db.Tingkat.Where(t => t.IsActive).Select(t => t.Kode).ToListAsync()).ToHashSet();
         var mapelByNama = await db.MataPelajaran.ToDictionaryAsync(m => m.Nama.ToLowerInvariant(), m => m.MataPelajaranId);
+        var peta = await MuatPetaAlokasiAsync(tahun_ajaran_id);
 
         int masuk = 0, dilewati = 0;
         var errors = new List<string>();
@@ -403,9 +417,10 @@ Baris dgn tingkat/mapel yang tidak dikenali akan DILEWATI dan dilaporkan.";
             if (!mapelByNama.TryGetValue(namaMapel.ToLowerInvariant(), out var mapelId)) { errors.Add($"Baris {rowNum}: mata pelajaran \"{namaMapel}\" tidak ditemukan (tambahkan dulu di tab Mata Pelajaran)."); dilewati++; continue; }
 
             int.TryParse(jpRaw, out var jp);
-            await SimpanSelAsync(tahun_ajaran_id, tingkat, mapelId, jp);
+            SimpanSelInMemory(peta, tahun_ajaran_id, tingkat, mapelId, jp);
             masuk++;
         }
+        await db.SaveChangesAsync();
 
         if (errors.Count > 0) TempData["import_errors"] = JsonSerializer.Serialize(errors);
         TempData["message"] = $"Import selesai: {masuk} sel diproses, {dilewati} dilewati.";

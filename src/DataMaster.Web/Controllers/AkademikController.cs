@@ -64,17 +64,23 @@ public class AkademikController(DataMasterDbContext db) : Controller
             return RedirectToAction(nameof(Index));
         }
 
+        // Ditemukan via audit performa (2026-09-08): versi lama query per-siswa
+        // (FindAsync + AnyAsync di dalam loop) bisa jadi ~2xN query saat admin
+        // memilih SEMUA siswa aktif sekaligus (skenario realistis kenaikan kelas
+        // tahunan, ratusan siswa) - sekarang 2 query muat-semua di awal, proses
+        // in-memory, SaveChanges tetap sekali di akhir spt sebelumnya.
         await using var tx = await db.Database.BeginTransactionAsync();
         var processed = 0;
         try
         {
+            var siswaMap = await db.Siswa.Where(s => ids.Contains(s.SiswaId)).ToDictionaryAsync(s => s.SiswaId);
+            var riwayatAda = (await db.RiwayatAkademik.Where(r => ids.Contains(r.SiswaId) && r.TahunAjaranId == tahunAktif.TahunAjaranId).Select(r => r.SiswaId).ToListAsync()).ToHashSet();
+
             foreach (var siswaId in ids)
             {
-                var siswa = await db.Siswa.FindAsync(siswaId);
-                if (siswa is null || siswa.Status != StatusSiswa.aktif) continue; // skip diam-diam (race/sudah diproses)
+                if (!siswaMap.TryGetValue(siswaId, out var siswa) || siswa.Status != StatusSiswa.aktif) continue; // skip diam-diam (race/sudah diproses)
 
-                var sudahAda = await db.RiwayatAkademik.AnyAsync(r => r.SiswaId == siswaId && r.TahunAjaranId == tahunAktif.TahunAjaranId);
-                if (!sudahAda)
+                if (!riwayatAda.Contains(siswaId))
                 {
                     db.RiwayatAkademik.Add(new RiwayatAkademik { SiswaId = siswaId, TahunAjaranId = tahunAktif.TahunAjaranId, KelasId = siswa.KelasId, Status = StatusRiwayatAkademik.naik });
                 }
@@ -113,17 +119,20 @@ public class AkademikController(DataMasterDbContext db) : Controller
             return RedirectToAction(nameof(Index));
         }
 
+        // Sama seperti ProsesNaikKelas - dioptimasi jadi muat-semua di awal (2
+        // query), bukan query per-siswa di dalam loop (lihat catatan di atas).
         await using var tx = await db.Database.BeginTransactionAsync();
         var processed = 0;
         try
         {
+            var siswaMap = await db.Siswa.Where(s => ids.Contains(s.SiswaId)).ToDictionaryAsync(s => s.SiswaId);
+            var riwayatMap = await db.RiwayatAkademik.Where(r => ids.Contains(r.SiswaId) && r.TahunAjaranId == tahunAktif.TahunAjaranId).ToDictionaryAsync(r => r.SiswaId);
+
             foreach (var siswaId in ids)
             {
-                var siswa = await db.Siswa.FindAsync(siswaId);
-                if (siswa is null || siswa.Status != StatusSiswa.aktif) continue;
+                if (!siswaMap.TryGetValue(siswaId, out var siswa) || siswa.Status != StatusSiswa.aktif) continue;
 
-                var existing = await db.RiwayatAkademik.FirstOrDefaultAsync(r => r.SiswaId == siswaId && r.TahunAjaranId == tahunAktif.TahunAjaranId);
-                if (existing is not null)
+                if (riwayatMap.TryGetValue(siswaId, out var existing))
                 {
                     // SUDAH ADA (mis. sebelumnya 'naik' di TA sama) -> UPDATE jadi 'lulus'
                     // (bukan insert baru - cegah duplikat unique(siswa_id,ta)).

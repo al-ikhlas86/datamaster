@@ -3,6 +3,12 @@
     ViewData["Title"] = "Kepala Sekolah";
 }
 
+@if (!Model.AdaTahunAjaran)
+{
+    <p class="text-muted">Belum ada tahun ajaran. Tambahkan dulu di menu Akademik &raquo; Tahun Ajaran.</p>
+    return;
+}
+
 <div class="row">
     <div class="col-lg-7">
         <div class="card">

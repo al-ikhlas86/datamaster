@@ -17,6 +17,17 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        // Rotasi log lama SEDINI mungkin (sebelum server sempat start) - supaya
+        // tetap jalan walau server lokal gagal start (skenario itu jugalah yang
+        // paling butuh log tetap bersih & terbaca, bukan tenggelam file lama).
+        try
+        {
+            var logDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DataMaster", "logs");
+            LogCleanup.RotasiLogLama(logDir);
+        }
+        catch { /* non-fatal */ }
+
         DispatcherUnhandledException += (_, args) =>
         {
             CatatErrorFatal(args.Exception);

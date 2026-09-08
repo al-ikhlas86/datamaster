@@ -492,4 +492,7 @@ src/DataMaster.Web/App_Data/
 src/DataMaster.Web/backup/
 src/DataMaster.Web/backup-antrian/
 src/DataMaster.Web/sync_state/
-src/DataMaster.Web/wwwroot/img/
+src/DataMaster.Web/wwwroot/img/*
+# ...KECUALI default.png - itu ASET STATIS (fallback placeholder saat foto
+# profil user kosong), bukan data upload runtime spt file lain di folder ini.
+!src/DataMaster.Web/wwwroot/img/default.png

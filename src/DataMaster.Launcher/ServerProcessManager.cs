@@ -49,6 +49,7 @@ public sealed class ServerProcessManager : IDisposable
         Directory.CreateDirectory(DataDirectory);
         var logDir = Path.Combine(DataDirectory, "logs");
         Directory.CreateDirectory(logDir);
+        LogCleanup.RotasiLogLama(logDir);
 
         var (fileName, arguments, workDir) = LocateServerExecutable();
 
