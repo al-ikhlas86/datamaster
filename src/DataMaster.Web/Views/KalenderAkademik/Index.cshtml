@@ -17,19 +17,19 @@
     }));
 }
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h3 class="mb-0">Kalender Akademik</h3>
-    <a asp-action="Import" asp-route-tahun="@Model.TahunAjaranId" class="btn btn-outline-secondary">Import Excel</a>
-</div>
-
-<div class="mb-3" style="max-width:320px">
-    <select class="form-select" onchange="window.location.href='@Url.Action("Index")?tahun='+this.value">
-        @foreach (var (id, nama) in Model.TahunAjaranList)
-        {
-            if (id == Model.TahunAjaranId) { <option value="@id" selected>@nama</option> }
-            else { <option value="@id">@nama</option> }
-        }
-    </select>
+<div class="row g-2 mb-3">
+    <div class="col-md-4" style="max-width:320px">
+        <select class="form-select" onchange="window.location.href='@Url.Action("Index")?tahun='+this.value">
+            @foreach (var (id, nama) in Model.TahunAjaranList)
+            {
+                if (id == Model.TahunAjaranId) { <option value="@id" selected>@nama</option> }
+                else { <option value="@id">@nama</option> }
+            }
+        </select>
+    </div>
+    <div class="col-md-8 d-flex gap-2">
+        <a asp-action="Import" asp-route-tahun="@Model.TahunAjaranId" class="btn btn-outline-success btn-sm"><i class="feather-upload me-1"></i>Import Excel</a>
+    </div>
 </div>
 
 @if (TempData["import_errors"] is string errJson)

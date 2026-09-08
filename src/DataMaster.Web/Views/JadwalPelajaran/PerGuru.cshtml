@@ -4,11 +4,6 @@
     var namaHari = new Dictionary<string, string> { ["senin"] = "Senin", ["selasa"] = "Selasa", ["rabu"] = "Rabu", ["kamis"] = "Kamis", ["jumat"] = "Jumat", ["sabtu"] = "Sabtu", ["minggu"] = "Minggu" };
 }
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h3 class="mb-0">Jadwal Per Guru</h3>
-    <a asp-action="Index" asp-route-tahun="@Model.TahunAjaranId" asp-route-semester="@Model.Semester" class="btn btn-outline-secondary">Kembali ke Grid</a>
-</div>
-
 <form method="get" class="row g-2 mb-3 align-items-end" id="formFilter">
     <div class="col-auto">
         <label class="form-label">Tahun Ajaran</label>
@@ -38,6 +33,9 @@
                 else { <option value="@g.GuruId">@label</option> }
             }
         </select>
+    </div>
+    <div class="col-auto">
+        <a asp-action="Index" asp-route-tahun="@Model.TahunAjaranId" asp-route-semester="@Model.Semester" class="btn btn-outline-secondary btn-sm"><i class="feather-arrow-left me-1"></i>Kembali ke Grid</a>
     </div>
 </form>
 

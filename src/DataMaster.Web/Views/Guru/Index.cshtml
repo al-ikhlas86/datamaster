@@ -3,14 +3,13 @@
     ViewData["Title"] = "Data Guru & Pegawai";
 }
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h3 class="mb-0">Data Guru &amp; Pegawai</h3>
-    <div>
-        <a asp-action="Print" target="_blank" class="btn btn-outline-secondary">Print</a>
-        <a asp-action="Import" class="btn btn-outline-secondary">Import Excel</a>
-        <a asp-action="Create" class="btn btn-primary">Tambah Guru</a>
+@section PageActions {
+    <div class="d-flex gap-2">
+        <a asp-action="Print" target="_blank" class="btn btn-outline-secondary btn-action"><i class="feather-printer me-1"></i> Print</a>
+        <a asp-action="Import" class="btn btn-outline-success btn-action"><i class="feather-upload me-1"></i> Import Excel</a>
+        <a asp-action="Create" class="btn btn-primary btn-action"><i class="feather-plus me-1"></i> Tambah Guru</a>
     </div>
-</div>
+}
 
 <div class="row g-3 mb-3">
     <div class="col-md-3"><div class="card text-center"><div class="card-body"><div class="text-muted small">Total</div><div class="fs-4 fw-bold">@Model.Total</div></div></div></div>

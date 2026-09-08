@@ -5,15 +5,6 @@
     var namaHari = new Dictionary<string, string> { ["senin"] = "Senin", ["selasa"] = "Selasa", ["rabu"] = "Rabu", ["kamis"] = "Kamis", ["jumat"] = "Jumat", ["sabtu"] = "Sabtu", ["minggu"] = "Minggu" };
 }
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h3 class="mb-0">Jadwal Pelajaran</h3>
-    <div class="d-flex gap-2">
-        <a asp-action="Import" asp-route-tahun="@Model.TahunAjaranId" asp-route-semester="@Model.Semester" class="btn btn-outline-secondary">Import Excel</a>
-        <a asp-action="Cetak" asp-route-tahun="@Model.TahunAjaranId" asp-route-semester="@Model.Semester" target="_blank" class="btn btn-outline-secondary">Cetak</a>
-        <a asp-action="PerGuru" asp-route-tahun="@Model.TahunAjaranId" asp-route-semester="@Model.Semester" class="btn btn-outline-secondary">Per Guru</a>
-    </div>
-</div>
-
 @if (!Model.AdaTahunAjaran)
 {
     <p class="text-muted">Belum ada tahun ajaran. Tambahkan dulu di menu Akademik &raquo; Tahun Ajaran.</p>
@@ -51,6 +42,11 @@
             </select>
         </div>
     }
+    <div class="col-auto d-flex gap-2 flex-wrap">
+        <a asp-action="Import" asp-route-tahun="@Model.TahunAjaranId" asp-route-semester="@Model.Semester" class="btn btn-outline-success btn-sm"><i class="feather-upload me-1"></i>Import Excel</a>
+        <a asp-action="Cetak" asp-route-tahun="@Model.TahunAjaranId" asp-route-semester="@Model.Semester" target="_blank" class="btn btn-outline-secondary btn-sm"><i class="feather-printer me-1"></i>Cetak</a>
+        <a asp-action="PerGuru" asp-route-tahun="@Model.TahunAjaranId" asp-route-semester="@Model.Semester" class="btn btn-outline-secondary btn-sm"><i class="feather-user me-1"></i>Per Guru</a>
+    </div>
 </form>
 
 @if (TempData["import_errors"] is string errJson)

@@ -5,10 +5,6 @@
     var namaHari = new Dictionary<string, string> { ["senin"] = "Senin", ["selasa"] = "Selasa", ["rabu"] = "Rabu", ["kamis"] = "Kamis", ["jumat"] = "Jumat", ["sabtu"] = "Sabtu", ["minggu"] = "Minggu" };
 }
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h3 class="mb-0">Kurikulum</h3>
-</div>
-
 <div class="mb-3" style="max-width:320px">
     <select class="form-select" onchange="window.location.href='@Url.Action("Index")?tab=@Model.Tab&tahun_ajaran_id='+this.value">
         @foreach (var (id, nama) in Model.TahunAjaranList)

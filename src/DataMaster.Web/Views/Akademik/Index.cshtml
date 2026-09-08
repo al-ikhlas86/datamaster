@@ -3,19 +3,16 @@
     ViewData["Title"] = "Akademik";
 }
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h3 class="mb-0">
-        Akademik
+@section PageActions {
+    <div class="d-flex gap-2 align-items-center">
         @if (Model.AdaTahunAktif)
         {
-            <span class="badge bg-primary ms-2">TA Aktif: @Model.TahunAktifNama</span>
+            <span class="badge bg-success fs-6"><i class="feather-calendar me-1"></i>TA Aktif: @Model.TahunAktifNama</span>
         }
-    </h3>
-    <div>
-        <a asp-action="Arsip" class="btn btn-outline-secondary">Arsip Historis</a>
-        <a asp-action="RekapLulusan" class="btn btn-outline-secondary">Rekap Lulusan</a>
+        <a asp-action="Arsip" class="btn btn-outline-info btn-action"><i class="feather-archive me-1"></i> Arsip Historis</a>
+        <a asp-action="RekapLulusan" class="btn btn-outline-primary btn-action"><i class="feather-award me-1"></i> Rekap Lulusan</a>
     </div>
-</div>
+}
 
 @if (!Model.AdaTahunAktif)
 {
