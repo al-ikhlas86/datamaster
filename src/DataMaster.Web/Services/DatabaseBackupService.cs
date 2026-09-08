@@ -1,5 +1,7 @@
+using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using DataMaster.Data;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -52,6 +54,99 @@ public class DatabaseBackupService(DataMasterDbContext db, IConfiguration config
     {
         var files = Directory.GetFiles(BackupDir(), "manual_*.db").OrderByDescending(f => f).ToList();
         foreach (var f in files.Skip(ManualBackupMaks)) { try { File.Delete(f); } catch { /* biarkan, coba lagi siklus berikutnya */ } }
+    }
+
+    // ---------------------------------------------------------------- Backup Awan (terenkripsi)
+    // Port dari App\Commands\BackupCloud.php - lihat 04-infra-auth-sync.md §8.2.
+    private const int AntrianMaks = 7;
+
+    private string AntrianDir()
+    {
+        var dir = Path.Combine(Path.GetDirectoryName(DbFilePath())!, "..", "backup-antrian");
+        Directory.CreateDirectory(dir);
+        return Path.GetFullPath(dir);
+    }
+
+    // buatBackupHariIni() - cek jam terjadwal (diatur Admin di Setting), idempotent
+    // (kalau berkas hari ini SUDAH ada di antrian, dilewati - aman dijalankan
+    // sesering apa pun). Return true kalau berkas baru benar2 dibuat.
+    public async Task<bool> BuatBackupHariIniJikaPerluAsync(string passphrase)
+    {
+        var jamTerjadwal = await JamBackupOnlineAsync();
+        if (DateTime.Now.Hour < jamTerjadwal) return false;
+
+        var tanggal = DateTime.Now.ToString("yyyy-MM-dd");
+        if (Directory.GetFiles(AntrianDir(), $"datamaster_{tanggal}_*.db.enc").Length > 0) return false;
+
+        var tempPath = Path.Combine(Path.GetTempPath(), $"dm_dump_{Guid.NewGuid():N}.db");
+        try
+        {
+            await db.Database.ExecuteSqlAsync($"VACUUM INTO {tempPath}");
+            var plain = await File.ReadAllBytesAsync(tempPath);
+            var encrypted = Enkripsi(plain, passphrase);
+            var nama = $"datamaster_{DateTime.Now:yyyy-MM-dd_HHmmss}.db.enc";
+            await File.WriteAllBytesAsync(Path.Combine(AntrianDir(), nama), encrypted);
+        }
+        finally
+        {
+            if (File.Exists(tempPath)) { try { File.Delete(tempPath); } catch { /* abaikan */ } }
+        }
+
+        RotasiAntrian();
+        return true;
+    }
+
+    // Batas antrian ANTRIAN_MAKS=7 - jaga disk tidak menggunung kalau internet
+    // mati berkepanjangan. Nama file sudah mengandung tanggal+jam, urut abjad =
+    // urut waktu (sort()).
+    private void RotasiAntrian()
+    {
+        var files = Directory.GetFiles(AntrianDir(), "*.db.enc").OrderBy(f => f).ToList();
+        foreach (var f in files.Take(Math.Max(0, files.Count - AntrianMaks))) { try { File.Delete(f); } catch { /* abaikan */ } }
+    }
+
+    // kirimAntrian() - jalan TANPA syarat jam (beda dari buatBackupHariIni), kirim
+    // SEMUA berkas di antrian urut file TERLAMA dulu. Gagal koneksi ATAU ditolak
+    // server (non-exception, mis. token salah) -> STOP loop (jangan membanjiri
+    // server dgn percobaan file berikutnya), berkas dibiarkan di antrian dicoba
+    // lagi siklus berikutnya.
+    public async Task<int> KirimAntrianAsync(HttpClient http, string url, string token)
+    {
+        var files = Directory.GetFiles(AntrianDir(), "*.db.enc").OrderBy(f => f).ToList();
+        var terkirim = 0;
+
+        foreach (var f in files)
+        {
+            try
+            {
+                using var content = new MultipartFormDataContent();
+                var bytes = await File.ReadAllBytesAsync(f);
+                var fileContent = new ByteArrayContent(bytes);
+                fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+                content.Add(fileContent, "berkas", Path.GetFileName(f));
+
+                using var req = new HttpRequestMessage(HttpMethod.Post, $"{url}/api/v1/backup/upload");
+                req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                req.Content = content;
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
+                using var resp = await http.SendAsync(req, cts.Token);
+
+                if (!resp.IsSuccessStatusCode) break;
+
+                using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+                if (!doc.RootElement.TryGetProperty("success", out var ok) || !ok.GetBoolean()) break;
+
+                File.Delete(f);
+                terkirim++;
+                await CatatWaktuAsync("last_backup_online_at");
+            }
+            catch
+            {
+                break; // internet mati/timeout - berhenti, coba lagi siklus berikutnya
+            }
+        }
+
+        return terkirim;
     }
 
     public async Task CatatWaktuAsync(string key)

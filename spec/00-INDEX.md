@@ -31,7 +31,7 @@ supaya tahu persis sudah sampai mana dan apa langkah berikutnya.
 | Halaman/Controller: **Kurikulum lengkap** (Mata Pelajaran CRUD+import, Struktur Kurikulum/Alokasi JP matrix+salin+import, Jam Belajar dgn 2 aturan bentrok+salin+import) | Selesai & teruji end-to-end. |
 | Halaman/Controller: **Jadwal Pelajaran** (grid per-kelas kode "35K", parser `bacaKode()`, deteksi bentrok guru lintas kelas, salin TA sama/beda, Piket replace-all, Cetak semua kelas, Per Guru+beban, import Excel dgn pencocokan kolom dinamis+prioritas kolom-tak-dikenal) | Selesai & teruji end-to-end. **Spec 03 (Kurikulum, Jadwal Pelajaran, Kalender Akademik, Akademik) kini 100% SELESAI dibangun.** |
 | Halaman/Controller: **Auth (Login/Setup Awal/Logout, cookie auth, RBAC role admin, rate-limit login bertahap) + Dashboard (Pendidikan+Perusahaan, panel Langkah Persiapan Awal) + Setting (profil+password+backup manual+jadwal backup+restore) + DevPreview** | Selesai & teruji end-to-end. **LINGKUP DIPERSEMPIT SENGAJA (didokumentasikan)**: fitur "Lupa Password via email" TIDAK diporting (PHP asli sendiri kemungkinan besar tidak fungsional tanpa SMTP - lihat 04-infra-auth-sync.md §6/§21); `allowRegistration=false` PHP diganti "Setup Awal" 1x saat tabel Users kosong (CLI `spark auth:create_user` tidak masuk akal utk distribusi desktop end-user - lihat catatan modul di bawah); cakupan `role:admin` PHP yang SPOTTY (cuma sebagian controller di `Filters.php`) diganti proteksi KONSISTEN: SEMUA controller wajib login (global filter), controller yang PHP asli tandai `role:admin` (Siswa/CalonSiswa/Guru/Kelas/TahunAjaran/Akademik/User) tetap `[Authorize(Roles="admin")]` - superset lebih aman, bukan replikasi celah. Sinkronisasi Hub API (SyncPush) & BackupCloud (upload terenkripsi ke awan) BELUM diporting - lihat baris terpisah di bawah. |
-| Sinkronisasi Hub API (port dari SyncPush.php) + BackupCloud (upload backup terenkripsi ke awan) | Belum dimulai |
+| Halaman/Controller: **Sinkronisasi Hub API** (`HubApiSyncService` - port `SyncPush.php`, 11 entitas push + pull keputusan PSB, fingerprint hemat-jaringan, full-snapshot vs non-full) **+ Backup Awan terenkripsi** (`BackupCloudHostedService` - port `BackupCloud.php`, AES-256-CBC+PBKDF2, antrian+rotasi+upload) | Selesai & **diuji end-to-end terhadap instance hub-api LOKAL SUNGGUHAN** (`C:\xampp\htdocs\hub-api`, MySQL asli, bukan mock) - lihat catatan modul di bawah untuk rincian & 1 bug nyata ditemukan+diperbaiki. |
 | Launcher (splash, start/stop server, WebView2, auto-update) | Kerangka XAML splash sudah ada (`MainWindow.xaml`); `MainWindow.xaml.cs` (logic start server + WebView2 + auto-update) belum dimulai |
 | CI GitHub Actions (build+release, pola Presensi) | Belum dimulai |
 | Uji coba sbg PC TU TK (token Hub API baru, unit_id=2) | Belum dimulai |
@@ -463,9 +463,87 @@ SELESAI dibangun dan teruji end-to-end.**
   `alpha_numeric_space` PHP asli memang tidak mengizinkan underscore, BENAR sesuai
   spec, bukan cacat implementasi).
 
-**Fase berikutnya: Sinkronisasi Hub API (SyncPush) + BackupCloud (upload otomatis
-ke awan) - BELUM tersentuh sama sekali, dan Launcher WPF (start/stop server,
-WebView2, auto-update, restart-setelah-restore) - masih kerangka splash screen saja.**
+## Catatan modul Sinkronisasi Hub API & Backup Awan
+
+- File: `Services/HubApiSyncService.cs` (port `SyncPush.php` §7 - 11 method push +
+  1 pull + 1 lapor-selesai + helper fingerprint/post generik), `Services/
+  HubApiSyncHostedService.cs` (loop periodik 1 menit), `Services/
+  DatabaseBackupService.cs` (ditambah bagian Backup Awan: `BuatBackupHariIniJikaPerluAsync`/
+  `KirimAntrianAsync`/`RotasiAntrian`, port `BackupCloud.php` §8.2),
+  `Services/BackupCloudHostedService.cs` (loop periodik 30 menit).
+  `AppOptions` (`HubApiUrl`/`HubApiToken`/`BackupPassphrase`/`InstallType`) dibaca
+  dari `appsettings.json` section `AppSettings` - kosong default, HARUS diisi
+  manual saat instalasi produksi (§8.2 "tidak ada fallback otomatis").
+- **ADAPTASI ARSITEKTUR SENGAJA**: PHP asli menjadwalkan `sync:push`/`backup:cloud`
+  sbg proses CLI TERPISAH lewat Windows Task Scheduler (tiap 1 menit / 30 menit).
+  Di sini keduanya jadi `BackgroundService` (`PeriodicTimer`) DI DALAM proses
+  Kestrel yang sama - desktop app ini sudah long-running selama WebView2 terbuka,
+  jadi proses CLI terpisah tidak diperlukan. Loop TUNGGAL secara alami mencegah
+  overlap (setara "Task Scheduler skip kalau eksekusi sebelumnya masih berjalan").
+  `do-while` membuat siklus PERTAMA jalan LANGSUNG saat app start (bukan menunggu
+  interval penuh dulu) - lebih responsif dari Task Scheduler, tidak mengubah makna.
+- **Fingerprint hemat-jaringan (§7.4) direplikasi PERSIS**: `sha256("v4-full|" +
+  json)`, versi protokol "v4-full" SENGAJA DISAMAKAN PERSIS dgn versi payload PHP
+  asli (guru sudah termasuk `is_kepala_sekolah`+`status_keluar`) - supaya PC yang
+  datanya kebetulan identik dgn kiriman PHP lama TIDAK perlu kirim ulang semua saat
+  berpindah ke implementasi C# ini. File fingerprint per-path (`md5(path).hash`)
+  disimpan di `sync_state/` SELEVEL dgn `backup/` (BUKAN di database) - sengaja
+  supaya tidak ikut ter-backup/ter-restore.
+- **`kelas_source_id` guru - ADAPTASI terdokumentasi**: skema C# di sini menyimpan
+  riwayat Wali Kelas PER TAHUN AJARAN (beda dari asumsi PHP lama "1 guru maks 1
+  kelas SELAMANYA" via `UNIQUE(guru_id)` global) - dipetakan ke wali kelas TAHUN
+  AJARAN AKTIF SAJA sbg representasi "kelas wali SAAT INI" di payload guru. Riwayat
+  LENGKAP lintas tahun tetap terkirim UTUH via `pushWaliKelas` (full snapshot
+  terpisah, tidak terpotong).
+- **1 bug nyata ditemukan & diperbaiki SAAT uji terhadap hub-api SUNGGUHAN** (bukan
+  mock - ini justru BUKTI kenapa uji end-to-end nyata wajib, bukan cuma baca kode):
+  `PullKeputusanPsbAsync` awalnya parse field JSON numerik (`id`, `calon_siswa_source_id`,
+  `kelas_source_id`) via `JsonElement.GetInt32()` langsung, ASUMSI semua angka JSON
+  native. Ternyata baris `PsbKeputusanModel` di hub-api (CI4+MySQLi, hasil query
+  DB mentah) mengembalikan SEMUA kolom sbg STRING di JSON (`"id":"3"`, bukan `"id":3`)
+  - BEDA dari respons `SyncController` (counter PHP int murni `$synced++` tetap
+    JSON number asli). Exception nyata: `"requires Number, target has String"`.
+  **Fix**: helper `GetIntFlexible()` menerima KEDUA bentuk (`JsonValueKind.Number`
+  ATAU `JsonValueKind.String` yg di-`int.TryParse`), diterapkan jg ke parsing respons
+  `PostAsync` (synced/changed/unchanged/deleted) sbg pertahanan berlapis walau jalur
+  itu terbukti sudah benar. **Pelajaran umum**: JANGAN asumsikan tipe JSON dari API
+  eksternal PHP/MySQLi konsisten across-endpoint - baris query mentah vs counter
+  terhitung PHP bisa berbeda representasi, walau sama2 "angka" secara logis.
+- **Diuji end-to-end SUNGGUHAN thd hub-api lokal** (`C:\xampp\htdocs\hub-api`, MySQL
+  `hubapi_db` asli dinyalakan via `mysql_start.bat`, server `php spark serve`,
+  klien API test dibuat via `php spark api:create-client ... source 999`, SEMUA
+  data uji+klien test DIHAPUS BERSIH dari `hubapi_db` sebelum sesi selesai):
+  - **Ke-11 entitas push diverifikasi FIELD-PER-FIELD lewat baca-balik `DataController`
+    Hub API** (bukan cuma "200 OK") - Kelas (label tingkat benar dari nama Tingkat,
+    bukan fallback), Guru (`kelas_source_id` resolve benar dari WaliKelas, jabatan
+    ikut ter-refleksi hasil auto-sync guru_bidang→guru_kelas dari modul Penugasan
+    Mengajar sebelumnya, `is_kepala_sekolah` benar), Siswa, TahunAjaran, MataPelajaran,
+    JamPelajaran, WaliKelas, KepalaSekolah, **JadwalPelajaran (JOIN dgn JamPelajaran
+    resolve hari/jam_mulai/jam_selesai/jam_ke dgn benar, guru_source_id null utk
+    mapel tanpa guru tetap)**, KalenderAkademik, PSB (dokumen_lengkap=0 benar
+    krn tanpa upload dokumen) - SEMUA cocok persis data yang diinput via web.
+  - **Fingerprint diverifikasi NYATA lewat 2 siklus proses berbeda**: entitas yang
+    datanya TIDAK berubah antar-restart correctly SKIP kirim ("tidak berubah sejak
+    sync terakhir"), entitas yang datanya BERUBAH correctly terkirim ulang - bukan
+    cuma dibaca dari kode, timing race alami dari 2 proses server terpisah
+    membuktikan logic compare-fingerprint bekerja benar di kedua arah.
+  - **Pull keputusan PSB - SEMUA 3 skenario diuji via hub-api SUNGGUHAN** (submit
+    keputusan lewat `POST /api/v1/psb/keputusan` persis cara Mobile-app asli akan
+    memanggilnya): Terima→siswa baru benar2 tercipta lokal dgn NIS sesuai kiriman,
+    Tolak→status calon jadi "ditolak" dgn catatan, **kelas_source_id tidak
+    valid→gagal DENGAN PESAN TEPAT** ("Kelas tujuan tidak ditemukan...") TANPA
+    merusak data lokal, dan `laporKeputusanSelesai` mengembalikan status
+    applied/failed yang benar ke hub-api (diverifikasi langsung query tabel
+    `psb_keputusan` di `hubapi_db`).
+  - **Backup awan end-to-end**: berkas terenkripsi otomatis dibuat (`VACUUM INTO`
+    + AES-256-CBC) dan ter-upload ke endpoint `/api/v1/backup/upload` hub-api PADA
+    SIKLUS PERTAMA startup, diverifikasi lewat `GET /api/v1/backup/status` hub-api
+    (ukuran berkas & waktu cocok).
+
+**Fase berikutnya: Launcher WPF (start/stop server, WebView2, auto-update,
+restart-setelah-restore) - masih kerangka splash screen saja, belum ada logic sama
+sekali. Setelah itu: CI/CD GitHub Actions, dan uji coba sungguhan sbg PC TU TK
+(token Hub API produksi baru, unit_id=2) sebelum dianggap siap dipakai nyata.**
 
 ## Prinsip wajib dipegang tiap sesi lanjutan
 

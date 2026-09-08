@@ -487,6 +487,9 @@ $RECYCLE.BIN/
 *.db-wal
 *.db.enc
 src/DataMaster.Web/App_Data/
-# Backup lokal (manual + pra-restore) & foto profil upload - runtime, per-instalasi
+# Backup lokal (manual + pra-restore), antrian backup awan, foto profil upload,
+# state fingerprint sync Hub API - semua runtime/per-instalasi
 src/DataMaster.Web/backup/
+src/DataMaster.Web/backup-antrian/
+src/DataMaster.Web/sync_state/
 src/DataMaster.Web/wwwroot/img/

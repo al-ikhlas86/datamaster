@@ -67,6 +67,15 @@ builder.Services.AddScoped<WaliKelasService>();
 builder.Services.AddScoped<KepalaSekolahService>();
 builder.Services.AddScoped<DatabaseBackupService>();
 
+// Sinkronisasi Hub API (port SyncPush.php, lihat 04-infra-auth-sync.md §7) & Backup
+// Awan terenkripsi (port BackupCloud.php, §8.2) - keduanya jalan sbg background
+// service DI DALAM proses yang sama (adaptasi dari Windows Task Scheduler +
+// proses CLI terpisah PHP asli, lihat komentar di masing2 HostedService).
+builder.Services.AddHttpClient<HubApiSyncService>();
+builder.Services.AddHttpClient();
+builder.Services.AddHostedService<HubApiSyncHostedService>();
+builder.Services.AddHostedService<BackupCloudHostedService>();
+
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
