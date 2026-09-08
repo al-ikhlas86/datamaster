@@ -1,0 +1,123 @@
+@model DataMaster.Web.Controllers.KepalaSekolahIndexViewModel
+@{
+    ViewData["Title"] = "Kepala Sekolah";
+}
+
+<div class="row">
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-person-check me-2"></i>Kepala Sekolah</div>
+            <div class="card-body">
+                <p class="text-muted">Kepala Sekolah BUKAN jabatan terpisah - orang yang ditunjuk di sini TETAP guru/guru kelas/ pegawai seperti biasa (jam mengajar, presensi, dst tidak berubah), cuma dapat kapasitas tambahan menyetujui izin guru di aplikasi Mobile-app.</p>
+
+                <div class="mb-3">
+                    <label class="form-label small text-uppercase text-muted fw-semibold">Tahun Ajaran</label>
+                    <select id="pilihTahunAjaran" class="form-select" onchange="window.location.href='@Url.Action("Index")?tahun='+this.value">
+                        @foreach (var (id, nama) in Model.TahunAjaranList)
+                        {
+                            var label = nama + (id == Model.TahunAjaranAktif ? " (aktif sekarang)" : "");
+                            if (id == Model.TahunAjaranId) { <option value="@id" selected>@label</option> }
+                            else { <option value="@id">@label</option> }
+                        }
+                    </select>
+                </div>
+
+                @if (Model.TahunAjaranId != Model.TahunAjaranAktif)
+                {
+                    <div class="alert alert-info small"><i class="bi bi-info-circle me-1"></i>Anda sedang melihat/mengisi tahun ajaran yang BUKAN tahun aktif sekarang - perubahan di sini TIDAK memengaruhi tahun ajaran yang sedang berjalan.</div>
+                }
+
+                @if (Model.SaatIni is not null)
+                {
+                    <div class="d-flex justify-content-between align-items-center bg-light rounded p-3 mb-3">
+                        <div>
+                            <div class="text-xs text-uppercase text-muted fw-semibold">Kepala Sekolah saat ini</div>
+                            <div class="fw-bold fs-5">@Model.SaatIni.Nama</div>
+                        </div>
+                        <form action="@Url.Action("Kosongkan")" method="post" class="form-kosongkan-kepsek">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="tahun_ajaran_id" value="@Model.TahunAjaranId" />
+                            <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-x-circle me-1"></i>Kosongkan</button>
+                        </form>
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-secondary">Belum ada Kepala Sekolah ditetapkan.</div>
+                }
+
+                <form id="formTetapkanKepsek" action="@Url.Action("Tetapkan")" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" id="kepsekGuruId" name="guru_id" value="" />
+                    <input type="hidden" name="tahun_ajaran_id" value="@Model.TahunAjaranId" />
+                    <label class="form-label fw-semibold">Ganti / Tetapkan Kepala Sekolah</label>
+                    <div class="position-relative">
+                        <input type="text" id="kepsekNama" class="form-control" placeholder="Ketik nama guru/pegawai..." autocomplete="off" />
+                        <div class="list-group position-absolute w-100 shadow-sm" id="kepsekSaran" style="z-index:1055;display:none;max-height:260px;overflow-y:auto;"></div>
+                    </div>
+                    <div class="text-danger small mt-2" id="kepsekError" style="display:none"></div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            var URL_CARI = @Html.Raw(Json.Serialize(Url.Action("CariKandidat")));
+            var input = document.getElementById('kepsekNama');
+            var hid = document.getElementById('kepsekGuruId');
+            var kotak = document.getElementById('kepsekSaran');
+            var form = document.getElementById('formTetapkanKepsek');
+            var errBox = document.getElementById('kepsekError');
+            var timer = null;
+
+            function cari() {
+                clearTimeout(timer);
+                var kata = input.value.trim();
+                timer = setTimeout(function () {
+                    fetch(URL_CARI + '?q=' + encodeURIComponent(kata)).then(function (r) { return r.json(); }).then(function (list) {
+                        if (list.length === 0) {
+                            kotak.innerHTML = '<div class="list-group-item small text-muted">Tidak ada nama cocok.</div>';
+                        } else {
+                            kotak.innerHTML = list.map(function (g) {
+                                return '<button type="button" class="list-group-item list-group-item-action small js-pilih-kepsek" data-id="' + g.guru_id + '" data-nama="' + String(g.nama).replace(/"/g, '&quot;') + '">' + g.nama + '</button>';
+                            }).join('');
+                        }
+                        kotak.style.display = '';
+                    });
+                }, 120);
+            }
+
+            input.addEventListener('focus', cari);
+            input.addEventListener('input', cari);
+            input.addEventListener('blur', function () { setTimeout(function () { kotak.style.display = 'none'; }, 150); });
+
+            kotak.addEventListener('mousedown', function (e) {
+                var btn = e.target.closest('.js-pilih-kepsek');
+                if (!btn) return;
+                e.preventDefault();
+                input.value = btn.dataset.nama;
+                hid.value = btn.dataset.id;
+                kotak.style.display = 'none';
+                errBox.style.display = 'none';
+
+                fetch(form.action, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: new FormData(form) })
+                    .then(function () { window.location.reload(); })
+                    .catch(function () {
+                        errBox.textContent = 'Gagal menyimpan - periksa koneksi.';
+                        errBox.style.display = '';
+                    });
+            });
+
+            var formKosongkan = document.querySelector('.form-kosongkan-kepsek');
+            if (formKosongkan) {
+                formKosongkan.addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    if (confirm('Kosongkan Kepala Sekolah?')) this.submit();
+                });
+            }
+        })();
+    </script>
+}

@@ -36,6 +36,7 @@ builder.Services.AddDbContext<DataMasterDbContext>(options =>
 builder.Services.AddScoped<DocumentStorageService>();
 builder.Services.AddScoped<PsbService>();
 builder.Services.AddScoped<WaliKelasService>();
+builder.Services.AddScoped<KepalaSekolahService>();
 
 var app = builder.Build();
 

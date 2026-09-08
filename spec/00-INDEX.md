@@ -24,7 +24,8 @@ supaya tahu persis sudah sampai mana dan apa langkah berikutnya.
 | Halaman/Controller: **Kelas** (CRUD, arsip+proteksi siswa aktif, kelola siswa per kelas, cetak per-kelas/per-tingkat, format-nama-otomatis anti-double-prefix) + **Master Tingkat** (`KurikulumController`, hanya 3 method Tingkat - modul Kurikulum lengkap belum) | Selesai & teruji end-to-end. **LINGKUP BELUM LENGKAP disengaja**: fitur penetapan Wali Kelas (assignWaliKelas dari PenugasanMengajar.php) BELUM diporting krn butuh modul Guru dulu (belum ada) - kolom Wali Kelas sementara nonaktif/placeholder di UI. |
 | Halaman/Controller: **Guru & Pegawai** (CRUD, arsip dgn alasan keluar, import upsert 3-langkah, cetak) | Selesai & teruji end-to-end. **LINGKUP SENGAJA DIPERSEMPIT**: install_type "perusahaan" belum didukung (selalu berperilaku "pendidikan" — semua jabatan diizinkan). |
 | Halaman/Controller: **Penugasan Mengajar "Guru Pengampu"** (nomor urut+deteksi bentrok, tautan guru↔mapel dgn tingkat, AJAX tanpa-reload) + **Wali Kelas** (autocomplete+autosave AJAX di halaman Kelas, sinkronisasi otomatis jabatan guru_kelas↔guru_bidang, guard tolak-ubah-jabatan) | Selesai & teruji end-to-end — CELAH yang didokumentasikan di modul Guru/Kelas sebelumnya kini TERTUTUP (kolom Wali Kelas terisi sungguhan). Termasuk `WaliKelasService` (port `WaliKelasModel.php`) dan tambahan cepat `KurikulumController.StoreMapel` (MataPelajaran belum punya CRUD sendiri). |
-| Halaman/Controller modul lain (Ekskul, Kepala Sekolah, Kurikulum lengkap - Alokasi JP/Jam Belajar, Jadwal Pelajaran, Kalender Akademik, Akademik/Kenaikan Kelas, Auth) | Belum dimulai — **Kepala Sekolah jadi kandidat prioritas berikutnya** (pola sangat mirip Wali Kelas, sudah ada skema+spec lengkap §6) |
+| Halaman/Controller: **Kepala Sekolah** (autocomplete tanpa filter eksklusif, tetapkan/kosongkan per-tahun-ajaran, reload penuh setelah AJAX - beda sengaja dari Wali Kelas/Guru Pengampu) | Selesai & teruji end-to-end. |
+| Halaman/Controller modul lain (Ekskul, Kurikulum lengkap - Alokasi JP/Jam Belajar, Jadwal Pelajaran, Kalender Akademik, Akademik/Kenaikan Kelas, Auth) | Belum dimulai — modul "Guru, Kelas, Tahun Ajaran, Penugasan Mengajar, Kepala Sekolah" (spec 02, minus Ekskul) kini 100% selesai. **Ekskul jadi kandidat termudah berikutnya** (independen, tidak bergantung modul lain yang belum ada). |
 | Sinkronisasi Hub API (port dari SyncPush.php) | Belum dimulai |
 | Launcher (splash, start/stop server, WebView2, auto-update) | Kerangka XAML splash sudah ada (`MainWindow.xaml`); `MainWindow.xaml.cs` (logic start server + WebView2 + auto-update) belum dimulai |
 | CI GitHub Actions (build+release, pola Presensi) | Belum dimulai |
@@ -159,6 +160,23 @@ supaya tahu persis sudah sampai mana dan apa langkah berikutnya.
 - Tidak ada bug baru ditemukan di modul ini - kemungkinan besar krn `WaliKelasService`
   ditulis SANGAT dekat dgn spec §11 (activeTahunAjaranId/getKelasByGuru/tetapkanSemua/
   sinkronJabatanGuru dgn urutan operasi PERSIS sama).
+
+## Catatan modul Kepala Sekolah
+
+- File: `Services/KepalaSekolahService.cs` (port `KepalaSekolahModel.php`),
+  `Controllers/KepalaSekolahController.cs`, `Views/KepalaSekolah/Index.cshtml`.
+  Pola SANGAT mirip Wali Kelas TAPI dengan 3 beda SENGAJA yang JANGAN disamakan:
+  (1) `CariKandidat` TANPA filter eksklusif (guru yang sudah wali kelas TETAP bisa
+  jadi kandidat kepala sekolah - kepala sekolah bukan jabatan, cuma flag tambahan);
+  (2) SETELAH `Tetapkan()` sukses via AJAX, JS SELALU `window.location.reload()`
+  (beda dari Wali Kelas/Guru Pengampu yang eksplisit menghindari reload - lihat
+  02-guru-kelas-struktur.md §6.9); (3) TIDAK ADA guard silang ke modul Guru (gap
+  nyata didokumentasikan §6.10 - kepala sekolah yang dinonaktifkan lewat menu Guru
+  TETAP tampil sebagai "saat ini" sampai di-Kosongkan manual - direplikasi APA ADANYA).
+- **Diuji end-to-end via HTTP nyata**: state kosong ("Belum ada Kepala Sekolah
+  ditetapkan."), autocomplete cari-kandidat, tetapkan (redirect ke `?tahun=` dgn
+  message verbatim), kosongkan (message verbatim, balik ke state kosong).
+- Tidak ada bug baru ditemukan di modul ini.
 
 ## Prinsip wajib dipegang tiap sesi lanjutan
 
