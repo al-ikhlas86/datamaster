@@ -10,6 +10,23 @@ peluncuran: uji coba dulu sebagai instalasi **PC TU TK** (unit baru, tanpa
 data lama yang perlu dimigrasikan) - baru setelah terbukti 100% stabil &
 identik perilakunya, data PC TU SD diimpor ke sini menggantikan web PHP.
 
+## Folder develop vs folder download
+
+Dua hal ini sering ketuker, jadi ditulis eksplisit:
+
+- **Develop (ubah kode, di sini)**: folder ini sendiri, `D:\Data Master`.
+  Berisi source code C#, bukan sesuatu yang dipasang ke PC sekolah.
+- **Download (pasang ke PC sekolah)**: halaman Releases repo GitHub ini -
+  https://github.com/al-ikhlas86/datamaster-desktop/releases - unduh
+  `DataMaster-win-x64.zip` dari rilis terbaru, extract, jalankan
+  `DataMaster.exe`. Repo ini privat, jadi perlu akun GitHub yang sudah
+  diundang sbg kolaborator untuk bisa mengunduh.
+
+Panduan lengkap langkah demi langkah (instalasi PC sekolah, aktifkan update
+otomatis, cara lanjut develop, rencana migrasi PC TU SD) ada di
+**[`PANDUAN-INSTALASI.md`](PANDUAN-INSTALASI.md)** - baca itu duluan kalau
+ini pertama kalinya pegang project ini.
+
 ## Kenapa arsitektur ini (bukan tulis ulang jadi WinForms/WPF native murni)
 
 Data Master itu aplikasi CRUD berat (puluhan tabel, form, validasi, cetak,

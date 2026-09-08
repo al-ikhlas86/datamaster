@@ -273,8 +273,11 @@ Perbaiki penulisannya lalu import ulang - agenda yang sudah masuk tidak akan ter
     {
         if (tahun_ajaran_id <= 0)
         {
+            // PHP asli: redirect()->to(base_url('kalender-akademik')) - balik ke INDEX,
+            // BUKAN ke halaman import lagi (beda dari validasi lain di bawah yang balik
+            // ke Import). Lihat KalenderAkademik::processImport() baris awal.
             TempData["error"] = "Tahun ajaran belum dipilih.";
-            return RedirectToAction(nameof(Import));
+            return RedirectToAction(nameof(Index));
         }
         if (file is null || file.Length == 0)
         {

@@ -80,7 +80,11 @@ public class AkademikController(DataMasterDbContext db) : Controller
             {
                 if (!siswaMap.TryGetValue(siswaId, out var siswa) || siswa.Status != StatusSiswa.aktif) continue; // skip diam-diam (race/sudah diproses)
 
-                if (!riwayatAda.Contains(siswaId))
+                // PHP asli: `if ($siswa['kelas_id'] && ! existsForSiswaTahun(...))` - riwayat
+                // "naik" HANYA disimpan kalau siswa SEBELUMNYA sudah punya kelas (kelas_id
+                // truthy). Siswa tanpa kelas (KelasId null) TIDAK dapat riwayat kenaikan sama
+                // sekali, meski tetap dipindah ke kelas tujuan di bawah.
+                if (siswa.KelasId is not null && !riwayatAda.Contains(siswaId))
                 {
                     db.RiwayatAkademik.Add(new RiwayatAkademik { SiswaId = siswaId, TahunAjaranId = tahunAktif.TahunAjaranId, KelasId = siswa.KelasId, Status = StatusRiwayatAkademik.naik });
                 }

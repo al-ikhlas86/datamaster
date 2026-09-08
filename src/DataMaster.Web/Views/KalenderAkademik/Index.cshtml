@@ -7,7 +7,11 @@
         id = a.KalenderAkademikId,
         judul = a.Judul,
         kategori = a.Kategori,
-        warna = a.Warna ?? "#0d6efd",
+        // PHP asli TIDAK PERNAH memakai #0d6efd sebagai fallback warna kosong - dot kalender
+        // (index.php baris 315), dot detail-klik (baris 334), dan bullet daftar per-bulan
+        // (baris 223) semuanya SATU warna konsisten: #adb5bd (abu-abu). #0d6efd cuma saran
+        // warna kategori "Asesmen" di WARNA_SARAN, bukan fallback warna kosong.
+        warna = a.Warna ?? "#adb5bd",
         mulai = a.TanggalMulai.ToString("yyyy-MM-dd"),
         selesai = a.TanggalSelesai?.ToString("yyyy-MM-dd"),
         waktu = a.Waktu,
@@ -127,7 +131,7 @@ else
                                 <tr>
                                     <td>@a.TanggalMulai.ToString("dd MMM yyyy")@(a.TanggalSelesai is not null ? $" s/d {a.TanggalSelesai:dd MMM yyyy}" : "")</td>
                                     <td>
-                                        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:@(a.Warna ?? "#6c757d")"></span>
+                                        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:@(a.Warna ?? "#adb5bd")"></span>
                                         @a.Judul
                                         @if (a.IsLibur) { <span class="badge bg-danger ms-1">Libur</span> }
                                         @if (!string.IsNullOrEmpty(a.Waktu)) { <span class="text-muted small"> &middot; @a.Waktu</span> }
@@ -228,10 +232,20 @@ else
                     (function (dateStr, matches) {
                         cell.addEventListener('click', function () {
                             var detail = document.getElementById('detailTanggal');
-                            if (matches.length === 0) { detail.innerHTML = ''; return; }
-                            detail.innerHTML = '<strong>' + dateStr + '</strong><ul class="mb-0">' + matches.map(function (a) {
-                                return '<li>' + a.judul + (a.libur ? ' <span class="badge bg-danger">Libur</span>' : '') + (a.waktu ? ' &middot; ' + a.waktu : '') + '</li>';
-                            }).join('') + '</ul>';
+                            if (matches.length === 0) { detail.style.display = 'none'; return; }
+                            // Sama persis dgn tampilkanDetail() di kalender_akademik/index.php PHP asli:
+                            // tanggal format Indonesia lengkap, dot warna (fallback #adb5bd), judul+badge
+                            // Libur, lalu waktu & sasaran digabung " · " (keduanya opsional).
+                            var tgl = new Date(dateStr + 'T00:00:00').toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+                            var html = '<p class="fw-semibold small mb-2">' + tgl + '</p>';
+                            matches.forEach(function (a) {
+                                html += '<div class="d-flex align-items-start gap-2 mb-2">' +
+                                    '<span style="width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0;display:inline-block;background:' + (a.warna || '#adb5bd') + ';"></span>' +
+                                    '<div><div class="small fw-medium">' + a.judul + (a.libur ? ' <span class="badge bg-danger">Libur</span>' : '') + '</div>' +
+                                    '<div class="small text-muted">' + [a.waktu, a.sasaran].filter(Boolean).join(' &middot; ') + '</div></div></div>';
+                            });
+                            detail.innerHTML = html;
+                            detail.style.display = '';
                         });
                     })(dateStr, matches);
                     grid.appendChild(cell);

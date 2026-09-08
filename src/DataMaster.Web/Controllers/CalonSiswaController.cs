@@ -237,8 +237,13 @@ public class CalonSiswaController(DataMasterDbContext db, DocumentStorageService
         }
         if (kelas_id is null or <= 0)
         {
+            // PHP: $rules=['kelas_id'=>'required|integer'] TANPA custom message ->
+            // jatuh ke default bawaan CI4 (vendor/.../Language/en/Validation.php,
+            // TIDAK ada override app/Language/id/) - pesan literal berbahasa Inggris
+            // ini SENGAJA direplikasi apa adanya (lihat juga TahunAjaranController
+            // utk pola sama), bukan diperhalus ke Indonesia.
             var vm = await ToFormViewModelAsync(calon);
-            vm.Errors["KelasTerima"] = "Kelas tujuan wajib dipilih.";
+            vm.Errors["KelasTerima"] = "The kelas_id field is required.";
             return View("Detail", vm);
         }
 

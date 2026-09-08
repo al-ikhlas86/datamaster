@@ -3,7 +3,7 @@
     ViewData["Title"] = "Detail Kelas";
 }
 
-<h5 class="text-muted mb-3">Tingkat @Model.Tingkat &bull; @Model.SiswaKelas.Count siswa</h5>
+<h5 class="text-muted mb-3">Tingkat @Model.Tingkat@(int.TryParse(Model.Tingkat, out _) ? " SD" : "") &bull; Wali Kelas: <strong>@(Model.WaliKelas ?? "-")</strong> &bull; @Model.SiswaKelas.Count siswa</h5>
 <h3 class="mb-3">@Model.NamaKelas</h3>
 
 <div class="row g-3">

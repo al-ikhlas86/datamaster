@@ -147,25 +147,32 @@ public class UserController(DataMasterDbContext db, DatabaseBackupService backup
     {
         if (!int.TryParse(jam_backup, out var jam) || jam is < 0 or > 23)
         {
-            TempData["error"] = "Jam backup tidak valid.";
+            // PHP: "Jam backup tidak valid - pilih antara 00:00 sampai 23:00." (User::simpanJadwalBackup).
+            TempData["error"] = "Jam backup tidak valid - pilih antara 00:00 sampai 23:00.";
             return RedirectToAction(nameof(Index));
         }
         await backup.SimpanJamBackupOnlineAsync(jam);
-        TempData["message"] = "Jadwal backup online disimpan.";
+        // PHP: sprintf('Jam Backup Online disimpan: %02d:00 WIB setiap hari.', $jam) - sertakan JAM
+        // yang baru disimpan (bukan cuma pesan generik) supaya Admin dapat konfirmasi nilai efektif.
+        TempData["message"] = $"Jam Backup Online disimpan: {jam:D2}:00 WIB setiap hari.";
         return RedirectToAction(nameof(Index));
     }
 
     [HttpPost("restore")]
     public async Task<IActionResult> Restore(IFormFile? file, string? sandi_restore, string? konfirmasi_restore)
     {
-        if ((konfirmasi_restore ?? "").Trim().ToUpperInvariant() != "TIMPA")
-        {
-            TempData["error"] = "Ketik \"TIMPA\" persis untuk konfirmasi pemulihan.";
-            return RedirectToAction(nameof(Index));
-        }
+        // Urutan pengecekan disamakan dgn PHP User::restore(): file dulu (getFile()+isValid()),
+        // BARU cek "TIMPA" - beda urutan bisa mengubah pesan mana yg tampil kalau keduanya salah.
         if (file is null || file.Length == 0)
         {
-            TempData["error"] = "File backup wajib diunggah.";
+            // PHP: "Berkas restore tidak valid atau gagal di-upload."
+            TempData["error"] = "Berkas restore tidak valid atau gagal di-upload.";
+            return RedirectToAction(nameof(Index));
+        }
+        if ((konfirmasi_restore ?? "").Trim().ToUpperInvariant() != "TIMPA")
+        {
+            // PHP: "Restore dibatalkan - ketik TIMPA persis untuk konfirmasi."
+            TempData["error"] = "Restore dibatalkan - ketik TIMPA persis untuk konfirmasi.";
             return RedirectToAction(nameof(Index));
         }
 

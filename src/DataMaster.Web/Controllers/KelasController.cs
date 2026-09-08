@@ -113,6 +113,7 @@ public class KelasController(DataMasterDbContext db, WaliKelasService waliKelas)
     {
         var kelas = await db.Kelas.FindAsync(id);
         if (kelas is null) return NotFound("Kelas tidak ditemukan.");
+        ViewBag.WaliKelasText = await waliKelas.GetDisplayTextAsync(kelas.KelasId);
         return View(kelas);
     }
 
@@ -126,6 +127,7 @@ public class KelasController(DataMasterDbContext db, WaliKelasService waliKelas)
         if (namaInput == "" || namaInput.Length < 3 || namaInput.Length > 100)
         {
             ModelState.AddModelError("nama_kelas", "Nama kelas wajib diisi (minimal 3, maksimal 100 karakter).");
+            ViewBag.WaliKelasText = await waliKelas.GetDisplayTextAsync(kelas.KelasId);
             return View("Edit", kelas);
         }
 
@@ -203,6 +205,7 @@ public class KelasController(DataMasterDbContext db, WaliKelasService waliKelas)
             KelasId = kelas.KelasId,
             NamaKelas = kelas.NamaKelas,
             Tingkat = kelas.Tingkat,
+            WaliKelas = await waliKelas.GetDisplayTextAsync(kelas.KelasId),
             SiswaKelas = await db.Siswa.Where(s => s.KelasId == id).OrderBy(s => s.Nama)
                 .Select(s => new SiswaRingkas { SiswaId = s.SiswaId, Nama = s.Nama, Nis = s.Nis, JenisKelamin = s.JenisKelamin.ToString() }).ToListAsync(),
             SiswaTanpaKelas = await db.Siswa.Where(s => s.KelasId == null).OrderBy(s => s.Nama)

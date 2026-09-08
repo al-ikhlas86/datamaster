@@ -37,7 +37,16 @@ public class GuruFormInput
     public string? GelarTerakhir { get; set; }
     public string? NoHandphone { get; set; }
     public string? Alamat { get; set; }
-    public bool StatusAktif { get; set; } = true;
+    // TIDAK diberi default 'true' SENGAJA - checkbox HTML tidak mengirim field
+    // sama sekali saat dikosongkan (unchecked, tidak ada hidden fallback input di
+    // _Form.cshtml), jadi model binder TIDAK PERNAH menyentuh properti ini kalau
+    // checkbox unchecked. Default 'true' di sini dulu BUG NYATA: uncheck "Aktif"
+    // lalu submit form edit tidak pernah menonaktifkan guru (nilai class-level
+    // 'true' selalu menang krn field yg hilang tidak di-bind ulang) - ditemukan
+    // testing 2026-09-08. Default bool (false) di sini justru BENAR: field hadir
+    // (dicentang) -> true; field hilang (tidak dicentang) -> false. Sama persis
+    // dgn PHP: getPost('status_aktif') !== null ? 1 : 0 (Guru.php update()).
+    public bool StatusAktif { get; set; }
 }
 
 public class GuruFormViewModel

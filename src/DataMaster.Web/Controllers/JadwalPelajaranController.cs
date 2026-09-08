@@ -125,7 +125,7 @@ public class JadwalPelajaranController(DataMasterDbContext db) : Controller
     private async Task<List<GuruOpt>> GetPengajarAktifAsync() =>
         (await db.Guru.Where(g => g.StatusAktif && g.Jabatan != JabatanGuru.karyawan).ToListAsync())
         .OrderBy(g => g.NomorUrut == null).ThenBy(g => g.NomorUrut).ThenBy(g => g.Nama)
-        .Select(g => new GuruOpt { GuruId = g.GuruId, NomorUrut = g.NomorUrut, Nama = g.Nama })
+        .Select(g => new GuruOpt { GuruId = g.GuruId, NomorUrut = g.NomorUrut, Nama = g.Nama, Jabatan = g.Jabatan.ToString() })
         .ToList();
 
     private static readonly string[] HariUrut = ["senin", "selasa", "rabu", "kamis", "jumat", "sabtu", "minggu"];
@@ -192,6 +192,18 @@ public class JadwalPelajaranController(DataMasterDbContext db) : Controller
 
             if (_existing.TryGetValue((kelasId, jamPelajaranId), out var row))
             {
+                // Kalau baris ini sebelumnya dipegang guru LAIN (atau tanpa guru) dan
+                // sekarang diganti, lepas index bentrok guru LAMA utk slot ini SEKARANG -
+                // BUG yg ditemukan+diperbaiki 2026-09-08: tanpa ini, index lama jadi
+                // stale (masih menunjuk ke kelas ini) sehingga baris BERIKUTNYA dlm
+                // batch yg sama yang mencoba assign guru lama itu ke KELAS LAIN pada
+                // jam yg sama akan ditolak "bentrok" secara keliru (guru itu sebenarnya
+                // sudah dilepas dari slot ini oleh baris ini sendiri).
+                if (row.GuruId is not null && row.GuruId != guruId
+                    && _bentrokIndex.TryGetValue((row.GuruId.Value, jamPelajaranId), out var lama) && lama.KelasId == kelasId)
+                {
+                    _bentrokIndex.Remove((row.GuruId.Value, jamPelajaranId));
+                }
                 row.MataPelajaranId = mapelId;
                 row.GuruId = guruId;
             }
@@ -214,15 +226,30 @@ public class JadwalPelajaranController(DataMasterDbContext db) : Controller
         {
             if (!_existing.TryGetValue((kelasId, jamPelajaranId), out var row)) return;
             _existing.Remove((kelasId, jamPelajaranId));
+            // Sama seperti di Simpan(): lepas index bentrok guru LAMA supaya baris
+            // berikutnya dlm batch yg sama tidak salah anggap guru itu masih mengajar
+            // slot yang baru saja dikosongkan ini.
+            if (row.GuruId is not null && _bentrokIndex.TryGetValue((row.GuruId.Value, jamPelajaranId), out var lama) && lama.KelasId == kelasId)
+            {
+                _bentrokIndex.Remove((row.GuruId.Value, jamPelajaranId));
+            }
             if (_toAdd.Remove(row)) return; // baru ditambahkan dlm batch ini, batal tanpa sentuh DB
             _toRemove.Add(row);
         }
 
         public async Task SimpanSemuaAsync(DataMasterDbContext db)
         {
+            // BUG yg ditemukan+diperbaiki 2026-09-08: versi lama HANYA memanggil
+            // SaveChangesAsync kalau ada baris baru/dihapus (_toAdd/_toRemove) - baris
+            // yang HANYA diubah di tempat (mis. ganti guru/mapel slot yg SUDAH ada,
+            // tanpa ada slot lain yg ditambah/dihapus dlm request yg sama) tetap
+            // ke-track EF sbg Modified tapi TIDAK PERNAH disimpan karena SaveChanges
+            // tidak pernah dipanggil - perubahan hilang diam-diam. SaveChangesAsync
+            // SEKARANG selalu dipanggil (EF tidak melakukan round-trip DB kalau
+            // memang tidak ada perubahan sama sekali, jadi ini aman & tetap murah).
             if (_toAdd.Count > 0) db.JadwalPelajaran.AddRange(_toAdd);
             if (_toRemove.Count > 0) db.JadwalPelajaran.RemoveRange(_toRemove);
-            if (_toAdd.Count > 0 || _toRemove.Count > 0) await db.SaveChangesAsync();
+            await db.SaveChangesAsync();
         }
     }
 
@@ -555,12 +582,17 @@ public class JadwalPelajaranController(DataMasterDbContext db) : Controller
             mapelSheet.Cell(mapelR, 1).Value = m.Kode; mapelSheet.Cell(mapelR, 2).Value = m.Nama; mapelR++;
         }
 
+        // PHP asli TIDAK memfilter guru tanpa nomor_urut di sheet ini (beda dgn
+        // legend Cetak) - guru yang belum diberi nomor tetap muncul (kolom Nomor
+        // kosong) supaya TU tahu guru itu ada & perlu diberi nomor di Penugasan
+        // Mengajar. Urutan sudah benar dari GetPengajarAktifAsync() (nomor_urut
+        // NULL ke belakang, lalu ASC, lalu nama) - JANGAN di-OrderBy ulang.
         var guruSheet = wb.Worksheets.Add("Kode Guru");
-        guruSheet.Cell(1, 1).Value = "Nomor"; guruSheet.Cell(1, 2).Value = "Nama"; guruSheet.Cell(1, 3).Value = "Jabatan";
+        guruSheet.Cell(1, 1).Value = "Nomor"; guruSheet.Cell(1, 2).Value = "Nama Guru"; guruSheet.Cell(1, 3).Value = "Jabatan";
         var guruR = 2;
-        foreach (var g in (await GetPengajarAktifAsync()).Where(g => g.NomorUrut is not null).OrderBy(g => g.NomorUrut))
+        foreach (var g in await GetPengajarAktifAsync())
         {
-            guruSheet.Cell(guruR, 1).Value = g.NomorUrut; guruSheet.Cell(guruR, 2).Value = g.Nama; guruR++;
+            guruSheet.Cell(guruR, 1).Value = g.NomorUrut; guruSheet.Cell(guruR, 2).Value = g.Nama; guruSheet.Cell(guruR, 3).Value = g.Jabatan; guruR++;
         }
 
         var panduan = wb.Worksheets.Add("Panduan");

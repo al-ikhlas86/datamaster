@@ -12,7 +12,7 @@
         </h2>
         <div id="panelTingkat" class="accordion-collapse collapse" data-bs-parent="#accordionTingkat">
             <div class="accordion-body">
-                <form asp-controller="Kurikulum" asp-action="Store" method="post" class="row g-2 mb-3">
+                <form asp-controller="Kurikulum" asp-action="StoreTingkat" method="post" class="row g-2 mb-3">
                     <input type="hidden" name="kembali_ke" value="kelas" />
                     <div class="col-md-3"><input type="text" name="kode" class="form-control" placeholder="Kode *" required /></div>
                     <div class="col-md-4"><input type="text" name="nama" class="form-control" placeholder="Nama Tampilan *" required /></div>
@@ -20,7 +20,7 @@
                     <div class="col-md-3"><button type="submit" class="btn btn-primary w-100">Tambah</button></div>
                 </form>
 
-                <form asp-controller="Kurikulum" asp-action="UpdateBatch" method="post" id="formTingkat">
+                <form asp-controller="Kurikulum" asp-action="UpdateTingkatBatch" method="post" id="formTingkat">
                     <input type="hidden" name="kembali_ke" value="kelas" />
                     <table class="table table-sm align-middle">
                         <thead><tr><th>Kode</th><th>Nama</th><th>Urutan</th><th>Aktif</th><th></th></tr></thead>
@@ -42,7 +42,7 @@
                                     }
                                 </td>
                                 <td>
-                                    <form asp-controller="Kurikulum" asp-action="Delete" asp-route-id="@t.TingkatId" method="post" class="d-inline form-hapus-tingkat" data-nama="@t.Nama">
+                                    <form asp-controller="Kurikulum" asp-action="DeleteTingkat" asp-route-id="@t.TingkatId" method="post" class="d-inline form-hapus-tingkat" data-nama="@t.Nama">
                                         <input type="hidden" name="kembali_ke" value="kelas" />
                                         <button type="submit" class="btn btn-sm btn-outline-danger">Hapus</button>
                                     </form>

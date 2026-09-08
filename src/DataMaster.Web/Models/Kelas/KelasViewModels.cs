@@ -49,6 +49,7 @@ public class KelasDetailViewModel
     public int KelasId { get; set; }
     public required string NamaKelas { get; set; }
     public required string Tingkat { get; set; }
+    public string? WaliKelas { get; set; }
     public List<SiswaRingkas> SiswaKelas { get; set; } = [];
     public List<SiswaRingkas> SiswaTanpaKelas { get; set; } = [];
 }

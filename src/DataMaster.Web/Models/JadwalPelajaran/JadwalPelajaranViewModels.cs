@@ -12,6 +12,7 @@ public class GuruOpt
     public int GuruId { get; set; }
     public int? NomorUrut { get; set; }
     public required string Nama { get; set; }
+    public string? Jabatan { get; set; }
 }
 
 public class MapelKodeOpt
