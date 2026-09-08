@@ -1,0 +1,123 @@
+@model DataMaster.Web.Models.User.UserSettingsViewModel
+@{
+    ViewData["Title"] = "Setting";
+}
+
+<h3 class="mb-3">Setting</h3>
+
+<div class="row g-3">
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">Profil</div>
+            <div class="card-body text-center">
+                <img id="previewFoto" src="~/img/@(Model.UserImage ?? "default.png")" onerror="this.src='https://via.placeholder.com/120?text=Foto'"
+                     class="rounded-circle mb-3" style="width:120px;height:120px;object-fit:cover;cursor:pointer" onclick="document.getElementById('inputFoto').click()" />
+                <div>
+                    <span class="badge @(Model.Active ? "bg-success" : "bg-secondary")">@(Model.Active ? "Aktif" : "Tidak Aktif")</span>
+                </div>
+                <form asp-controller="User" asp-action="Update" method="post" enctype="multipart/form-data" class="mt-3 text-start">
+                    <input type="file" id="inputFoto" name="user_image" accept=".jpg,.jpeg,.png" class="d-none" onchange="document.getElementById('previewFoto').src=URL.createObjectURL(this.files[0])" />
+                    <div class="form-text mb-2">Klik foto untuk mengganti. JPG/PNG, maksimal 500KB.</div>
+                    <div class="mb-2">
+                        <label class="form-label">Email</label>
+                        <input type="text" class="form-control" value="@Model.Email" readonly />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Username</label>
+                        <input type="text" name="username" class="form-control" value="@Model.Username" minlength="3" maxlength="30" required />
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Simpan Profil</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">Ubah Kata Sandi</div>
+            <div class="card-body">
+                <form asp-controller="User" asp-action="UpdatePassword" method="post">
+                    <div class="mb-2">
+                        <label class="form-label">Kata Sandi Lama *</label>
+                        <input type="password" name="password_lama" class="form-control" required />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Kata Sandi Baru *</label>
+                        <input type="password" name="password_baru" class="form-control" minlength="8" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Konfirmasi Kata Sandi Baru *</label>
+                        <input type="password" name="password_baru_konfirmasi" class="form-control" minlength="8" required />
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Ubah Kata Sandi</button>
+                </form>
+            </div>
+        </div>
+        <div class="card mt-3">
+            <div class="card-header">Logout</div>
+            <div class="card-body">
+                <a asp-controller="Auth" asp-action="Logout" class="btn btn-outline-danger w-100">Keluar</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">Backup &amp; Pemulihan</div>
+            <div class="card-body">
+                <p class="mb-1 small text-muted">Backup Manual Terakhir</p>
+                <p class="mb-3">@(Model.LastBackupManualAt?.ToString("d MMM yyyy HH:mm") ?? "-")</p>
+                <p class="mb-1 small text-muted">Backup Online Terakhir</p>
+                <p class="mb-3">@(Model.LastBackupOnlineAt?.ToString("d MMM yyyy HH:mm") ?? "-")</p>
+
+                <form asp-controller="User" asp-action="SimpanJadwalBackup" method="post" class="d-flex gap-2 mb-3">
+                    <select name="jam_backup" class="form-select">
+                        @for (var h = 0; h < 24; h++)
+                        {
+                            if (h == Model.JamBackupOnline) { <option value="@h" selected>@h:00</option> }
+                            else { <option value="@h">@h:00</option> }
+                        }
+                    </select>
+                    <button type="submit" class="btn btn-outline-secondary">Simpan Jam</button>
+                </form>
+
+                <form asp-controller="User" asp-action="BackupManual" method="post" class="mb-2"
+                      onsubmit="return confirm('Buat backup manual sekarang?')">
+                    <button type="submit" class="btn btn-primary w-100">Backup Manual Sekarang</button>
+                </form>
+
+                <button type="button" class="btn btn-outline-warning w-100" data-bs-toggle="modal" data-bs-target="#modalRestore">Pemulihan Data</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalRestore" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form asp-controller="User" asp-action="Restore" method="post" enctype="multipart/form-data" id="formRestore">
+                <div class="modal-header"><h5 class="modal-title text-danger">Pemulihan Data</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <div class="alert alert-danger">Seluruh isi database AKTIF akan DITIMPA oleh isi berkas ini. Operasi ini tidak bisa dibatalkan setelah berjalan.</div>
+                    <div class="mb-3">
+                        <label class="form-label">Berkas Backup (.db atau .db.enc) *</label>
+                        <input type="file" name="file" id="fileRestore" class="form-control" accept=".db,.enc" required
+                               onchange="document.getElementById('grupSandi').classList.toggle('d-none', !this.value.toLowerCase().endsWith('.enc'))" />
+                    </div>
+                    <div class="mb-3 d-none" id="grupSandi">
+                        <label class="form-label">Sandi Pemulihan</label>
+                        <input type="password" name="sandi_restore" class="form-control" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Ketik <strong>TIMPA</strong> untuk konfirmasi *</label>
+                        <input type="text" name="konfirmasi_restore" id="konfirmasiRestore" class="form-control" oninput="document.getElementById('btnRestore').disabled = this.value.trim().toUpperCase() !== 'TIMPA'" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-danger" id="btnRestore" disabled>Timpa &amp; Pulihkan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

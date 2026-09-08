@@ -485,4 +485,8 @@ $RECYCLE.BIN/
 *.db
 *.db-shm
 *.db-wal
+*.db.enc
 src/DataMaster.Web/App_Data/
+# Backup lokal (manual + pra-restore) & foto profil upload - runtime, per-instalasi
+src/DataMaster.Web/backup/
+src/DataMaster.Web/wwwroot/img/

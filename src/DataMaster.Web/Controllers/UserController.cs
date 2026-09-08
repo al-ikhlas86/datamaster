@@ -1,0 +1,201 @@
+using System.Security.Claims;
+using System.Text.RegularExpressions;
+using DataMaster.Data;
+using DataMaster.Web.Models.User;
+using DataMaster.Web.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
+namespace DataMaster.Web.Controllers;
+
+// Port 1:1 dari app/Controllers/User.php ("Setting" - gabungan Edit Profil +
+// Ubah Password + Backup/Pemulihan sejak 2026-08-27) - lihat 04-infra-auth-sync.md
+// §1.5-1.6. role:admin (satu2nya grup dipakai nyata di sistem asli).
+[Authorize(Roles = "admin")]
+[Route("user")]
+public class UserController(DataMasterDbContext db, DatabaseBackupService backup) : Controller
+{
+    // REGEX_TEKS_PENDEK-setara utk username: alpha_numeric_space (BaseController.php
+    // di PHP asli tidak dipakai di sini krn username punya aturan alpha_numeric_space
+    // sendiri, bukan REGEX_NAMA/REGEX_TEKS_PENDEK - lihat §1.5 poin 1).
+    private static readonly Regex UsernameRegex = new(@"^[a-zA-Z0-9\s]+$", RegexOptions.Compiled);
+
+    private int CurrentUserId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+    [HttpGet("")]
+    public async Task<IActionResult> Index()
+    {
+        var user = await db.Users.FindAsync(CurrentUserId);
+        if (user is null) return RedirectToAction("Logout", "Auth");
+
+        var vm = new UserSettingsViewModel
+        {
+            UserId = user.UserId,
+            Email = user.Email,
+            Username = user.Username,
+            UserImage = user.UserImage,
+            Active = user.Active,
+            LastBackupManualAt = await backup.WaktuTerakhirAsync("last_backup_manual_at"),
+            LastBackupOnlineAt = await backup.WaktuTerakhirAsync("last_backup_online_at"),
+            JamBackupOnline = await backup.JamBackupOnlineAsync(),
+        };
+        return View(vm);
+    }
+
+    [HttpPost("update")]
+    public async Task<IActionResult> Update(string? username, IFormFile? user_image)
+    {
+        var user = await db.Users.FindAsync(CurrentUserId);
+        if (user is null) return RedirectToAction("Logout", "Auth");
+
+        var uname = (username ?? "").Trim();
+        var errors = new List<string>();
+        if (uname == "") errors.Add("Username wajib diisi.");
+        else if (uname.Length < 3 || uname.Length > 30) errors.Add("Username 3-30 karakter.");
+        else if (!UsernameRegex.IsMatch(uname)) errors.Add("Username hanya boleh huruf, angka, dan spasi.");
+        else if (await db.Users.AnyAsync(u => u.Username == uname && u.UserId != user.UserId)) errors.Add("Username ini sudah dipakai.");
+
+        if (user_image is not null && user_image.Length > 0)
+        {
+            var ext = Path.GetExtension(user_image.FileName).ToLowerInvariant();
+            if (ext is not (".jpg" or ".jpeg" or ".png")) errors.Add("Foto harus JPG atau PNG.");
+            else if (user_image.Length > 500 * 1024) errors.Add("Ukuran foto maksimal 500KB.");
+        }
+
+        if (errors.Count > 0)
+        {
+            TempData["error"] = string.Join(" ", errors);
+            return RedirectToAction(nameof(Index));
+        }
+
+        user.Username = uname;
+
+        if (user_image is not null && user_image.Length > 0)
+        {
+            var imgDir = Path.Combine(AppContext.BaseDirectory, "wwwroot", "img");
+            Directory.CreateDirectory(imgDir);
+            var ext = Path.GetExtension(user_image.FileName).ToLowerInvariant();
+            var namaBaru = $"{Guid.NewGuid():N}{ext}";
+            await using (var stream = System.IO.File.Create(Path.Combine(imgDir, namaBaru)))
+                await user_image.CopyToAsync(stream);
+
+            if (!string.IsNullOrEmpty(user.UserImage) && user.UserImage != "default.png")
+            {
+                var lama = Path.Combine(imgDir, user.UserImage);
+                if (System.IO.File.Exists(lama)) { try { System.IO.File.Delete(lama); } catch { /* abaikan, tidak fatal */ } }
+            }
+            user.UserImage = namaBaru;
+        }
+
+        await db.SaveChangesAsync();
+        TempData["message"] = "Profil berhasil diperbarui.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost("password")]
+    public async Task<IActionResult> UpdatePassword(string? password_lama, string? password_baru, string? password_baru_konfirmasi)
+    {
+        var user = await db.Users.FindAsync(CurrentUserId);
+        if (user is null) return RedirectToAction("Logout", "Auth");
+
+        var hasher = new PasswordHasher<Data.Entities.User>();
+        if (string.IsNullOrEmpty(password_lama) || hasher.VerifyHashedPassword(user, user.PasswordHash, password_lama) == PasswordVerificationResult.Failed)
+        {
+            TempData["error"] = "Kata sandi lama tidak cocok.";
+            return RedirectToAction(nameof(Index));
+        }
+        // Sesuai catatan §6/§19 spec: alur ganti password sendiri di PHP asli HANYA
+        // menegakkan min_length[8]+matches (TIDAK menjalankan passwordValidators
+        // Composition/NothingPersonal/Dictionary yang berlaku di reset password resmi
+        // Myth Auth) - inkonsistensi yang SUDAH ADA di PHP asli, direplikasi apa adanya.
+        if (string.IsNullOrEmpty(password_baru) || password_baru.Length < 8)
+        {
+            TempData["error"] = "Kata sandi baru minimal 8 karakter.";
+            return RedirectToAction(nameof(Index));
+        }
+        if (password_baru != password_baru_konfirmasi)
+        {
+            TempData["error"] = "Konfirmasi kata sandi baru tidak cocok.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        user.PasswordHash = hasher.HashPassword(user, password_baru);
+        await db.SaveChangesAsync();
+        TempData["message"] = "Kata sandi berhasil diubah.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost("backup-manual")]
+    public async Task<IActionResult> BackupManual()
+    {
+        try
+        {
+            var nama = await backup.BuatBackupManualAsync();
+            TempData["message"] = $"Backup manual berhasil dibuat: {nama}.";
+        }
+        catch (Exception ex)
+        {
+            TempData["error"] = $"Gagal membuat backup: {ex.Message}";
+        }
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost("jadwal-backup")]
+    public async Task<IActionResult> SimpanJadwalBackup(string? jam_backup)
+    {
+        if (!int.TryParse(jam_backup, out var jam) || jam is < 0 or > 23)
+        {
+            TempData["error"] = "Jam backup tidak valid.";
+            return RedirectToAction(nameof(Index));
+        }
+        await backup.SimpanJamBackupOnlineAsync(jam);
+        TempData["message"] = "Jadwal backup online disimpan.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost("restore")]
+    public async Task<IActionResult> Restore(IFormFile? file, string? sandi_restore, string? konfirmasi_restore)
+    {
+        if ((konfirmasi_restore ?? "").Trim().ToUpperInvariant() != "TIMPA")
+        {
+            TempData["error"] = "Ketik \"TIMPA\" persis untuk konfirmasi pemulihan.";
+            return RedirectToAction(nameof(Index));
+        }
+        if (file is null || file.Length == 0)
+        {
+            TempData["error"] = "File backup wajib diunggah.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        var terenkripsi = ext == ".enc";
+        if (ext is not (".db" or ".enc"))
+        {
+            TempData["error"] = "Format file harus .db atau .db.enc.";
+            return RedirectToAction(nameof(Index));
+        }
+        if (terenkripsi && string.IsNullOrEmpty(sandi_restore))
+        {
+            TempData["error"] = "Sandi pemulihan wajib diisi untuk berkas terenkripsi.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        try
+        {
+            using var ms = new MemoryStream();
+            await file.CopyToAsync(ms);
+            await backup.RestoreAsync(ms.ToArray(), sandi_restore, terenkripsi);
+            // Aplikasi akan berhenti sesaat lagi (StopApplication) - Launcher yang
+            // menjalankan ulang proses, migrasi otomatis jalan lagi seperti startup
+            // normal. Redirect ini kemungkinan besar tidak akan sempat dirender.
+            TempData["message"] = "Pemulihan berhasil diterapkan. Aplikasi akan dimulai ulang.";
+        }
+        catch (Exception ex)
+        {
+            TempData["error"] = $"Gagal memulihkan: {ex.Message}";
+        }
+        return RedirectToAction(nameof(Index));
+    }
+}

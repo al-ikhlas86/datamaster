@@ -1,8 +1,120 @@
-﻿@{
-    ViewData["Title"] = "Home Page";
+@model DataMaster.Web.Models.Dashboard.DashboardPendidikanViewModel
+@{
+    ViewData["Title"] = "Dashboard";
+    var maxPerTingkat = Model.PerTingkat.Count > 0 ? Model.PerTingkat.Values.Max() : 0;
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<h3 class="mb-3">Dashboard</h3>
+
+@if (!string.IsNullOrEmpty(Model.TahunAktifNama))
+{
+    <div class="alert alert-success">Tahun Ajaran Aktif: <strong>@Model.TahunAktifNama</strong></div>
+}
+
+@if (!Model.SemuaLangkahSelesai)
+{
+    var sudah = Model.LangkahPersiapan.Count(l => l.Ok);
+    var pct = Model.LangkahPersiapan.Count > 0 ? sudah * 100 / Model.LangkahPersiapan.Count : 0;
+    <div class="card mb-4">
+        <div class="card-header">Langkah Persiapan Awal</div>
+        <div class="card-body">
+            <div class="progress mb-3" style="height:20px">
+                <div class="progress-bar bg-success" style="width:@(pct)%">@sudah/@Model.LangkahPersiapan.Count</div>
+            </div>
+            <ol class="list-group list-group-numbered">
+                @foreach (var l in Model.LangkahPersiapan)
+                {
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            @if (l.Ok)
+                            {
+                                <span class="text-success">&#10003;</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">&#9675;</span>
+                            }
+                            <strong class="ms-2">@l.Nama</strong>
+                            <div class="small text-muted ms-4">@l.Ket</div>
+                        </div>
+                        <a href="@l.Url" class="btn btn-sm @(l.Ok ? "btn-outline-secondary" : "btn-primary")">@(l.Ok ? "Lihat" : "Isi sekarang")</a>
+                    </li>
+                }
+            </ol>
+        </div>
+    </div>
+}
+
+<div class="row g-3 mb-3">
+    <div class="col-md-3"><div class="card text-center"><div class="card-body"><div class="text-muted small">Siswa Aktif</div><div class="fs-4 fw-bold">@Model.TotalSiswa</div></div></div></div>
+    <div class="col-md-3"><div class="card text-center"><div class="card-body"><div class="text-muted small">Laki-laki</div><div class="fs-4 fw-bold">@Model.TotalL</div></div></div></div>
+    <div class="col-md-3"><div class="card text-center"><div class="card-body"><div class="text-muted small">Perempuan</div><div class="fs-4 fw-bold">@Model.TotalP</div></div></div></div>
+    <div class="col-md-3"><div class="card text-center"><div class="card-body"><div class="text-muted small">Alumni (Lulus)</div><div class="fs-4 fw-bold">@Model.TotalAlumni</div></div></div></div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-header">Jumlah Siswa per Tingkat</div>
+            <div class="card-body">
+                @if (Model.PerTingkat.Count == 0)
+                {
+                    <p class="text-muted mb-0">Belum ada data.</p>
+                }
+                else
+                {
+                    foreach (var (label, jml) in Model.PerTingkat)
+                    {
+                        var lebar = maxPerTingkat > 0 ? jml * 100 / maxPerTingkat : 0;
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between"><span>@label</span><span>@jml</span></div>
+                            <div class="progress" style="height:10px"><div class="progress-bar" style="width:@(lebar)%"></div></div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-header">Distribusi Jenis Kelamin</div>
+            <div class="card-body">
+                @{
+                    var totalGender = Model.TotalL + Model.TotalP;
+                    var pctL = totalGender > 0 ? Model.TotalL * 100 / totalGender : 0;
+                    var pctP = totalGender > 0 ? Model.TotalP * 100 / totalGender : 0;
+                }
+                <div class="d-flex justify-content-between"><span>Laki-laki</span><span>@Model.TotalL (@pctL%)</span></div>
+                <div class="progress mb-2" style="height:10px"><div class="progress-bar bg-primary" style="width:@(pctL)%"></div></div>
+                <div class="d-flex justify-content-between"><span>Perempuan</span><span>@Model.TotalP (@pctP%)</span></div>
+                <div class="progress" style="height:10px"><div class="progress-bar bg-danger" style="width:@(pctP)%"></div></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">Siswa Terbaru Ditambahkan</div>
+    <div class="card-body">
+        @if (Model.RecentSiswa.Count == 0)
+        {
+            <p class="text-muted mb-0">Belum ada siswa.</p>
+        }
+        else
+        {
+            <table class="table table-sm">
+                <thead><tr><th>No</th><th>NIS</th><th>Nama</th><th>JK</th><th>Asal Sekolah</th><th></th></tr></thead>
+                <tbody>
+                    @{ var no = 1; }
+                    @foreach (var s in Model.RecentSiswa)
+                    {
+                        <tr>
+                            <td>@(no++)</td><td>@s.Nis</td><td>@s.Nama</td><td>@s.JenisKelamin</td><td>@s.AsalSekolah</td>
+                            <td><a asp-controller="Siswa" asp-action="Detail" asp-route-id="@s.SiswaId" class="btn btn-sm btn-outline-secondary">Detail</a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
 </div>

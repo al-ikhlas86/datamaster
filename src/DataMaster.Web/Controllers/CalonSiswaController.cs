@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using System.Text.RegularExpressions;
 using DataMaster.Data;
 using DataMaster.Data.Entities;
@@ -13,6 +14,7 @@ namespace DataMaster.Web.Controllers;
 // Mutasi status (Terima/Tolak) SENGAJA didelegasikan ke PsbService (bukan ditulis
 // ulang di sini) - persis arsitektur PHP asli (PsbProcessor dipakai SAMA baik dari
 // jalur web ini maupun jalur sync Hub API/Mobile-app).
+[Authorize(Roles = "admin")]
 [Route("calon-siswa")]
 public class CalonSiswaController(DataMasterDbContext db, DocumentStorageService docs, PsbService psb) : Controller
 {

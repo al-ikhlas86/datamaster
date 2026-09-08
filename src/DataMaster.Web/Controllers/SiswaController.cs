@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -15,6 +16,7 @@ namespace DataMaster.Web.Controllers;
 // rujukan lengkap tiap aturan/pesan/edge-case. Jangan ubah pesan/urutan validasi
 // tanpa mengecek ulang spec tsb - banyak teks di sini SENGAJA verbatim (termasuk
 // yang terasa tidak konsisten, mis. "Hapus Data" yang sebenarnya cuma arsip).
+[Authorize(Roles = "admin")]
 [Route("siswa")]
 public class SiswaController(DataMasterDbContext db, DocumentStorageService docs) : Controller
 {

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using DataMaster.Data;
 using DataMaster.Data.Entities;
 using DataMaster.Web.Models.Akademik;
@@ -10,6 +11,7 @@ namespace DataMaster.Web.Controllers;
 // Port 1:1 dari app/Controllers/Akademik.php - lihat 03-akademik-jadwal.md §9.
 // BEDA TOTAL dari Kurikulum/Jadwal/Kalender - modul ini murni proses kenaikan
 // kelas & kelulusan akhir tahun ajaran, arsip historis, dan rekap lulusan.
+[Authorize(Roles = "admin")]
 [Route("akademik")]
 public class AkademikController(DataMasterDbContext db) : Controller
 {

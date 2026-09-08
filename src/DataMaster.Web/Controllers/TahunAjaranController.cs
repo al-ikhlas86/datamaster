@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using System.Text.RegularExpressions;
 using DataMaster.Data;
 using DataMaster.Data.Entities;
@@ -7,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace DataMaster.Web.Controllers;
 
 // Port 1:1 dari app/Controllers/TahunAjaran.php - lihat 02-guru-kelas-struktur.md §9.
+[Authorize(Roles = "admin")]
 [Route("tahun-ajaran")]
 public class TahunAjaranController(DataMasterDbContext db) : Controller
 {

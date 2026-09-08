@@ -30,8 +30,8 @@ supaya tahu persis sudah sampai mana dan apa langkah berikutnya.
 | Halaman/Controller: **Akademik** (Kenaikan Kelas, Kelulusan, Arsip Historis, Rekap Lulusan) | Selesai & teruji end-to-end. |
 | Halaman/Controller: **Kurikulum lengkap** (Mata Pelajaran CRUD+import, Struktur Kurikulum/Alokasi JP matrix+salin+import, Jam Belajar dgn 2 aturan bentrok+salin+import) | Selesai & teruji end-to-end. |
 | Halaman/Controller: **Jadwal Pelajaran** (grid per-kelas kode "35K", parser `bacaKode()`, deteksi bentrok guru lintas kelas, salin TA sama/beda, Piket replace-all, Cetak semua kelas, Per Guru+beban, import Excel dgn pencocokan kolom dinamis+prioritas kolom-tak-dikenal) | Selesai & teruji end-to-end. **Spec 03 (Kurikulum, Jadwal Pelajaran, Kalender Akademik, Akademik) kini 100% SELESAI dibangun.** |
-| Halaman/Controller modul lain (Auth/Manajemen Pengguna, Dashboard, Sync Hub API, Launcher) | Belum dimulai — spec 04 (Infra/Auth) masih tersisa penuh. |
-| Sinkronisasi Hub API (port dari SyncPush.php) | Belum dimulai |
+| Halaman/Controller: **Auth (Login/Setup Awal/Logout, cookie auth, RBAC role admin, rate-limit login bertahap) + Dashboard (Pendidikan+Perusahaan, panel Langkah Persiapan Awal) + Setting (profil+password+backup manual+jadwal backup+restore) + DevPreview** | Selesai & teruji end-to-end. **LINGKUP DIPERSEMPIT SENGAJA (didokumentasikan)**: fitur "Lupa Password via email" TIDAK diporting (PHP asli sendiri kemungkinan besar tidak fungsional tanpa SMTP - lihat 04-infra-auth-sync.md §6/§21); `allowRegistration=false` PHP diganti "Setup Awal" 1x saat tabel Users kosong (CLI `spark auth:create_user` tidak masuk akal utk distribusi desktop end-user - lihat catatan modul di bawah); cakupan `role:admin` PHP yang SPOTTY (cuma sebagian controller di `Filters.php`) diganti proteksi KONSISTEN: SEMUA controller wajib login (global filter), controller yang PHP asli tandai `role:admin` (Siswa/CalonSiswa/Guru/Kelas/TahunAjaran/Akademik/User) tetap `[Authorize(Roles="admin")]` - superset lebih aman, bukan replikasi celah. Sinkronisasi Hub API (SyncPush) & BackupCloud (upload terenkripsi ke awan) BELUM diporting - lihat baris terpisah di bawah. |
+| Sinkronisasi Hub API (port dari SyncPush.php) + BackupCloud (upload backup terenkripsi ke awan) | Belum dimulai |
 | Launcher (splash, start/stop server, WebView2, auto-update) | Kerangka XAML splash sudah ada (`MainWindow.xaml`); `MainWindow.xaml.cs` (logic start server + WebView2 + auto-update) belum dimulai |
 | CI GitHub Actions (build+release, pola Presensi) | Belum dimulai |
 | Uji coba sbg PC TU TK (token Hub API baru, unit_id=2) | Belum dimulai |
@@ -364,8 +364,108 @@ supaya tahu persis sudah sampai mana dan apa langkah berikutnya.
   dipanggil sama sekali).
 
 **Spec 03 (Kurikulum, Jadwal Pelajaran, Kalender Akademik, Akademik) kini 100%
-SELESAI dibangun dan teruji end-to-end.** Fase berikutnya: spec 04 (Auth/Manajemen
-Pengguna, Dashboard, Sinkronisasi Hub API, Backup) - belum tersentuh sama sekali.
+SELESAI dibangun dan teruji end-to-end.**
+
+## Catatan modul Auth, Dashboard, Setting (User), DevPreview
+
+- File: `Controllers/AuthController.cs`, `Controllers/UserController.cs`,
+  `Controllers/DevPreviewController.cs`, `HomeController.cs` (dijadikan Dashboard -
+  lihat poin adaptasi rute di bawah), `Services/LoginThrottleService.cs`,
+  `Services/InstallTypeService.cs`, `Services/AppOptions.cs`,
+  `Services/DatabaseBackupService.cs`, `Models/Auth/*`, `Models/User/*`,
+  `Models/Dashboard/*`, `Views/Auth/{Login,Setup}.cshtml` (Layout=null, halaman
+  standalone sebelum login), `Views/Home/{Index,IndexPerusahaan}.cshtml`,
+  `Views/User/Index.cshtml`.
+- **4 ADAPTASI SENGAJA didokumentasikan** (bukan gap diam-diam - PHP asli tidak
+  bisa direplikasi literal krn perbedaan arsitektur web-hosted vs desktop-lokal
+  dan MySQL vs SQLite):
+  1. **"Setup Awal" menggantikan `allowRegistration=false` + CLI `spark
+     auth:create_user`**: PHP asli SENGAJA mematikan registrasi mandiri (siapapun
+     daftar dapat akses PENUH tanpa RBAC - insiden audit keamanan nyata, lihat
+     §1.2) dan HANYA membuat akun lewat CLI admin. CLI tidak masuk akal utk
+     distribusi desktop end-user (sekolah tidak punya admin PHP/CLI). Diganti:
+     layar "Setup Awal" HANYA muncul selagi tabel `Users` BENAR-BENAR KOSONG
+     (`AuthController.Setup` re-cek kosong di server SEBELUM insert, menolak kalau
+     sudah ada 1 user pun) - begitu 1 akun dibuat, jalur ini TERTUTUP SELAMANYA,
+     mempertahankan SEMANGAT PHP asli (tidak ada pendaftaran bebas kapan saja)
+     dengan cara yang masuk akal utk instalasi 1x oleh TU sekolah sendiri.
+  2. **Proteksi rute LEBIH KONSISTEN dari PHP asli, BUKAN replikasi celah**: spec
+     §1.3 menunjukkan `role:admin` di `Filters.php` PHP asli HANYA dipasang di
+     sebagian rute (siswa/calon-siswa/guru/kelas/tahun-ajaran/akademik/user) -
+     Kurikulum/JadwalPelajaran/KalenderAkademik/Ekskul/PenugasanMengajar/
+     KepalaSekolah TIDAK ADA di daftar filter PHP (kemungkinan besar celah
+     konfigurasi nyata, bukan desain sengaja - tidak ada penanda "SENGAJA" di
+     spec utk gap ini, beda dgn pola penandaan bug/keputusan lain di seluruh
+     spec). Diputuskan TIDAK direplikasi: filter GLOBAL "wajib login" dipasang
+     di `Program.cs` utk SEMUA controller (superset - tidak pernah kurang aman
+     dari PHP), DITAMBAH `[Authorize(Roles="admin")]` spesifik persis di 6
+     controller yang PHP secara eksplisit tandai. Praktiknya tidak ada beda
+     perilaku (cuma 1 grup "admin" pernah dipakai nyata di kedua sistem), tapi
+     postur keamanan kode ini LEBIH KETAT by design.
+  3. **Restore = timpa file `.db` langsung, BUKAN `terapkanSql()` baris-per-baris**:
+     SQLite tidak butuh replay SQL spt MySQL. "Dump" konsisten pakai `VACUUM INTO`
+     (setara `mysqldump --single-transaction`, aman walau WAL aktif). Format
+     enkripsi backup (AES-256-CBC, PBKDF2-SHA256 100rb iterasi, marker "ARSIPV1")
+     DIPERTAHANKAN PERSIS dari §8.2 - hanya isi payload yang beda (file `.db` utuh,
+     bukan teks SQL). Ekstensi diadaptasi `.db`/`.db.enc` (bukan `.sql`/`.sql.enc`).
+     **Restore WAJIB restart proses** (`IHostApplicationLifetime.StopApplication()`
+     dipanggil setelah file ditimpa, migrasi otomatis jalan lagi via jalur startup
+     normal yang SUDAH ADA di `Program.cs` - tidak perlu logic migrate terpisah)
+     - Launcher (WPF, belum dibangun) yang nanti bertanggung jawab menjalankan
+       ulang proses child, persis semangat PHP asli yang minta `php spark migrate`
+       manual setelah restore (§1.6, §8.4: "menekan tombol pulihkan tetap harus
+       keputusan manusia", di sini "restart aplikasi" adalah langkah manusia yang
+       setara). **Lapisan tambahan yang TIDAK ADA di PHP asli**: snapshot
+       `pra_restore_{timestamp}.db` otomatis dibuat SEBELUM file ditimpa - murni
+       jaga-jaga, PHP tidak punya ini krn karakter risiko mysqldump/restore beda.
+  4. **BackupCloud (upload terenkripsi ke Hub API) & SyncPush BELUM diporting** -
+     `DatabaseBackupService` SUDAH punya seluruh primitif kripto (Enkripsi/Dekripsi
+     AES-256-CBC+PBKDF2 statis, format ARSIPV1 persis §8.2) siap dipakai ulang saat
+     modul sync dibangun, tapi background service periodik (`backup:cloud`
+     equivalent, cek jam terjadwal, kirim antrian ke `/api/v1/backup/upload`) BELUM
+     ada. `AppOptions.HubApiUrl/HubApiToken/BackupPassphrase` sudah disiapkan di
+     `appsettings.json` (kosong default, WAJIB diisi manual saat instalasi produksi
+     - PERSIS semangat §8.2 "tidak ada fallback otomatis").
+- **RBAC**: hanya grup `admin` diimplementasikan bermakna (grup lain BISA dibuat via
+  skema `AuthGroup`/`AuthGroupUser` tapi tidak ada UI Manajemen Pengguna - PERSIS PHP
+  asli, §1.1 "Tidak ada tabel/menu Manajemen Pengguna berbasis web sama sekali").
+- **LoginThrottleService**: backoff bertahap PERSIS §1.4 (≥3→30 detik, ≥5→60 detik,
+  ≥7→300 detik), key=MD5(login value), TTL cache 3600 detik, direset begitu login
+  sukses - BUKAN lockout permanen (mencegah orang lain mengunci akun KORBAN dgn
+  sengaja salah password berkali-kali).
+- **`User::updatePassword()` inkonsistensi PHP direplikasi APA ADANYA** (§6/§19):
+  ganti password sendiri di halaman Setting HANYA menegakkan `min_length[8]+matches`
+  (TIDAK menjalankan Composition/NothingPersonal/DictionaryValidator yang berlaku di
+  alur reset-password resmi - yang malah TIDAK diporting sama sekali, lihat poin
+  "Lupa Password" di tabel status atas). Password lemah tetap BISA lolos lewat jalur
+  ganti-password-sendiri, PERSIS PHP asli.
+- **Dashboard perTingkat pakai kode tingkat MENTAH** (bukan lookup `Tingkat.Nama`
+  spt modul lain) - `Dashboard.php` PHP asli literal `"Kelas " . $tingkat`, BUKAN
+  panggil `TingkatModel`, direplikasi persis §2.2 walau beda pola dari modul lain.
+- **Diuji end-to-end via HTTP nyata, mencakup SEMUA invarian kritis**: akses rute
+  terproteksi tanpa login (redirect ke `/login?ReturnUrl=...`), Setup Awal HANYA
+  muncul saat Users kosong lalu TERTUTUP setelah 1 akun dibuat, login sukses/gagal,
+  **rate-limit login diverifikasi NYATA** (percobaan ke-4 ditolak dgn hitung mundur
+  detik, kredensial BENAR sekalipun tetap ditolak selama masa tunggu, direset
+  otomatis setelah masa tunggu habis DAN setelah login sukses), Dashboard Pendidikan
+  (kartu statistik, panel Langkah Persiapan Awal 0/8 di database kosong), Setting
+  (update profil dgn validasi `alpha_numeric_space` username - underscore DITOLAK
+  benar, ganti password dgn verifikasi password lama, login ulang pakai password
+  baru berhasil), **backup manual nyata dibuat via `VACUUM INTO` (berkas .db
+  315KB valid diverifikasi header SQLite)**, **restore end-to-end PENUH**: upload
+  balik file backup terenkripsi dgn sandi SALAH (ditolak rapi, server tetap
+  hidup), sandi BENAR (snapshot pra-restore otomatis dibuat, file ditimpa, server
+  berhenti via `StopApplication()` - diverifikasi proses benar2 mati), restart
+  manual server (migrasi "already up to date", TIDAK error), login dgn akun HASIL
+  RESTORE berhasil membuktikan pemulihan bekerja utuh dari ujung ke ujung.
+- Tidak ada bug nyata ditemukan di modul ini (di luar 1 kesalahan skenario uji milik
+  sendiri - username `admin_tu` sempat dikira bug krn ditolak, ternyata validasi
+  `alpha_numeric_space` PHP asli memang tidak mengizinkan underscore, BENAR sesuai
+  spec, bukan cacat implementasi).
+
+**Fase berikutnya: Sinkronisasi Hub API (SyncPush) + BackupCloud (upload otomatis
+ke awan) - BELUM tersentuh sama sekali, dan Launcher WPF (start/stop server,
+WebView2, auto-update, restart-setelah-restore) - masih kerangka splash screen saja.**
 
 ## Prinsip wajib dipegang tiap sesi lanjutan
 

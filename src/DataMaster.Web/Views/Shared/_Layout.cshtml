@@ -1,4 +1,6 @@
-﻿<!DOCTYPE html>
+﻿@using DataMaster.Web.Services
+@inject InstallTypeService InstallTypeSvc
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -34,6 +36,29 @@
                         <li class="nav-item"><a class="nav-link" asp-controller="KalenderAkademik" asp-action="Index">Kalender Akademik</a></li>
                         <li class="nav-item"><a class="nav-link" asp-controller="Akademik" asp-action="Index">Akademik</a></li>
                         <li class="nav-item"><a class="nav-link" asp-controller="TahunAjaran" asp-action="Index">Tahun Ajaran</a></li>
+                    </ul>
+                    <ul class="navbar-nav">
+                        @if (InstallTypeSvc.InstallType() == "pengembang")
+                        {
+                            <li class="nav-item">
+                                <form asp-controller="DevPreview" asp-action="Set" method="post" class="d-flex align-items-center me-2">
+                                    <select name="type" class="form-select form-select-sm" onchange="this.form.submit()">
+                                        @if (InstallTypeSvc.EffectiveInstallType() == "pendidikan")
+                                        {
+                                            <option value="pendidikan" selected>Preview: Pendidikan</option>
+                                            <option value="perusahaan">Preview: Perusahaan</option>
+                                        }
+                                        else
+                                        {
+                                            <option value="pendidikan">Preview: Pendidikan</option>
+                                            <option value="perusahaan" selected>Preview: Perusahaan</option>
+                                        }
+                                    </select>
+                                </form>
+                            </li>
+                        }
+                        <li class="nav-item"><a class="nav-link" asp-controller="User" asp-action="Index">Setting</a></li>
+                        <li class="nav-item"><a class="nav-link" asp-controller="Auth" asp-action="Logout">Keluar</a></li>
                     </ul>
                 </div>
             </div>

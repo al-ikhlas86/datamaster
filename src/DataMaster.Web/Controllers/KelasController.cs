@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using System.Text.RegularExpressions;
 using DataMaster.Data;
 using DataMaster.Data.Entities;
@@ -13,6 +14,7 @@ namespace DataMaster.Web.Controllers;
 // Penetapan Wali Kelas (assignWaliKelas, autocomplete guru) dilayani endpoint di
 // PenugasanMengajarController (persis arsitektur PHP asli - lihat §5.3), View Index
 // di sini hanya merender combobox-nya & memanggil endpoint tsb via JS.
+[Authorize(Roles = "admin")]
 [Route("kelas")]
 public class KelasController(DataMasterDbContext db, WaliKelasService waliKelas) : Controller
 {

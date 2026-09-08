@@ -1,0 +1,53 @@
+@model DataMaster.Web.Models.Auth.LoginInput
+@{
+    Layout = null;
+    ViewData["Title"] = "Masuk";
+}
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Masuk - Data Master</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+</head>
+<body class="bg-light">
+<div class="container" style="max-width:420px;margin-top:8vh">
+    <div class="text-center mb-4">
+        <h3>Data Master</h3>
+        <p class="text-muted">Al-Ikhlas 86</p>
+    </div>
+    <div class="card shadow-sm">
+        <div class="card-body p-4">
+            <h5 class="card-title mb-3">Masuk</h5>
+            @if (!ViewData.ModelState.IsValid)
+            {
+                <div class="alert alert-danger">
+                    <ul class="mb-0">
+                        @foreach (var err in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                        {
+                            <li>@err.ErrorMessage</li>
+                        }
+                    </ul>
+                </div>
+            }
+            <form asp-controller="Auth" asp-action="Login" method="post">
+                <div class="mb-3">
+                    <label class="form-label">Email atau Username</label>
+                    <input type="text" name="Login" class="form-control" value="@Model.Login" required autofocus />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Kata Sandi</label>
+                    <input type="password" name="Password" class="form-control" required />
+                </div>
+                <div class="form-check mb-3">
+                    <input type="checkbox" name="IngatLogin" value="true" class="form-check-input" id="ingatLogin" />
+                    <label class="form-check-label" for="ingatLogin">Ingat login (30 hari)</label>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Masuk</button>
+            </form>
+        </div>
+    </div>
+</div>
+</body>
+</html>

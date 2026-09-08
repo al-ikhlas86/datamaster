@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using ClosedXML.Excel;
@@ -18,6 +19,7 @@ namespace DataMaster.Web.Controllers;
 // Wali Kelas dibaca dari tabel WaliKelas (skema sudah ada) walau UI penetapannya
 // belum dibangun - jadi kolom ini akan selalu kosong sampai modul PenugasanMengajar
 // dibuat, TAPI logic baca & guard di sini sudah benar sejak sekarang (forward-compatible).
+[Authorize(Roles = "admin")]
 [Route("guru")]
 public class GuruController(DataMasterDbContext db, WaliKelasService waliKelas) : Controller
 {
