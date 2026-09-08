@@ -1,0 +1,46 @@
+@model List<DataMaster.Web.Models.Siswa.SiswaRow>
+@{
+    ViewData["Title"] = "Arsip Siswa";
+}
+
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item"><span class="nav-link active">Arsip Siswa</span></li>
+</ul>
+
+<div class="card">
+    <div class="card-header">
+        <strong>Arsip Siswa</strong>
+        <div class="text-muted small">Siswa yang sudah lulus/keluar. Data tidak dihapus, cuma tidak lagi tampil di Data Siswa aktif.</div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr><th>No</th><th>NIS</th><th>Nama</th><th>JK</th><th>Kelas Terakhir</th><th>Status</th><th>Aksi</th></tr>
+                </thead>
+                <tbody>
+                @if (Model.Count == 0)
+                {
+                    <tr><td colspan="7" class="text-center text-muted py-4">Belum ada siswa yang diarsipkan.</td></tr>
+                }
+                else
+                {
+                    var no = 1;
+                    foreach (var s in Model)
+                    {
+                        <tr>
+                            <td>@(no++)</td>
+                            <td>@s.Nis</td>
+                            <td>@s.Nama</td>
+                            <td><span class="badge @(s.JenisKelamin == "L" ? "bg-primary" : "bg-danger")">@s.JenisKelamin</span></td>
+                            <td>@(s.NamaKelas ?? "-")</td>
+                            <td><span class="badge bg-secondary">@(s.Status == "lulus" ? "Lulus" : "Keluar")</span></td>
+                            <td><a asp-action="Detail" asp-route-id="@s.SiswaId" class="btn btn-sm btn-outline-info">Detail</a></td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,84 @@
+@using DataMaster.Web.Models.Siswa
+@model ImportPreviewSession
+@{
+    ViewData["Title"] = "Preview Import Siswa";
+}
+
+<div class="card mb-3">
+    <div class="card-body">
+        <span class="badge bg-success">@Model.InsertCount Baru</span>
+        <span class="badge bg-warning text-dark">@Model.UpdateCount Diperbarui</span>
+        @if (Model.ErrorCount > 0)
+        {
+            <span class="badge bg-danger">@Model.ErrorCount Error</span>
+        }
+        <p class="mt-2 mb-0">
+            Periksa dulu hasil klasifikasi di bawah sebelum diterapkan ke database. Baris <strong>Baru</strong> akan ditambahkan sebagai siswa baru@(Model.NamaKelas is null ? "" : $" di kelas {Model.NamaKelas}"). Baris <strong>Diperbarui</strong> akan MENGOREKSI data siswa yang sudah ada (NIS cocok) - kolom yang tidak diisi di Excel TIDAK akan diubah, kelas siswa juga tidak ikut berpindah.
+        </p>
+    </div>
+</div>
+
+@if (Model.Errors.Count > 0)
+{
+    <div class="alert alert-warning">
+        <strong>Baris yang dilewati (error):</strong>
+        <ul class="mb-0">
+            @foreach (var e in Model.Errors)
+            {
+                <li>@e</li>
+            }
+        </ul>
+    </div>
+}
+
+<div class="table-responsive mb-3">
+    <table class="table table-bordered align-middle">
+        <thead>
+            <tr><th>Baris</th><th>NIS</th><th>Nama</th><th>Status</th><th>Perubahan</th></tr>
+        </thead>
+        <tbody>
+        @foreach (var row in Model.Rows)
+        {
+            <tr>
+                <td>@row.RowNumber</td>
+                <td>@row.Nis</td>
+                <td>@row.Nama</td>
+                <td>
+                    @if (row.Type == "insert")
+                    {
+                        <span class="badge bg-success">Baru</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-warning text-dark">Diperbarui</span>
+                    }
+                </td>
+                <td>
+                    @if (row.Type == "insert")
+                    {
+                        <span class="text-muted">Siswa baru, seluruh data pada file akan disimpan.</span>
+                    }
+                    else if (row.Diff.Count == 0)
+                    {
+                        <span class="text-muted">Tidak ada perubahan (data sama dengan yang tersimpan).</span>
+                    }
+                    else
+                    {
+                        <ul class="mb-0 small">
+                            @foreach (var d in row.Diff)
+                            {
+                                <li>@d.Label: <del class="text-danger">@(d.Lama ?? "-")</del> &rarr; <ins class="text-success">@(d.Baru ?? "-")</ins></li>
+                            }
+                        </ul>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+
+<form asp-action="ApplyImport" method="post" class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary">Terapkan Sekarang (@(Model.InsertCount + Model.UpdateCount) baris)</button>
+    <a asp-action="Import" class="btn btn-outline-secondary">Batal</a>
+</form>

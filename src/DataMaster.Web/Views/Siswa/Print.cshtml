@@ -1,0 +1,67 @@
+@model List<DataMaster.Web.Models.Siswa.SiswaPrintRow>
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="utf-8" />
+    <title>Data Siswa - SDIT AL IKHLAS 86</title>
+    <style>
+        body { font-family: Arial, sans-serif; font-size: 11px; margin: 20px; }
+        h1, h2, p { text-align: center; margin: 2px 0; }
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+        th, td { border: 1px solid #333; padding: 4px 6px; text-align: left; }
+        th { background: #eee; }
+        .no-print { text-align: center; margin-bottom: 16px; }
+        @@media print { .no-print { display: none; } }
+    </style>
+</head>
+<body>
+    <div class="no-print">
+        <button onclick="window.print()">🖨 Cetak Sekarang</button>
+        <button onclick="window.close()">✕ Tutup</button>
+    </div>
+    <h1>SDIT AL IKHLAS 86</h1>
+    <h2>Daftar Data Siswa</h2>
+    <p>Dicetak pada: @DateTime.Now.ToString("dd MMMM yyyy HH:mm") | Total: @Model.Count siswa</p>
+    <table>
+        <thead>
+            <tr>
+                <th>No</th><th>NIS</th><th>Nama Lengkap</th><th>JK</th><th>Kelas</th>
+                <th>Tempat/Tgl Lahir</th><th>Asal Sekolah</th><th>Alamat</th>
+                <th>Nama Ayah</th><th>Nama Ibu</th><th>No. HP</th>
+            </tr>
+        </thead>
+        <tbody>
+        @if (Model.Count == 0)
+        {
+            <tr><td colspan="11" style="text-align:center">Tidak ada data siswa.</td></tr>
+        }
+        else
+        {
+            var no = 1;
+            foreach (var s in Model)
+            {
+                <tr>
+                    <td>@(no++)</td>
+                    <td>@s.Nis</td>
+                    <td>@s.Nama</td>
+                    <td>@s.JenisKelamin</td>
+                    <td>@(s.NamaKelas ?? "-")</td>
+                    <td>@(string.IsNullOrEmpty(s.TempatLahir) && s.TanggalLahir is null ? "-" : $"{s.TempatLahir}, {s.TanggalLahir:dd-MM-yyyy}")</td>
+                    <td>@(s.AsalSekolah ?? "-")</td>
+                    <td>@(string.IsNullOrEmpty(s.Alamat) ? "-" : s.Alamat)</td>
+                    <td>@(s.NamaAyah ?? "-")</td>
+                    <td>@(s.NamaIbu ?? "-")</td>
+                    <td>@(s.NoHandphone ?? "-")</td>
+                </tr>
+            }
+        }
+        </tbody>
+        <tfoot>
+            <tr><th colspan="10">Total</th><th>@Model.Count siswa</th></tr>
+        </tfoot>
+    </table>
+</body>
+</html>

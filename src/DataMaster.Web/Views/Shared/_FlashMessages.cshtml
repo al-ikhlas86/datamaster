@@ -1,0 +1,24 @@
+@* Port dari flashdata CI4 ("message"/"error"/"warning") - sekali baca lalu hilang,
+   sama seperti TempData ASP.NET Core. Dirender global di layout supaya semua
+   controller cukup set TempData["message"]/["error"]/["warning"] seperti PHP asli. *@
+@if (TempData["message"] is string msg)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @msg
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+@if (TempData["error"] is string err)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @err
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+@if (TempData["warning"] is string warn)
+{
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        @warn
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}

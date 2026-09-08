@@ -1,0 +1,119 @@
+@model DataMaster.Web.Models.Siswa.SiswaIndexViewModel
+
+@if (Model.ImportErrors.Count > 0)
+{
+    <div class="alert alert-warning">
+        <strong>Import selesai dengan beberapa error:</strong>
+        <ul class="mb-0">
+            @foreach (var err in Model.ImportErrors)
+            {
+                <li>@err</li>
+            }
+        </ul>
+    </div>
+}
+
+@if (Model.Keyword != "")
+{
+    <p class="text-muted">Hasil pencarian untuk: <strong>@Model.Keyword</strong> &mdash; ditemukan @Model.TotalSiswa siswa.</p>
+}
+
+<div class="d-flex align-items-center justify-content-between mb-2 d-none" id="bulkDeleteToolbar">
+    <span><span id="bulkDeleteCount">0</span> siswa dipilih</span>
+    <button type="submit" form="formBulkDelete" class="btn btn-sm btn-danger">Hapus Terpilih</button>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead>
+            <tr>
+                <th style="width:2rem"><input type="checkbox" id="checkAll" /></th>
+                <th>No</th>
+                <th>NIS</th>
+                <th>NISN</th>
+                <th>Nama</th>
+                <th>JK</th>
+                <th>Kelas</th>
+                <th>Tempat, Tgl Lahir</th>
+                <th>Aksi</th>
+            </tr>
+        </thead>
+        <tbody>
+        @if (Model.Rows.Count == 0)
+        {
+            <tr>
+                <td colspan="9" class="text-center text-muted py-4">
+                    @if (Model.Keyword != "")
+                    {
+                        <text>Tidak ada siswa yang cocok dengan pencarian "@Model.Keyword".</text>
+                    }
+                    else
+                    {
+                        <text>Belum ada data siswa. <a asp-action="Create">Tambah sekarang</a>.</text>
+                    }
+                </td>
+            </tr>
+        }
+        else
+        {
+            var no = (Model.Page - 1) * Model.PerPage + 1;
+            foreach (var s in Model.Rows)
+            {
+                <tr>
+                    <td><input type="checkbox" name="ids" value="@s.SiswaId" form="formBulkDelete" class="js-row-check" /></td>
+                    <td>@(no++)</td>
+                    <td>@s.Nis</td>
+                    <td>@(s.Nisn ?? "-")</td>
+                    <td><a asp-action="Detail" asp-route-id="@s.SiswaId">@s.Nama</a></td>
+                    <td><span class="badge @(s.JenisKelamin == "L" ? "bg-primary" : "bg-danger")">@s.JenisKelamin</span></td>
+                    <td>
+                        @if (s.NamaKelas is null)
+                        {
+                            <span class="text-muted">-</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">@s.NamaKelas</span>
+                        }
+                    </td>
+                    <td>
+                        @if (string.IsNullOrEmpty(s.TempatLahir) && s.TanggalLahir is null)
+                        {
+                            <text>-</text>
+                        }
+                        else
+                        {
+                            @($"{s.TempatLahir}, {s.TanggalLahir:dd MMM yyyy}")
+                        }
+                    </td>
+                    <td>
+                        <a asp-action="Detail" asp-route-id="@s.SiswaId" class="btn btn-sm btn-outline-info">Detail</a>
+                        <form asp-action="Delete" asp-route-id="@s.SiswaId" method="post" class="d-inline form-delete-siswa" data-nama="@s.Nama">
+                            <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        }
+        </tbody>
+    </table>
+</div>
+
+@if (Model.Keyword == "" && Model.TotalPages > 1)
+{
+    var from = (Model.Page - 1) * Model.PerPage + 1;
+    var to = Math.Min(Model.Page * Model.PerPage, Model.TotalSiswa);
+    <div class="d-flex justify-content-between align-items-center">
+        <span class="text-muted small">Menampilkan @from sampai @to dari @Model.TotalSiswa data</span>
+        <nav>
+            <ul class="pagination pagination-sm mb-0">
+                @for (var p = 1; p <= Model.TotalPages; p++)
+                {
+                    <li class="page-item @(p == Model.Page ? "active" : "")">
+                        <a class="page-link js-page-link" href="@Url.Action("Index", new { q = Model.Keyword, per_page = Model.PerPage, page = p })" data-page="@p">@p</a>
+                    </li>
+                }
+            </ul>
+        </nav>
+    </div>
+}

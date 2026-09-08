@@ -1,0 +1,141 @@
+@model DataMaster.Web.Models.Siswa.SiswaIndexViewModel
+@{
+    ViewData["Title"] = "Data Siswa";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Data Siswa</h3>
+    <div>
+        <a asp-action="Print" target="_blank" class="btn btn-outline-secondary">Print</a>
+        <a asp-action="Import" class="btn btn-outline-secondary">Import Excel</a>
+        <a asp-action="Create" class="btn btn-primary">Tambah Siswa</a>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-4">
+        <div class="card text-center"><div class="card-body"><div class="text-muted small">Total Siswa</div><div class="fs-4 fw-bold">@Model.TotalSiswa</div></div></div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center"><div class="card-body"><div class="text-muted small">Laki-laki</div><div class="fs-4 fw-bold">@Model.TotalL</div></div></div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center"><div class="card-body"><div class="text-muted small">Perempuan</div><div class="fs-4 fw-bold">@Model.TotalP</div></div></div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <strong>Data Siswa Aktif</strong>
+        <div class="d-flex align-items-center gap-2">
+            <div class="input-group input-group-sm" style="width:260px">
+                <input type="text" id="searchInput" class="form-control" placeholder="Cari nama atau NIS..." value="@Model.Keyword" />
+                <button type="button" class="btn btn-outline-secondary" id="btnSearch"><i class="bi bi-search"></i></button>
+                @if (Model.Keyword != "")
+                {
+                    <a asp-action="Index" class="btn btn-outline-secondary">Bersihkan</a>
+                }
+            </div>
+            @if (Model.Keyword == "")
+            {
+                <select id="perPageSelect" class="form-select form-select-sm" style="width:auto">
+                    @foreach (var pp in new[] { 50, 100, 150, 200 })
+                    {
+                        if (pp == Model.PerPage)
+                        {
+                            <option value="@pp" selected>Tampilkan: @pp</option>
+                        }
+                        else
+                        {
+                            <option value="@pp">Tampilkan: @pp</option>
+                        }
+                    }
+                </select>
+            }
+        </div>
+    </div>
+    <div class="card-body">
+        <form id="formBulkDelete" asp-action="BulkDelete" method="post"></form>
+        <div id="hasilSiswa">
+            @await Html.PartialAsync("_Hasil", Model)
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            var searchInput = document.getElementById('searchInput');
+            var perPageSelect = document.getElementById('perPageSelect');
+            var hasil = document.getElementById('hasilSiswa');
+            var timer = null;
+
+            function muat(page) {
+                var visible = new URLSearchParams();
+                if (searchInput.value.trim() !== '') visible.set('q', searchInput.value.trim());
+                if (perPageSelect) visible.set('per_page', perPageSelect.value);
+                if (page) visible.set('page', page);
+
+                var ajaxParams = new URLSearchParams(visible);
+                ajaxParams.set('ajax', '1');
+
+                fetch('@Url.Action("Index")?' + ajaxParams.toString())
+                    .then(function (r) { return r.text(); })
+                    .then(function (html) {
+                        hasil.innerHTML = html;
+                        var qs = visible.toString();
+                        history.replaceState(null, '', '@Url.Action("Index")' + (qs ? '?' + qs : ''));
+                        attachHasilEvents();
+                    });
+            }
+
+            searchInput.addEventListener('input', function () {
+                clearTimeout(timer);
+                timer = setTimeout(function () { muat(1); }, 300);
+            });
+            document.getElementById('btnSearch').addEventListener('click', function () { muat(1); });
+            if (perPageSelect) perPageSelect.addEventListener('change', function () { muat(1); });
+
+            function attachHasilEvents() {
+                hasil.querySelectorAll('.js-page-link').forEach(function (a) {
+                    a.addEventListener('click', function (e) {
+                        e.preventDefault();
+                        muat(this.dataset.page);
+                    });
+                });
+                hasil.querySelectorAll('.form-delete-siswa').forEach(function (f) {
+                    f.addEventListener('submit', function (e) {
+                        if (!confirm('Data ' + this.dataset.nama + ' akan dihapus permanen. Lanjutkan?')) {
+                            e.preventDefault();
+                        }
+                    });
+                });
+                var checkAll = document.getElementById('checkAll');
+                var rowChecks = hasil.querySelectorAll('.js-row-check');
+                var toolbar = document.getElementById('bulkDeleteToolbar');
+                var countEl = document.getElementById('bulkDeleteCount');
+                function refreshToolbar() {
+                    var n = hasil.querySelectorAll('.js-row-check:checked').length;
+                    if (countEl) countEl.textContent = n;
+                    if (toolbar) toolbar.classList.toggle('d-none', n === 0);
+                }
+                if (checkAll) {
+                    checkAll.addEventListener('change', function () {
+                        rowChecks.forEach(function (c) { c.checked = checkAll.checked; });
+                        refreshToolbar();
+                    });
+                }
+                rowChecks.forEach(function (c) { c.addEventListener('change', refreshToolbar); });
+            }
+            attachHasilEvents();
+
+            var bulkForm = document.getElementById('formBulkDelete');
+            bulkForm.addEventListener('submit', function (e) {
+                var n = hasil.querySelectorAll('.js-row-check:checked').length;
+                if (n === 0 || !confirm(n + ' data siswa yang dipilih akan dihapus secara permanen. Lanjutkan?')) {
+                    e.preventDefault();
+                }
+            });
+        })();
+    </script>
+}

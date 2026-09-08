@@ -1,0 +1,96 @@
+@using DataMaster.Web.Models.Siswa
+@{
+    ViewData["Title"] = "Import Data Siswa";
+    var kelasOptions = (List<KelasOption>)ViewBag.KelasOptions;
+}
+
+<h3 class="mb-3">Import Data Siswa</h3>
+
+<div class="card border-primary mb-3">
+    <div class="card-header bg-primary text-white">Petunjuk Import Data Siswa</div>
+    <div class="card-body">
+        <ol>
+            <li>Download template Excel dengan klik tombol di bawah</li>
+            <li>
+                Isi data siswa sesuai kolom yang tersedia:
+                <ul>
+                    <li>Nama: Nama lengkap siswa (wajib)</li>
+                    <li>JK: Jenis kelamin, isi dengan <code>L</code> atau <code>P</code> (wajib)</li>
+                    <li>NIS: Nomor Induk Siswa (wajib, harus unik)</li>
+                    <li>NISN: Nomor Induk Siswa Nasional (opsional - boleh dikosongkan kalau belum ada dari Dapodik)</li>
+                    <li>TTL: Isi <code>Kota, Tanggal Bulan Tahun</code>, contoh <code>Bekasi, 14 Maret 2018</code> — format angka <code>Jakarta, 15-05-2018</code> juga tetap bisa dipakai (opsional)</li>
+                    <li>ASAL TK: Nama TK asal (opsional)</li>
+                    <li>Alamat: Alamat lengkap (opsional)</li>
+                    <li>Nama Orang Tua: Nama ayah/ibu/wali (opsional)</li>
+                    <li>Pekerjaan Orang Tua: Pekerjaan orang tua (opsional)</li>
+                    <li>No HP: Nomor telepon (wajib - dipakai akun Orang Tua di aplikasi HP)</li>
+                </ul>
+            </li>
+            <li>Simpan file dalam format <code>.xlsx</code> atau <code>.xls</code></li>
+            <li>Upload file menggunakan form di bawah</li>
+        </ol>
+        <div class="alert alert-info small mb-0">
+            <ul class="mb-0">
+                <li>Kelas tujuan dipilih satu kali pada form upload dan berlaku untuk siswa BARU saja.</li>
+                <li>File ini bisa berisi campuran siswa baru &amp; koreksi data siswa lama sekaligus - kalau NIS di suatu baris SUDAH ADA di database, baris itu otomatis dianggap koreksi (kolom yang dikosongkan tidak akan diubah), bukan siswa baru. Kelas siswa lama TIDAK ikut berpindah walau ikut dikoreksi.</li>
+                <li>Sebelum benar-benar tersimpan, akan ada halaman Preview yang menampilkan mana baris baru &amp; mana baris koreksi (beserta perubahannya) - Anda konfirmasi dulu baru diterapkan.</li>
+                <li>No. HP yang diisi akan disinkronkan sebagai nomor orang tua penerima notifikasi presensi.</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-body text-center">
+                <p>Download template Excel untuk memudahkan input data siswa</p>
+                <a asp-action="DownloadTemplate" class="btn btn-success btn-lg">Download Template Excel</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-7">
+        <div class="card">
+            <div class="card-body">
+                <form asp-action="PreviewImport" method="post" enctype="multipart/form-data" id="formImport">
+                    <div class="mb-3">
+                        <label class="form-label">Kelas Tujuan</label>
+                        <select name="kelas_id" class="form-select">
+                            <option value="">-- Import tanpa kelas --</option>
+                            @foreach (var k in kelasOptions)
+                            {
+                                <option value="@k.KelasId">@k.NamaKelas</option>
+                            }
+                        </select>
+                        <div class="form-text">Semua siswa dalam file akan langsung dimasukkan ke kelas ini.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Pilih File Excel *</label>
+                        <input type="file" name="file" id="fileInput" class="form-control" accept=".xlsx,.xls" required />
+                        <div class="form-text">Format file: .xlsx atau .xls (Max: 5MB)</div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg" id="btnSubmitImport">Upload &amp; Import Data</button>
+                        <a asp-action="Index" class="btn btn-outline-secondary btn-lg">Kembali ke Data Siswa</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.getElementById('fileInput').addEventListener('change', function () {
+            if (this.files[0] && this.files[0].size > 5 * 1024 * 1024) {
+                alert('Ukuran file terlalu besar! Maksimal 5MB.');
+                this.value = '';
+            }
+        });
+        document.getElementById('formImport').addEventListener('submit', function () {
+            var btn = document.getElementById('btnSubmitImport');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Sedang mengimport...';
+        });
+    </script>
+}

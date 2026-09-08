@@ -1,10 +1,31 @@
 using DataMaster.Data;
+using DataMaster.Web.Services;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllersWithViews();
+// Session dipakai utk alur preview-import 2 langkah (persis pola PHP
+// session()->set('preview_import_siswa', ...) di Siswa::previewImport() ->
+// Siswa::showPreviewImport() -> Siswa::applyImport(), lihat 01-siswa-psb.md §3.13-15).
+// TempData memakai session yang sama (bukan cookie) supaya flash message
+// "message"/"error"/"warning" sekali-baca konsisten dgn semantik flashdata CI4.
+builder.Services.AddControllersWithViews(options =>
+    {
+        // Validasi CSRF WAJIB di semua POST secara global - pola sama persis
+        // csrf_field() CI4 yang otomatis divalidasi framework di setiap form.
+        // Tiap <form method="post"> WAJIB menyertakan @Html.AntiForgeryToken().
+        options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute());
+    })
+    .AddSessionStateTempDataProvider();
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(30);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+});
 
 // SQLite tunggal, 1 file per instalasi - path default dev di App_Data/, TAPI
 // Launcher (WPF) akan meng-override connection string ini saat menjalankan sbg
@@ -12,6 +33,7 @@ builder.Services.AddControllersWithViews();
 // (bukan di dalam folder aplikasi, supaya aman dari overwrite saat auto-update).
 builder.Services.AddDbContext<DataMasterDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DataMaster")));
+builder.Services.AddScoped<DocumentStorageService>();
 
 var app = builder.Build();
 
@@ -35,6 +57,7 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseRouting();
 
+app.UseSession();
 app.UseAuthorization();
 
 app.MapStaticAssets();
