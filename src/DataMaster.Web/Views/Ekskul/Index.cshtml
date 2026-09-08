@@ -1,0 +1,69 @@
+@model DataMaster.Web.Models.Ekskul.EkskulIndexViewModel
+@{
+    ViewData["Title"] = "Ekstrakurikuler";
+}
+
+<h3 class="mb-3">Ekstrakurikuler</h3>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <form asp-action="Store" method="post" class="row g-2">
+            <div class="col-md-3"><input type="text" name="nama" class="form-control" placeholder="Nama Ekskul *" required /></div>
+            <div class="col-md-3"><input type="text" name="pembina" class="form-control" placeholder="Pembina" /></div>
+            <div class="col-md-2"><input type="text" name="hari" class="form-control" placeholder="Hari Latihan" /></div>
+            <div class="col-md-2"><input type="text" name="deskripsi" class="form-control" placeholder="Deskripsi" /></div>
+            <div class="col-md-2"><button type="submit" class="btn btn-primary w-100">Tambah Ekskul</button></div>
+        </form>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-6"><div class="card text-center"><div class="card-body"><div class="text-muted small">Ekskul Aktif</div><div class="fs-4 fw-bold">@Model.TotalAktif</div></div></div></div>
+    <div class="col-md-6"><div class="card text-center"><div class="card-body"><div class="text-muted small">Total Peserta (Seluruh Ekskul)</div><div class="fs-4 fw-bold">@Model.TotalPesertaSemua</div></div></div></div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <table class="table table-hover align-middle">
+            <thead><tr><th>Nama Ekskul</th><th>Pembina</th><th>Hari</th><th>Peserta</th><th>Status</th><th>Aksi</th></tr></thead>
+            <tbody>
+            @if (Model.Rows.Count == 0)
+            {
+                <tr><td colspan="6" class="text-center text-muted py-4">Belum ada ekskul. Tambahkan lewat form di atas.</td></tr>
+            }
+            else
+            {
+                foreach (var e in Model.Rows)
+                {
+                    <tr class="@(e.IsActive ? "" : "table-secondary")">
+                        <td><a asp-action="Detail" asp-route-id="@e.EkskulId">@e.Nama</a></td>
+                        <td>@(e.Pembina ?? "-")</td>
+                        <td>@(e.Hari ?? "-")</td>
+                        <td><span class="badge bg-secondary">@e.TotalPeserta</span></td>
+                        <td>
+                            @if (e.IsActive) { <span class="badge bg-success">Aktif</span> }
+                            else { <span class="badge bg-secondary">Arsip</span> }
+                        </td>
+                        <td>
+                            <a asp-action="Detail" asp-route-id="@e.EkskulId" class="btn btn-sm btn-outline-info">Lihat Peserta</a>
+                            <a asp-action="Edit" asp-route-id="@e.EkskulId" class="btn btn-sm btn-outline-secondary">Edit</a>
+                            @if (e.IsActive)
+                            {
+                                <form asp-action="Archive" asp-route-id="@e.EkskulId" method="post" class="d-inline" onsubmit="return confirm('Arsipkan ekskul ini?');">
+                                    <button type="submit" class="btn btn-sm btn-outline-warning">Arsipkan</button>
+                                </form>
+                            }
+                            else
+                            {
+                                <form asp-action="Restore" asp-route-id="@e.EkskulId" method="post" class="d-inline">
+                                    <button type="submit" class="btn btn-sm btn-outline-success">Pulihkan</button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

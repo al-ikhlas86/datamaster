@@ -25,7 +25,8 @@ supaya tahu persis sudah sampai mana dan apa langkah berikutnya.
 | Halaman/Controller: **Guru & Pegawai** (CRUD, arsip dgn alasan keluar, import upsert 3-langkah, cetak) | Selesai & teruji end-to-end. **LINGKUP SENGAJA DIPERSEMPIT**: install_type "perusahaan" belum didukung (selalu berperilaku "pendidikan" — semua jabatan diizinkan). |
 | Halaman/Controller: **Penugasan Mengajar "Guru Pengampu"** (nomor urut+deteksi bentrok, tautan guru↔mapel dgn tingkat, AJAX tanpa-reload) + **Wali Kelas** (autocomplete+autosave AJAX di halaman Kelas, sinkronisasi otomatis jabatan guru_kelas↔guru_bidang, guard tolak-ubah-jabatan) | Selesai & teruji end-to-end — CELAH yang didokumentasikan di modul Guru/Kelas sebelumnya kini TERTUTUP (kolom Wali Kelas terisi sungguhan). Termasuk `WaliKelasService` (port `WaliKelasModel.php`) dan tambahan cepat `KurikulumController.StoreMapel` (MataPelajaran belum punya CRUD sendiri). |
 | Halaman/Controller: **Kepala Sekolah** (autocomplete tanpa filter eksklusif, tetapkan/kosongkan per-tahun-ajaran, reload penuh setelah AJAX - beda sengaja dari Wali Kelas/Guru Pengampu) | Selesai & teruji end-to-end. |
-| Halaman/Controller modul lain (Ekskul, Kurikulum lengkap - Alokasi JP/Jam Belajar, Jadwal Pelajaran, Kalender Akademik, Akademik/Kenaikan Kelas, Auth) | Belum dimulai — modul "Guru, Kelas, Tahun Ajaran, Penugasan Mengajar, Kepala Sekolah" (spec 02, minus Ekskul) kini 100% selesai. **Ekskul jadi kandidat termudah berikutnya** (independen, tidak bergantung modul lain yang belum ada). |
+| Halaman/Controller: **Ekskul** (CRUD, arsip, kelola peserta) | Selesai & teruji end-to-end. **Modul "Guru, Kelas, Struktur" (spec 02) kini 100% SELESAI dibangun.** |
+| Halaman/Controller modul lain (Kurikulum lengkap - Mata Pelajaran/Alokasi JP/Jam Belajar, Jadwal Pelajaran, Kalender Akademik, Akademik/Kenaikan Kelas, Auth/Manajemen Pengguna, Dashboard) | Belum dimulai — spec 03 (Akademik/Jadwal) dan sebagian besar spec 04 (Infra/Auth) tersisa. **Kalender Akademik jadi kandidat berikutnya** (independen, parser tanggal Indonesia sudah ada di `IndonesianDateService`). |
 | Sinkronisasi Hub API (port dari SyncPush.php) | Belum dimulai |
 | Launcher (splash, start/stop server, WebView2, auto-update) | Kerangka XAML splash sudah ada (`MainWindow.xaml`); `MainWindow.xaml.cs` (logic start server + WebView2 + auto-update) belum dimulai |
 | CI GitHub Actions (build+release, pola Presensi) | Belum dimulai |
@@ -177,6 +178,25 @@ supaya tahu persis sudah sampai mana dan apa langkah berikutnya.
   ditetapkan."), autocomplete cari-kandidat, tetapkan (redirect ke `?tahun=` dgn
   message verbatim), kosongkan (message verbatim, balik ke state kosong).
 - Tidak ada bug baru ditemukan di modul ini.
+
+## Catatan modul Ekskul
+
+- File: `Controllers/EkskulController.cs`, `Models/Ekskul/EkskulViewModels.cs`,
+  `Views/Ekskul/*.cshtml`. Modul PALING SEDERHANA/independen di spec 02 - tidak
+  bergantung Guru/Kelas sama sekali (Pembina teks bebas, bukan FK).
+- **Edge-case yang WAJIB dipertahankan** (bukan bug untuk diperbaiki): (1) kartu
+  "Total Peserta" di Index menghitung SEMUA baris ekskul_siswa tanpa filter status
+  siswa (beda dari halaman Detail yang filter status=aktif saja - §12 poin 20);
+  (2) `AddSiswa` melaporkan JUMLAH YANG DICENTANG di pesan sukses, bukan jumlah yang
+  benar-benar diinsert (cek duplikat manual sebelum insert, form disubmit dobel tidak
+  berhenti di tengah loop - §12 poin 21).
+- **Diuji end-to-end via HTTP nyata**: create ekskul, tambah peserta (siswa masuk
+  daftar peserta), keluarkan peserta (siswa kembali muncul di daftar "belum ikut",
+  bukan hilang permanen), arsip (riwayat peserta tetap utuh, tidak terhapus).
+- Tidak ada bug baru ditemukan di modul ini.
+
+**Modul "Guru, Kelas, Tahun Ajaran, Penugasan Mengajar, Kepala Sekolah, Ekskul"
+(spec 02) kini 100% SELESAI dibangun dan teruji end-to-end.**
 
 ## Prinsip wajib dipegang tiap sesi lanjutan
 

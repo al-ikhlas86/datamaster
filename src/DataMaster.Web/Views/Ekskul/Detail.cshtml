@@ -1,0 +1,79 @@
+@model DataMaster.Web.Models.Ekskul.EkskulDetailViewModel
+@{
+    ViewData["Title"] = "Detail Ekskul";
+}
+
+<h3 class="mb-1">@Model.Nama</h3>
+<p class="text-muted">
+    Pembina: @(Model.Pembina ?? "-") &bull; Hari: @(Model.Hari ?? "-") &bull; @Model.Peserta.Count peserta
+    @if (!string.IsNullOrEmpty(Model.Deskripsi)) { <br /> @Model.Deskripsi }
+</p>
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-header"><strong>Peserta</strong></div>
+            <div class="card-body">
+                <table class="table table-sm align-middle">
+                    <thead><tr><th>No</th><th>NIS</th><th>Nama</th><th>Kelas</th><th>Terdaftar</th><th>Aksi</th></tr></thead>
+                    <tbody>
+                    @if (Model.Peserta.Count == 0)
+                    {
+                        <tr><td colspan="6" class="text-center text-muted">Belum ada peserta.</td></tr>
+                    }
+                    else
+                    {
+                        var no = 1;
+                        foreach (var p in Model.Peserta)
+                        {
+                            <tr>
+                                <td>@(no++)</td>
+                                <td>@p.Nis</td>
+                                <td><a asp-controller="Siswa" asp-action="Detail" asp-route-id="@p.SiswaId">@p.Nama</a></td>
+                                <td>@(p.NamaKelas ?? "-")</td>
+                                <td>@p.TanggalDaftar.ToString("dd MMM yyyy")</td>
+                                <td>
+                                    <form asp-action="RemoveSiswa" asp-route-ekskulId="@Model.EkskulId" asp-route-siswaId="@p.SiswaId" method="post" onsubmit="return confirm('Keluarkan @p.Nama dari ekskul?');">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Keluarkan</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-header"><strong>Tambah Peserta</strong></div>
+            <div class="card-body">
+                @if (Model.SiswaBelumIkut.Count == 0)
+                {
+                    <p class="text-muted mb-0">Semua siswa aktif sudah terdaftar di ekskul ini.</p>
+                }
+                else
+                {
+                    <p class="text-muted small">Pilih siswa yang belum mengikuti @Model.Nama. 1 siswa boleh ikut lebih dari 1 ekskul.</p>
+                    <form asp-action="AddSiswa" asp-route-id="@Model.EkskulId" method="post">
+                        <div class="mb-2">
+                            <button type="button" class="btn btn-sm btn-link p-0" onclick="document.querySelectorAll('.js-siswa-check').forEach(c=>c.checked=true)">Pilih Semua</button>
+                        </div>
+                        <div style="max-height:320px;overflow-y:auto">
+                        @foreach (var s in Model.SiswaBelumIkut)
+                        {
+                            <div class="form-check">
+                                <input class="form-check-input js-siswa-check" type="checkbox" name="siswa_ids" value="@s.SiswaId" id="chk@(s.SiswaId)" />
+                                <label class="form-check-label" for="chk@(s.SiswaId)">@s.Nama (@s.Nis)</label>
+                            </div>
+                        }
+                        </div>
+                        <button type="submit" class="btn btn-primary mt-2">Tambahkan</button>
+                    </form>
+                }
+            </div>
+        </div>
+    </div>
+</div>
