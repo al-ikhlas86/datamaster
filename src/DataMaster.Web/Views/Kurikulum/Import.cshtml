@@ -1,0 +1,62 @@
+@{
+    var jenis = (string)ViewBag.Jenis; // "mapel" | "alokasi" | "jam"
+    var taId = (int)ViewBag.TahunAjaranId;
+    var judul = jenis switch { "mapel" => "Import Mata Pelajaran", "alokasi" => "Import Struktur Kurikulum (Alokasi JP)", _ => "Import Jam Belajar" };
+    var actionProcess = jenis switch { "mapel" => "ProcessImportMapel", "alokasi" => "ProcessImportAlokasi", _ => "ProcessImportJam" };
+    var actionTemplate = jenis switch { "mapel" => "DownloadTemplateMapel", "alokasi" => "DownloadTemplateAlokasi", _ => "DownloadTemplateJam" };
+    var tab = jenis == "mapel" ? "mapel" : jenis == "alokasi" ? "alokasi" : "jam";
+    ViewData["Title"] = judul;
+}
+
+<h3 class="mb-3">@judul</h3>
+
+<div class="alert alert-info">
+    @if (jenis == "mapel")
+    {
+        <ul class="mb-0">
+            <li>Kolom: Nama, Kode, Kelompok, Urutan.</li>
+            <li>Nama wajib diisi dan belum pernah dipakai mata pelajaran lain. Kode (kalau diisi) juga harus unik.</li>
+        </ul>
+    }
+    else if (jenis == "alokasi")
+    {
+        <ul class="mb-0">
+            <li>Kolom: Tingkat, Mata Pelajaran, JP per Minggu.</li>
+            <li>Tingkat harus sesuai kode yang sudah ada di menu Kelola Kelas, Mata Pelajaran harus sesuai nama yang sudah ada di tab Mata Pelajaran (tambahkan/import dulu kalau belum ada).</li>
+            <li>JP per Minggu diisi 0 atau kosong berarti mapel itu dihapus dari alokasi tingkat tersebut.</li>
+        </ul>
+    }
+    else
+    {
+        <ul class="mb-0">
+            <li>Kolom: Hari, Jam Ke, Jenis, Jam Mulai, Jam Selesai, Label.</li>
+            <li>Jam Ke boleh dikosongkan (otomatis lanjutan). Jenis "kegiatan" wajib mengisi Label.</li>
+            <li>Baris yang bentrok nomor jam atau tumpang tindih waktu dengan baris lain di hari yang sama akan dilewati dan dilaporkan.</li>
+        </ul>
+    }
+</div>
+
+<div class="row g-3">
+    <div class="col-md-5">
+        <div class="card"><div class="card-body text-center">
+            <p>Download template Excel untuk memudahkan input</p>
+            <a asp-action="@actionTemplate" class="btn btn-success btn-lg">Download Template XLSX</a>
+        </div></div>
+    </div>
+    <div class="col-md-7">
+        <div class="card"><div class="card-body">
+            <form asp-action="@actionProcess" method="post" enctype="multipart/form-data">
+                <input type="hidden" name="tahun_ajaran_id" value="@taId" />
+                <div class="mb-3">
+                    <label class="form-label">Pilih File Excel *</label>
+                    <input type="file" name="file" class="form-control" accept=".xlsx,.xls" required />
+                    <div class="form-text">Format file: .xlsx atau .xls (Max: 5MB)</div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-lg">Import Sekarang</button>
+                    <a asp-action="Index" asp-route-tab="@tab" asp-route-tahun_ajaran_id="@taId" class="btn btn-outline-secondary btn-lg">Batal</a>
+                </div>
+            </form>
+        </div></div>
+    </div>
+</div>

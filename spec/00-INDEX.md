@@ -27,8 +27,9 @@ supaya tahu persis sudah sampai mana dan apa langkah berikutnya.
 | Halaman/Controller: **Kepala Sekolah** (autocomplete tanpa filter eksklusif, tetapkan/kosongkan per-tahun-ajaran, reload penuh setelah AJAX - beda sengaja dari Wali Kelas/Guru Pengampu) | Selesai & teruji end-to-end. |
 | Halaman/Controller: **Ekskul** (CRUD, arsip, kelola peserta) | Selesai & teruji end-to-end. **Modul "Guru, Kelas, Struktur" (spec 02) kini 100% SELESAI dibangun.** |
 | Halaman/Controller: **Kalender Akademik** (CRUD, kalender visual, import Excel dgn parser tanggal Indonesia fleksibel, validasi anti-salah-tahun) | Selesai & teruji end-to-end, TERMASUK uji regresi bug historis "strtotime salah tahun" (§7) — "7 Juni 2027" terverifikasi ke-parse sebagai 2027, bukan mundur ke 2026. |
-| Halaman/Controller: **Akademik** (Kenaikan Kelas, Kelulusan, Arsip Historis, Rekap Lulusan) | Selesai & teruji end-to-end. **Spec 03 kini HANYA menyisakan: Kurikulum lengkap (Mata Pelajaran CRUD penuh/Alokasi JP/Jam Belajar) dan Jadwal Pelajaran (paling kompleks, disengaja ditunda paling akhir).** |
-| Halaman/Controller modul lain (Kurikulum lengkap, Jadwal Pelajaran, Auth/Manajemen Pengguna, Dashboard, Sync Hub API, Launcher) | Belum dimulai — spec 04 (Infra/Auth) juga masih tersisa penuh. |
+| Halaman/Controller: **Akademik** (Kenaikan Kelas, Kelulusan, Arsip Historis, Rekap Lulusan) | Selesai & teruji end-to-end. |
+| Halaman/Controller: **Kurikulum lengkap** (Mata Pelajaran CRUD+import, Struktur Kurikulum/Alokasi JP matrix+salin+import, Jam Belajar dgn 2 aturan bentrok+salin+import) | Selesai & teruji end-to-end. **Spec 03 kini HANYA menyisakan: Jadwal Pelajaran (paling kompleks, disengaja ditunda paling akhir).** |
+| Halaman/Controller modul lain (Jadwal Pelajaran, Auth/Manajemen Pengguna, Dashboard, Sync Hub API, Launcher) | Belum dimulai — spec 04 (Infra/Auth) juga masih tersisa penuh. |
 | Sinkronisasi Hub API (port dari SyncPush.php) | Belum dimulai |
 | Launcher (splash, start/stop server, WebView2, auto-update) | Kerangka XAML splash sudah ada (`MainWindow.xaml`); `MainWindow.xaml.cs` (logic start server + WebView2 + auto-update) belum dimulai |
 | CI GitHub Actions (build+release, pola Presensi) | Belum dimulai |
@@ -256,6 +257,62 @@ supaya tahu persis sudah sampai mana dan apa langkah berikutnya.
   {kelas tujuan}" / "Lulus"), Rekap Lulusan menampilkan lulusan, dan bulk-delete
   DITOLAK dgn pesan verbatim persis.
 - Tidak ada bug baru ditemukan di modul ini.
+
+## Catatan modul Kurikulum lengkap (Mata Pelajaran, Struktur Kurikulum/Alokasi JP, Jam Belajar)
+
+- File: `Controllers/KurikulumController.cs` (SATU controller untuk 4 sub-fitur: Master
+  Tingkat yang sudah ada dari sesi sebelumnya + 3 tab baru sesi ini), `Models/Kurikulum/
+  KurikulumViewModels.cs`, `Views/Kurikulum/Index.cshtml` (3-tab: Mata Pelajaran/Struktur
+  Kurikulum/Jam Belajar), `Views/Kurikulum/Import.cshtml` (SATU view dipakai bergantian
+  utk ke-3 jenis import lewat `ViewBag.Jenis`, pola sama `Views/Siswa/Import.cshtml`).
+- **Alokasi JP ("Struktur Kurikulum")**: matriks Tingkat×MataPelajaran per Tahun Ajaran.
+  Baris TIDAK ADA = mapel tidak diajarkan di tingkat itu; input 0/kosong saat simpan =
+  HAPUS baris (bukan simpan nilai 0) - beda makna "tidak diajarkan" vs "diajarkan 0 jam"
+  dipertahankan persis spec §5.3. `SalinAlokasi`/`SalinJam` menyalin dari TA lain TANPA
+  menimpa baris yang sudah ada di TA tujuan.
+- **Jam Belajar**: 2 aturan bentrok WAJIB diterapkan identik di jalur manual (`StoreJam`)
+  MAUPUN import Excel (`ProcessImportJam`) - (1) nomor jam ke- bentrok di hari yang sama,
+  (2) rentang waktu tumpang tindih (formula `mulai<selesai_baru AND selesai>mulai_baru`).
+  **`UpdateJamBatch()` SENGAJA TIDAK mengecek ulang kedua aturan itu** (hanya validasi
+  `mulai<selesai`) - inkonsistensi NYATA dari PHP asli, diverifikasi via test regresi
+  eksplisit (batch-update dipaksa membuat 2 baris tumpang tindih waktu → BERHASIL masuk,
+  bukan ditolak) supaya celah ini tidak "diperbaiki" tanpa sengaja di masa depan.
+- **2 bug nyata ditemukan & diperbaiki selama uji coba** (pola baru, belum pernah muncul
+  di modul-modul sebelumnya):
+  1. `UpdateMapelBatch` (banyak baris disimpan via SATU `SaveChangesAsync()` di akhir)
+     mengecek keunikan nama/kode PER BARIS ke DATABASE saja - kalau 2 baris DALAM BATCH
+     YANG SAMA diubah jadi nama identik, keduanya lolos cek individual (karena baris
+     lawannya belum ter-commit ke DB saat dicek) lalu SqliteException UNIQUE constraint
+     mentah-mentah muncul saat `SaveChangesAsync()`. **Fix**: hitung dulu SELURUH state
+     akhir (baris diedit + baris tidak diedit) jadi satu `Dictionary` di memori, deteksi
+     tabrakan nama/kode LINTAS seluruh state itu (bukan query DB per baris), baru terapkan
+     yang tidak tabrakan.
+  2. `ProcessImportMapel`/`ProcessImportJam` punya bug SERUPA: validasi tiap baris (nama
+     mapel duplikat / jam bentrok) query ke DB, TAPI `SaveChangesAsync()` cuma dipanggil
+     SEKALI di akhir loop - baris ke-3 dalam file yang sama tidak "melihat" baris ke-1/ke-2
+     yang baru ditambahkan (belum ter-commit), sehingga 2 baris identik dalam 1 file yang
+     SAMA-SAMA seharusnya cuma 1 yang masuk malah keduanya lolos validasi lalu crash di
+     `SaveChangesAsync()` (utk Jam: pernah bikin 3 baris `jam_ke=1` lolos sekaligus).
+     **Fix**: panggil `SaveChangesAsync()` LANGSUNG setelah tiap baris valid ditambahkan
+     (bukan sekali di akhir) - pola ini SUDAH BENAR dari awal di `ProcessImportAlokasi`
+     (lewat `SimpanSelAsync` yang sudah per-sel `SaveChangesAsync`), jadi tidak perlu diubah.
+     **Pelajaran umum utk modul Jadwal Pelajaran nanti**: setiap kali sebuah loop impor
+     Excel melakukan "cek-lalu-`Add()`" berulang dgn kemungkinan baris saling terkait
+     (bentrok satu sama lain), JANGAN batch semua `Add()` lalu SATU `SaveChangesAsync()`
+     di akhir - commit per baris supaya baris berikutnya melihat state ter-update.
+- **Diuji end-to-end via HTTP nyata, mencakup SEMUA invarian kritis**: Mata Pelajaran
+  (tambah cepat, tolak nama duplikat, batch-update dgn tabrakan SESAMA BARIS DALAM SATU
+  SUBMIT terdeteksi rapi - bukan crash, hapus dgn/tanpa proteksi FK JadwalPelajaran),
+  Alokasi (simpan matriks, hapus-jika-nol, salin dari TA lain tanpa menimpa), Jam Belajar
+  (tambah manual dgn kedua aturan bentrok diuji terpisah, `UpdateJamBatch` diverifikasi
+  TIDAK mengecek ulang bentrok - regresi sengaja, hapus dgn info dampak ke Jadwal
+  Pelajaran, salin dari TA lain), 3 alur import Excel (Mata Pelajaran/Alokasi/Jam Belajar)
+  masing-masing dgn campuran baris valid+invalid DAN kasus duplikat-dalam-file-yang-sama.
+
+**Spec 03 (Kurikulum, Jadwal Pelajaran, Kalender Akademik, Akademik) kini HANYA
+menyisakan Jadwal Pelajaran** - modul terakhir dan paling kompleks (grid entri jadwal,
+parser kode "35K", deteksi bentrok guru, piket, cetak, import Excel dgn pencocokan
+kolom dinamis) sebelum spec 03 100% selesai.
 
 ## Prinsip wajib dipegang tiap sesi lanjutan
 

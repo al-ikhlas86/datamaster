@@ -1,0 +1,243 @@
+@using System.Text.Json
+@model DataMaster.Web.Models.Kurikulum.KurikulumIndexViewModel
+@{
+    ViewData["Title"] = "Kurikulum";
+    var namaHari = new Dictionary<string, string> { ["senin"] = "Senin", ["selasa"] = "Selasa", ["rabu"] = "Rabu", ["kamis"] = "Kamis", ["jumat"] = "Jumat", ["sabtu"] = "Sabtu", ["minggu"] = "Minggu" };
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Kurikulum</h3>
+</div>
+
+<div class="mb-3" style="max-width:320px">
+    <select class="form-select" onchange="window.location.href='@Url.Action("Index")?tab=@Model.Tab&tahun_ajaran_id='+this.value">
+        @foreach (var (id, nama) in Model.TahunAjaranList)
+        {
+            if (id == Model.TahunAjaranId) { <option value="@id" selected>@nama</option> }
+            else { <option value="@id">@nama</option> }
+        }
+    </select>
+</div>
+
+@if (TempData["import_errors"] is string errJson)
+{
+    <div class="alert alert-warning">
+        <strong>Baris yang dilewati:</strong>
+        <ul class="mb-0">
+            @foreach (var e in JsonSerializer.Deserialize<List<string>>(errJson) ?? [])
+            {
+                <li>@e</li>
+            }
+        </ul>
+    </div>
+}
+
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item"><a class="nav-link @(Model.Tab == "mapel" ? "active" : "")" href="@Url.Action("Index", new { tab = "mapel", tahun_ajaran_id = Model.TahunAjaranId })">Mata Pelajaran</a></li>
+    <li class="nav-item"><a class="nav-link @(Model.Tab == "alokasi" ? "active" : "")" href="@Url.Action("Index", new { tab = "alokasi", tahun_ajaran_id = Model.TahunAjaranId })">Struktur Kurikulum</a></li>
+    <li class="nav-item"><a class="nav-link @(Model.Tab == "jam" ? "active" : "")" href="@Url.Action("Index", new { tab = "jam", tahun_ajaran_id = Model.TahunAjaranId })">Jam Belajar</a></li>
+</ul>
+
+@if (Model.Tab == "mapel")
+{
+    <div class="d-flex justify-content-end gap-2 mb-3">
+        <a asp-action="ImportMapel" asp-route-tahun_ajaran_id="@Model.TahunAjaranId" class="btn btn-outline-secondary">Import Excel</a>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header">Tambah Mata Pelajaran</div>
+        <div class="card-body">
+            <form asp-action="StoreMapel" method="post" class="row g-2 align-items-end">
+                <input type="hidden" name="tahun_ajaran_id" value="@Model.TahunAjaranId" />
+                <div class="col-md-2"><label class="form-label">Kode</label><input type="text" name="kode" class="form-control" maxlength="10" /></div>
+                <div class="col-md-4"><label class="form-label">Nama *</label><input type="text" name="nama" class="form-control" required /></div>
+                <div class="col-md-3"><label class="form-label">Kelompok</label><input type="text" name="kelompok" class="form-control" placeholder="mis. Kelompok A (Umum)" /></div>
+                <div class="col-md-1"><label class="form-label">Urutan</label><input type="number" name="urutan" class="form-control" value="0" /></div>
+                <div class="col-md-2"><button type="submit" class="btn btn-primary w-100">Tambah</button></div>
+            </form>
+        </div>
+    </div>
+
+    <form asp-action="UpdateMapelBatch" method="post">
+        <input type="hidden" name="tahun_ajaran_id" value="@Model.TahunAjaranId" />
+        @foreach (var (kelompok, list) in Model.MapelPerKelompok)
+        {
+            <div class="card mb-3">
+                <div class="card-header">@kelompok</div>
+                <table class="table table-sm mb-0 align-middle">
+                    <thead><tr><th style="width:90px">Kode</th><th>Nama</th><th style="width:220px">Kelompok</th><th style="width:90px">Urutan</th><th style="width:80px"></th></tr></thead>
+                    <tbody>
+                        @foreach (var m in list)
+                        {
+                            <tr>
+                                <td><input type="text" name="rows[@m.MataPelajaranId].Kode" class="form-control form-control-sm" value="@m.Kode" maxlength="10" /></td>
+                                <td><input type="text" name="rows[@m.MataPelajaranId].Nama" class="form-control form-control-sm" value="@m.Nama" required /></td>
+                                <td><input type="text" name="rows[@m.MataPelajaranId].Kelompok" class="form-control form-control-sm" value="@m.Kelompok" /></td>
+                                <td><input type="number" name="rows[@m.MataPelajaranId].Urutan" class="form-control form-control-sm" value="@m.Urutan" /></td>
+                                <td>
+                                    <button type="submit" formaction="@Url.Action("DeleteMapel", new { id = m.MataPelajaranId, tahun_ajaran_id = Model.TahunAjaranId })"
+                                            class="btn btn-sm btn-outline-danger" data-nama="@m.Nama"
+                                            onclick="return confirm('Hapus mata pelajaran &quot;' + this.dataset.nama + '&quot;?')">Hapus</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        @if (Model.MapelList.Count == 0)
+        {
+            <p class="text-muted">Belum ada mata pelajaran.</p>
+        }
+        else
+        {
+            <button type="submit" class="btn btn-success">Simpan Semua Perubahan</button>
+        }
+    </form>
+}
+else if (Model.Tab == "alokasi")
+{
+    <div class="d-flex justify-content-end gap-2 mb-3">
+        <form asp-action="SalinAlokasi" method="post" class="d-flex gap-2">
+            <input type="hidden" name="tahun_ajaran_id" value="@Model.TahunAjaranId" />
+            <select name="sumber_id" class="form-select form-select-sm" required>
+                <option value="">Salin dari tahun ajaran...</option>
+                @foreach (var (id, nama) in Model.TahunAjaranList)
+                {
+                    if (id != Model.TahunAjaranId) { <option value="@id">@nama</option> }
+                }
+            </select>
+            <button type="submit" class="btn btn-outline-secondary btn-sm">Salin</button>
+        </form>
+        <a asp-action="ImportAlokasi" asp-route-tahun_ajaran_id="@Model.TahunAjaranId" class="btn btn-outline-secondary">Import Excel</a>
+    </div>
+
+    @if (Model.TingkatList.Count == 0)
+    {
+        <p class="text-muted">Belum ada Master Tingkat aktif. Tambahkan dulu di menu Kelola Kelas.</p>
+    }
+    else if (Model.MapelList.Count == 0)
+    {
+        <p class="text-muted">Belum ada mata pelajaran. Tambahkan dulu di tab Mata Pelajaran.</p>
+    }
+    else
+    {
+        <form asp-action="SimpanAlokasi" method="post">
+            <input type="hidden" name="tahun_ajaran_id" value="@Model.TahunAjaranId" />
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered align-middle">
+                    <thead>
+                        <tr>
+                            <th style="min-width:220px">Mata Pelajaran</th>
+                            @foreach (var t in Model.TingkatList)
+                            {
+                                <th class="text-center" style="width:90px">@t.Nama</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var m in Model.MapelList)
+                        {
+                            <tr>
+                                <td>@m.Nama</td>
+                                @foreach (var t in Model.TingkatList)
+                                {
+                                    var jp = Model.Matriks.TryGetValue(t.Kode, out var row) && row.TryGetValue(m.MataPelajaranId, out var v) ? v : 0;
+                                    <td class="text-center">
+                                        <input type="number" min="0" max="99" class="form-control form-control-sm text-center"
+                                               name="alokasi[@t.Kode][@m.MataPelajaranId]" value="@jp" style="width:70px;display:inline-block" />
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <button type="submit" class="btn btn-success">Simpan Alokasi</button>
+        </form>
+    }
+}
+else
+{
+    <div class="d-flex justify-content-end gap-2 mb-3">
+        <form asp-action="SalinJam" method="post" class="d-flex gap-2">
+            <input type="hidden" name="tahun_ajaran_id" value="@Model.TahunAjaranId" />
+            <select name="sumber_id" class="form-select form-select-sm" required>
+                <option value="">Salin dari tahun ajaran...</option>
+                @foreach (var (id, nama) in Model.TahunAjaranList)
+                {
+                    if (id != Model.TahunAjaranId) { <option value="@id">@nama</option> }
+                }
+            </select>
+            <button type="submit" class="btn btn-outline-secondary btn-sm">Salin</button>
+        </form>
+        <a asp-action="ImportJam" asp-route-tahun_ajaran_id="@Model.TahunAjaranId" class="btn btn-outline-secondary">Import Excel</a>
+    </div>
+
+    <form asp-action="UpdateJamBatch" method="post">
+        <input type="hidden" name="tahun_ajaran_id" value="@Model.TahunAjaranId" />
+        <div class="row g-3">
+            @foreach (var h in Model.HariList)
+            {
+                var list = Model.JamPerHari.TryGetValue(h, out var l) ? l : [];
+                <div class="col-lg-6">
+                    <div class="card mb-3">
+                        <div class="card-header">@namaHari[h]</div>
+                        <table class="table table-sm mb-0 align-middle">
+                            <thead><tr><th style="width:40px">Ke</th><th>Mulai</th><th>Selesai</th><th>Jenis</th><th>Label</th><th></th></tr></thead>
+                            <tbody>
+                                @foreach (var j in list)
+                                {
+                                    <tr>
+                                        <td>@j.JamKe</td>
+                                        <td><input type="time" name="rows[@j.JamPelajaranId].JamMulai" class="form-control form-control-sm" value="@j.JamMulai.ToString("HH:mm")" /></td>
+                                        <td><input type="time" name="rows[@j.JamPelajaranId].JamSelesai" class="form-control form-control-sm" value="@j.JamSelesai.ToString("HH:mm")" /></td>
+                                        <td>
+                                            <select name="rows[@j.JamPelajaranId].Jenis" class="form-select form-select-sm">
+                                                @if (j.Jenis == "kegiatan")
+                                                {
+                                                    <option value="pelajaran">Pelajaran</option>
+                                                    <option value="kegiatan" selected>Kegiatan</option>
+                                                }
+                                                else
+                                                {
+                                                    <option value="pelajaran" selected>Pelajaran</option>
+                                                    <option value="kegiatan">Kegiatan</option>
+                                                }
+                                            </select>
+                                        </td>
+                                        <td><input type="text" name="rows[@j.JamPelajaranId].Label" class="form-control form-control-sm" value="@j.Label" /></td>
+                                        <td>
+                                            <button type="submit" formaction="@Url.Action("DeleteJam", new { id = j.JamPelajaranId, tahun_ajaran_id = Model.TahunAjaranId })"
+                                                    class="btn btn-sm btn-outline-danger" onclick="return confirm('Hapus jam ke-@j.JamKe hari @namaHari[h]?')">&times;</button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                        <div class="card-footer">
+                            <form asp-action="StoreJam" method="post" class="row g-1 align-items-end">
+                                <input type="hidden" name="tahun_ajaran_id" value="@Model.TahunAjaranId" />
+                                <input type="hidden" name="hari" value="@h" />
+                                <div class="col-3"><input type="time" name="jam_mulai" class="form-control form-control-sm" required /></div>
+                                <div class="col-3"><input type="time" name="jam_selesai" class="form-control form-control-sm" required /></div>
+                                <div class="col-3">
+                                    <select name="jenis" class="form-select form-select-sm">
+                                        <option value="pelajaran">Pelajaran</option>
+                                        <option value="kegiatan">Kegiatan</option>
+                                    </select>
+                                </div>
+                                <div class="col-2"><input type="text" name="label" class="form-control form-control-sm" placeholder="Label" /></div>
+                                <div class="col-1"><button type="submit" class="btn btn-sm btn-primary w-100">+</button></div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+        @if (Model.JamPerHari.Values.Any(l => l.Count > 0))
+        {
+            <button type="submit" class="btn btn-success">Simpan Semua Perubahan Jam</button>
+        }
+    </form>
+}
