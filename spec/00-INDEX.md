@@ -32,7 +32,7 @@ supaya tahu persis sudah sampai mana dan apa langkah berikutnya.
 | Halaman/Controller: **Jadwal Pelajaran** (grid per-kelas kode "35K", parser `bacaKode()`, deteksi bentrok guru lintas kelas, salin TA sama/beda, Piket replace-all, Cetak semua kelas, Per Guru+beban, import Excel dgn pencocokan kolom dinamis+prioritas kolom-tak-dikenal) | Selesai & teruji end-to-end. **Spec 03 (Kurikulum, Jadwal Pelajaran, Kalender Akademik, Akademik) kini 100% SELESAI dibangun.** |
 | Halaman/Controller: **Auth (Login/Setup Awal/Logout, cookie auth, RBAC role admin, rate-limit login bertahap) + Dashboard (Pendidikan+Perusahaan, panel Langkah Persiapan Awal) + Setting (profil+password+backup manual+jadwal backup+restore) + DevPreview** | Selesai & teruji end-to-end. **LINGKUP DIPERSEMPIT SENGAJA (didokumentasikan)**: fitur "Lupa Password via email" TIDAK diporting (PHP asli sendiri kemungkinan besar tidak fungsional tanpa SMTP - lihat 04-infra-auth-sync.md §6/§21); `allowRegistration=false` PHP diganti "Setup Awal" 1x saat tabel Users kosong (CLI `spark auth:create_user` tidak masuk akal utk distribusi desktop end-user - lihat catatan modul di bawah); cakupan `role:admin` PHP yang SPOTTY (cuma sebagian controller di `Filters.php`) diganti proteksi KONSISTEN: SEMUA controller wajib login (global filter), controller yang PHP asli tandai `role:admin` (Siswa/CalonSiswa/Guru/Kelas/TahunAjaran/Akademik/User) tetap `[Authorize(Roles="admin")]` - superset lebih aman, bukan replikasi celah. Sinkronisasi Hub API (SyncPush) & BackupCloud (upload terenkripsi ke awan) BELUM diporting - lihat baris terpisah di bawah. |
 | Halaman/Controller: **Sinkronisasi Hub API** (`HubApiSyncService` - port `SyncPush.php`, 11 entitas push + pull keputusan PSB, fingerprint hemat-jaringan, full-snapshot vs non-full) **+ Backup Awan terenkripsi** (`BackupCloudHostedService` - port `BackupCloud.php`, AES-256-CBC+PBKDF2, antrian+rotasi+upload) | Selesai & **diuji end-to-end terhadap instance hub-api LOKAL SUNGGUHAN** (`C:\xampp\htdocs\hub-api`, MySQL asli, bukan mock) - lihat catatan modul di bawah untuk rincian & 1 bug nyata ditemukan+diperbaiki. |
-| Launcher (splash, start/stop server, WebView2, auto-update) | Kerangka XAML splash sudah ada (`MainWindow.xaml`); `MainWindow.xaml.cs` (logic start server + WebView2 + auto-update) belum dimulai |
+| Launcher (splash, start/stop server sbg proses anak, WebView2, restart-otomatis-setelah-restore, cek pembaruan) | Selesai & **diuji end-to-end sungguhan** (proses nyata di-start/di-stop, bukan cuma baca kode) - lihat catatan modul di bawah untuk rincian & 1 bug nyata ditemukan+diperbaiki. **LINGKUP DIPERSEMPIT SENGAJA**: unduh+pasang pembaruan OTOMATIS belum diimplementasikan (baru cek+notifikasi+tautan manual) - bergantung pipeline CI/CD yang belum ada, lihat baris di bawah. |
 | CI GitHub Actions (build+release, pola Presensi) | Belum dimulai |
 | Uji coba sbg PC TU TK (token Hub API baru, unit_id=2) | Belum dimulai |
 
@@ -540,10 +540,94 @@ SELESAI dibangun dan teruji end-to-end.**
     SIKLUS PERTAMA startup, diverifikasi lewat `GET /api/v1/backup/status` hub-api
     (ukuran berkas & waktu cocok).
 
-**Fase berikutnya: Launcher WPF (start/stop server, WebView2, auto-update,
-restart-setelah-restore) - masih kerangka splash screen saja, belum ada logic sama
-sekali. Setelah itu: CI/CD GitHub Actions, dan uji coba sungguhan sbg PC TU TK
-(token Hub API produksi baru, unit_id=2) sebelum dianggap siap dipakai nyata.**
+## Catatan modul Launcher (WPF)
+
+- File: `ServerProcessManager.cs` (start/stop DataMaster.Web sbg proses ANAK terpisah,
+  bukan hosting in-process), `UpdateChecker.cs` (cek versi rilis GitHub), `App.xaml.cs`
+  (tangkap exception tak tertangani WPF + log ke berkas), `MainWindow.xaml.cs`
+  (orkestrasi: splash → start server → WebView2 → restart otomatis kalau server
+  berhenti sendiri). `MainWindow.xaml` (splash overlay) sudah ada dari sesi
+  sebelumnya, tidak diubah strukturnya.
+- **Arsitektur proses ANAK, bukan in-process hosting**: Launcher menjalankan
+  `DataMaster.Web.exe`/`dotnet DataMaster.Web.dll` sbg proses TERPISAH (persis
+  semangat PHP asli: Apache+Kestrel adalah proses lain dari CMD window yang
+  menjalankannya), BUKAN meng-host Kestrel langsung di dalam proses WPF - supaya
+  restart server (mis. setelah restore) tidak perlu me-restart SELURUH aplikasi
+  WPF/WebView2. Port dipilih DINAMIS (`TcpListener` bind ke port 0) - bebas konflik
+  port, tidak di-hardcode.
+- **Folder data terpisah dari folder instalasi** (`%LocalAppData%\DataMaster\`,
+  BUKAN folder tempat Launcher.exe berada) via override environment variable
+  `ConnectionStrings__DataMaster` - supaya auto-update kode aplikasi nanti tidak
+  pernah menimpa data pengguna, persis semangat `WRITEPATH`/database terpisah PHP
+  asli. Database SENGAJA diletakkan di subfolder `App_Data\` di dalam folder data
+  itu (meniru tata letak dev `App_Data/datamaster.db`) - lihat bug di bawah.
+- **`/healthz` minimal-API endpoint baru ditambahkan ke `DataMaster.Web/Program.cs`**
+  - di luar filter otorisasi global MVC (endpoint Minimal API tidak ikut
+  `AuthorizeFilter` yg didaftarkan lewat `AddControllersWithViews`), dipakai
+  Launcher polling "server sudah siap?" sebelum menampilkan WebView2 (timeout 30
+  detik) - lapisan PENTING yang tidak ada wujud PHP-nya (PHP tidak butuh "tunggu
+  siap" krn Apache start seketika, ASP.NET Core butuh waktu utk migrate+load DI).
+- **Auto-restart setelah restore** (`ServerExitedUnexpectedly` event): satu2nya
+  penyebab SAH proses server berhenti sendiri tanpa diminta Launcher adalah
+  `DatabaseBackupService.RestoreAsync()` memanggil `StopApplication()` (lihat
+  catatan modul Auth/Setting). Launcher mendeteksi via `Process.Exited`, tampilkan
+  splash lagi, start ulang (port BARU dipilih, WebView2 di-navigate ulang ke URL
+  baru) - transparan bagi pengguna, tidak perlu menutup-buka aplikasi manual.
+  Dibedakan dari "user menutup window sendiri" via flag `_intentionalStop`/
+  `_closingIntentionally` supaya tidak salah restart setelah ditutup betulan.
+- **Auto-update LINGKUP DIPERSEMPIT SENGAJA (didokumentasikan)**: `UpdateChecker`
+  HANYA membandingkan versi terpasang (dari `AssemblyVersion`) terhadap tag rilis
+  GitHub terbaru (`api.github.com/repos/.../releases/latest`) dan menawarkan
+  tautan manual ke halaman rilis - TIDAK mengunduh+memasang otomatis. Alasan:
+  unduh+pasang otomatis butuh pipeline CI/CD yang menerbitkan aset rilis
+  terstruktur (belum dibangun - lihat baris CI GitHub Actions di tabel status),
+  DAN pola "update.lock dgn stale-timeout" PHP (§12, bug nyata 2026-09-02 - lock
+  tanpa batas waktu bikin sistem macet total kalau proses update terhenti
+  ditengah) WAJIB direplikasi persis begitu bagian unduh+pasang dikerjakan -
+  belum relevan sebelum ada yang benar2 diunduh+dipasang.
+- **1 bug nyata ditemukan & diperbaiki SAAT uji restart end-to-end** (bukan cuma
+  baca kode - Launcher benar2 dijalankan sbg proses Windows sungguhan, restore
+  dipicu via HTTP nyata, restart diverifikasi via proses+port+HTTP nyata):
+  `StartAsync()` TIDAK membersihkan `Process`/`StreamWriter` log dari pemanggilan
+  SEBELUMNYA sebelum membuat yang baru - saat restart (StreamWriter KEDUA ke
+  berkas log HARI YANG SAMA), `File.Open(..., FileShare.Read)` gagal
+  `IOException` krn handle pertama belum dilepas (FileShare.Read menolak penulis
+  kedua bersamaan). Exception ini terjadi di dalam `async void` event handler
+  (`Dispatcher.Invoke(async () => ...)`) sehingga GAGAL SENYAP - proses Launcher
+  tetap hidup normal, tapi server child TIDAK PERNAH benar2 menyala ulang,
+  pengguna akan melihat WebView2 macet di splash screen tanpa error apa pun
+  terlihat. **Fix**: `_process?.Dispose()`/`_logWriter?.Dispose()` di AWAL
+  `StartAsync()` sebelum membuat instance baru. **Ditemukan lapisan kedua
+  sekaligus saat memperbaiki**: ditambahkan `App.xaml.cs` `DispatcherUnhandledException`
+  handler + logging ke berkas - supaya kelas bug "silent async void failure"
+  seperti ini tidak lagi tak-terlihat total di masa depan (pelajaran umum: JANGAN
+  biarkan event handler WPF `async void` tanpa jaring pengaman logging global).
+  **Bug KEDUA ditemukan di uji yang SAMA**: taruh `datamaster.db` LANGSUNG di root
+  folder data (bukan di subfolder `App_Data\`) membuat perhitungan folder
+  `backup`/`backup-antrian`/`sync_state` di `DatabaseBackupService`/
+  `HubApiSyncService` (yang pakai `"../"` RELATIF ke folder database, meniru tata
+  letak dev) salah naik SATU LEVEL TERLALU JAUH, keluar dari folder `DataMaster`
+  itu sendiri. Fix: folder database Launcher disamakan persis strukturnya dgn dev
+  (`App_Data\datamaster.db` di bawah folder data), BUKAN mengubah logic
+  `DatabaseBackupService`/`HubApiSyncService` yang sudah teruji benar di modul
+  sebelumnya - prinsip "sesuaikan pemanggil ke kontrak yang sudah teruji, jangan
+  ubah kontrak yang sudah teruji demi 1 pemanggil baru".
+- **Diuji end-to-end via PROSES WINDOWS SUNGGUHAN** (bukan simulasi/mock):
+  Launcher.exe dijalankan nyata, proses anak `DataMaster.Web` dikonfirmasi ter-spawn
+  dgn `Get-Process`, port dinamis dikonfirmasi via log + `curl` ke `/healthz` nyata,
+  koneksi database dikonfirmasi teralih ke `%LocalAppData%\DataMaster\App_Data\`
+  (bukan `App_Data/` dev), siklus penuh Setup Awal→backup manual→restore→**restart
+  otomatis terverifikasi** (port BARU muncul di log, `/healthz` baru merespons,
+  halaman login menampilkan form NORMAL bukan Setup Awal - membuktikan data hasil
+  restore utuh selamat lewat siklus restart), dan penutupan window (`CloseMainWindow()`
+  via WM_CLOSE asli, bukan `Stop-Process -Force`) dikonfirmasi mematikan KEDUA
+  proses (Launcher + child web) bersih tanpa proses menggantung (`Get-Process`
+  kosong setelahnya).
+
+**Fase berikutnya: CI/CD GitHub Actions (build+publish+release, pola Presensi) -
+diperlukan sebelum unduh+pasang pembaruan otomatis bisa dikerjakan bermakna. Setelah
+itu: uji coba sungguhan sbg PC TU TK (token Hub API produksi baru, unit_id=2)
+sebelum dianggap siap dipakai nyata di lapangan.**
 
 ## Prinsip wajib dipegang tiap sesi lanjutan
 

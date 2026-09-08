@@ -102,6 +102,11 @@ app.UseSession();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Dipakai Launcher (WPF) utk polling "server sudah siap?" sebelum menampilkan
+// WebView2 - endpoint Minimal API TIDAK ikut filter otorisasi global MVC di atas
+// (filter itu cuma berlaku utk action controller), jadi sengaja tetap anonim.
+app.MapGet("/healthz", () => Results.Ok(new { ok = true }));
+
 app.MapStaticAssets();
 
 app.MapControllerRoute(
