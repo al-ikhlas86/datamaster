@@ -50,15 +50,29 @@ D:\DataMaster\
 ### Langkah 2 - Jalankan pertama kali
 
 1. Dobel-klik `DataMaster.exe`.
-2. Akan muncul jendela splash "Cek update...", lalu jendela utama aplikasi
+2. **Muncul 1 layar tanya "Cara pakai PC ini"** (cuma sekali, tidak akan
+   muncul lagi sesudahnya) - pilih salah satu:
+   - **"PC ini berdiri sendiri"** (paling umum, sudah terpilih default) -
+     langsung klik Lanjutkan kalau ini satu-satunya PC di unit ini.
+   - **"PC ini jadi SERVER"** - pilih HANYA di 1 PC, kalau unit ini punya
+     beberapa PC yang harus melihat data yang sama (lihat bagian 4).
+   - **"PC ini ikut PC lain (klien)"** - pilih di PC ke-2/ke-3 dst, isi
+     alamat PC yang sudah dipilih "Server" tadi.
+3. Muncul jendela splash "Cek update...", lalu jendela utama aplikasi
    (mesin Chromium/WebView2 - kalau Windows-nya belum pernah pasang
    "Microsoft Edge WebView2 Runtime", akan diminta pasang dulu sekali, ini
    normal, cukup ikuti saja).
-3. Karena database masih kosong, aplikasi otomatis menampilkan halaman
+4. Karena database masih kosong, aplikasi otomatis menampilkan halaman
    **"Setup Awal"** - isi email, username (boleh dikosongkan, defaultnya
-   pakai email), dan password admin pertama. Password ini yang dipakai
-   TU/admin sekolah untuk login sehari-hari.
-4. Setelah submit, langsung masuk ke Dashboard. Instalasi selesai - siap
+   pakai email), dan password admin pertama (dipakai TU/admin sekolah untuk
+   login sehari-hari). Di bagian bawah ada 2 kolom opsional "Alamat Hub API"
+   dan "Token Hub API" - kalau belum punya token, klik link "Buat Token"
+   di bawahnya (akan membuka halaman generate token, lihat bagian 2),
+   generate, copy, tempel di sini - atau lewati dulu, bisa diisi belakangan
+   lewat menu Pengaturan.
+5. Setelah submit, langsung masuk ke Dashboard (kalau token Hub API diisi,
+   aplikasi akan menyala ulang sebentar sendiri untuk mengaktifkan
+   sinkronisasi - normal, tunggu beberapa detik). Instalasi selesai - siap
    diisi data sekolah (Tahun Ajaran, Kelas, Guru, Siswa, dst, urutannya
    sama seperti versi web PHP yang sekarang dipakai PC TU SD).
 
@@ -101,7 +115,34 @@ kredensial pribadi, perlakukan seperti password.
 
 ---
 
-## 2. Cara lanjut mengembangkan (mode developer)
+## 2. Cara generate token Hub API (buat unit baru: TK/SD/dst)
+
+Token ini yang menghubungkan 1 instalasi Data Master ke unit sekolahnya
+di server pusat (Hub API/VPS) - tanpa token, aplikasi tetap jalan normal
+tapi berdiri sendiri, tidak sinkron kemana-mana. **TK dan SD masing-masing
+punya token SENDIRI** - jangan pernah pakai token yang sama di 2 instalasi.
+
+1. Buka `https://<alamat-hub-api-anda>/admin` di browser (bukan di dalam
+   aplikasi Data Master - buka terpisah).
+2. Masuk pakai password panel admin (disetel di server lewat
+   `admin.panelPassword` di file `.env` Hub API - minta ke yang pegang
+   akses server kalau belum tahu).
+3. Isi "Nama Unit" (contoh: "TK Al Ikhlas 86"), klik "Generate Token".
+4. Token muncul SEKALI di kotak hitam - **copy sekarang juga**, halaman
+   ini tidak menyimpan/menampilkannya lagi setelah ditutup/di-refresh.
+5. Tempel token itu ke kolom "Token Hub API" saat Setup Awal Data Master
+   di PC unit yang bersangkutan (lihat bagian 1 langkah 2), atau lewat
+   menu Pengaturan kalau instalasinya sudah lebih dulu jalan.
+
+Unit yang sudah tidak dipakai (mis. ganti PC, ganti token krn bocor) bisa
+dinonaktifkan dari halaman yang sama (tombol "Nonaktifkan") - token lama
+langsung ditolak Hub API sejak saat itu, tanpa perlu ganti apapun di
+Data Master (biarkan saja, kalaupun masih terisi tokennya, cuma akan
+gagal sinkron - tidak error mengganggu penggunaan aplikasi sehari-hari).
+
+---
+
+## 3. Cara lanjut mengembangkan (mode developer)
 
 Semua kode ada di folder **`D:\Data Master`** (bukan di PC sekolah - ini
 folder kerja di komputer developer/IT).
@@ -194,7 +235,7 @@ karena tujuan proyek ini adalah 100% sama persis dengan yang lama.
 
 ---
 
-## 3. Beberapa PC pakai 1 data yang sama (mis. 3 PC TU SD)
+## 4. Beberapa PC pakai 1 data yang sama (mis. 3 PC TU SD)
 
 Kalau cuma 1 PC per unit (kasus PC TU TK sekarang), LEWATI bagian ini -
 instalasi biasa di bagian 1 di atas sudah cukup, tiap PC otomatis berdiri
@@ -215,51 +256,48 @@ mode **server + klien**:
   semua PC (tidak perlu diatur ulang per PC) - siapa saja yang punya
   akun bisa login dari PC mana saja di antara ketiganya.
 
+Pilihan Mandiri/Server/Klien ini sekarang ditanyakan lewat layar wizard
+begitu `DataMaster.exe` pertama kali dibuka (lihat bagian 1 langkah 2) -
+tidak perlu edit `appsettings.json` manual lagi. Urutan setup-nya:
+
 ### Setup PC server (PC 1)
 
-1. Pasang aplikasi seperti biasa (bagian 1 di atas).
-2. Cari tahu IP lokal PC ini di jaringan kantor (`ipconfig` di Command
+1. Cari tahu IP lokal PC ini di jaringan kantor (`ipconfig` di Command
    Prompt, lihat baris "IPv4 Address", contoh `192.168.1.10`). **Minta staf
    jaringan mereservasi IP ini di router (DHCP reservation)** supaya
    alamatnya tidak berubah-ubah tiap PC dinyalakan ulang - kalau berubah,
    PC klien akan kehilangan koneksi sampai alamatnya disetel ulang manual.
-3. Buka `appsettings.json` di sebelah `DataMaster.exe`, isi:
-   ```json
-   {
-     "Mode": "server",
-     "ServerPort": 5250
-   }
-   ```
-4. Izinkan port ini masuk lewat Windows Firewall PC ini (Control Panel →
+2. Pasang aplikasi seperti biasa (bagian 1 di atas). Di layar wizard
+   pertama, pilih **"PC ini jadi SERVER"**, isi port (default 5250 sudah
+   cukup, tidak perlu diubah kecuali bentrok dgn aplikasi lain), klik
+   Lanjutkan.
+3. Izinkan port ini masuk lewat Windows Firewall PC ini (Control Panel →
    Windows Defender Firewall → Pengaturan lanjutan → Inbound Rules → New
    Rule → Port → TCP 5250 → Allow). Tanpa ini PC lain akan gagal konek
    walau sudah 1 jaringan.
-5. Tutup & buka lagi `DataMaster.exe`.
 
 ### Setup PC klien (PC 2, PC 3, dst)
 
-1. Pasang aplikasi seperti biasa (bagian 1 di atas) - TAPI setelah dibuka
-   pertama kali, JANGAN isi Setup Awal (tidak akan pernah dipakai, PC ini
-   tidak punya database sendiri). Tutup aplikasinya.
-2. Buka `appsettings.json` di sebelah `DataMaster.exe` PC ini, isi (ganti
-   IP sesuai IP PC server yang dicatat di atas):
-   ```json
-   {
-     "Mode": "klien",
-     "KlienServerUrl": "http://192.168.1.10:5250"
-   }
-   ```
-3. Buka lagi `DataMaster.exe` - sekarang jendelanya langsung menampilkan
-   data dari PC server, seolah-olah memakai aplikasi yang sama persis.
+1. Pasang aplikasi seperti biasa (bagian 1 di atas). Di layar wizard
+   pertama, pilih **"PC ini ikut PC lain (klien)"**, isi alamat PC server
+   (IP yang dicatat di langkah 1 setup server + port-nya, contoh
+   `http://192.168.1.10:5250`), klik Lanjutkan.
+2. Selesai - jendelanya langsung menampilkan data dari PC server, seolah-
+   olah memakai aplikasi yang sama persis. Tidak perlu isi Setup Awal
+   sendiri (PC ini tidak punya database sendiri).
 
 Update otomatis (token GitHub, bagian 1 langkah 3) tetap perlu diisi di
 SEMUA PC (server maupun klien) - masing-masing tetap punya salinan
 program sendiri yang perlu diperbarui, cuma DATA-nya yang dipusatkan di
 PC server.
 
+**Kalau wizard sudah kelewat/salah pilih**: hapus baris `"SetupSelesai":
+true` dari `appsettings.json` sebelah `DataMaster.exe` (atau ubah jadi
+`false`), buka lagi aplikasinya - wizard akan muncul lagi.
+
 ---
 
-## 4. Migrasi PC TU SD (alat sudah siap & teruji, BELUM dijalankan ke data asli)
+## 5. Migrasi PC TU SD (alat sudah siap & teruji, BELUM dijalankan ke data asli)
 
 PC TU SD sekarang masih pakai versi web PHP
 (`C:\xampp\htdocs\webarsipdata-master`, jalan lewat XAMPP + MySQL) dan
@@ -319,16 +357,15 @@ sukses total, baru boleh dihapus.
 
 ---
 
-## 5. Pertanyaan yang sering muncul
+## 6. Pertanyaan yang sering muncul
 
 **Fitur "Pulihkan Data" di menu Setting - apakah bisa dipakai menarik data
 dari web PHP yang lama?** Tidak. "Pulihkan Data" (restore) HANYA bisa
 membaca file cadangan yang dibuat SENDIRI oleh aplikasi desktop ini
 (tombol "Backup Sekarang" di menu yang sama, formatnya `.db` bawaan
 SQLite) - dia tidak tahu apa-apa soal database MySQL web PHP yang lama.
-Memindahkan data dari web PHP ke sini adalah proses TERPISAH (lihat
-bagian 4 di bawah, "alat migrasi" yang belum dibuat), bukan lewat tombol
-Pulihkan Data ini.
+Memindahkan data dari web PHP ke sini adalah proses TERPISAH lewat alat
+migrasi khusus (lihat bagian 5), bukan lewat tombol Pulihkan Data ini.
 
 **Kenapa saat instalasi tidak ada pilihan "Pendidikan/Perusahaan/Develop"?**
 "Pendidikan" vs "Perusahaan" itu 1 pengaturan (`AppSettings:InstallType`
@@ -336,8 +373,12 @@ di `appsettings.json` sebelah `DataMaster.Web.exe`, bukan sebelah
 `DataMaster.exe`), bukan sesuatu yang ditanyakan pas instalasi - untuk
 sekolah ini nilainya SELALU "pendidikan" (default), tidak perlu diubah.
 "Develop" bukan pilihan instalasi sama sekali - itu artinya menjalankan
-KODE SUMBER dari folder `D:\Data Master` (lihat bagian 2), sepenuhnya
-terpisah dari file `.zip` hasil download di bagian 1.
+KODE SUMBER dari folder `D:\Data Master` (lihat bagian 3), sepenuhnya
+terpisah dari file `.zip` hasil download di bagian 1. "Mandiri/Server/
+Klien" MEMANG ditanyakan pas instalasi (wizard di bagian 1 langkah 2) -
+itu beda konsep, murni soal apakah PC ini pakai data sendiri atau ikut
+PC lain di jaringan yang sama, tidak ada hubungannya dgn Pendidikan/
+Perusahaan.
 
 **Bagaimana Hub API (server pusat di VPS) tahu data yang masuk itu dari
 unit TK atau unit SD?** Bukan dari isi datanya, tapi dari TOKEN yang
@@ -352,7 +393,7 @@ akan pernah tercampur di server pusat selama tokennya beda.
 
 ---
 
-## 6. Kontak & eskalasi
+## 7. Kontak & eskalasi
 
 Kalau ada error yang tidak dimengerti: catat langkah persis yang bikin
 error muncul, screenshot pesan errornya (kalau ada), lalu cek dulu apakah
