@@ -15,6 +15,15 @@ public partial class SetupWizardWindow : Window
     {
         InitializeComponent();
         _config = config;
+        // Nama komputer (BUKAN alamat IP) - ditampilkan di panel "Server" supaya
+        // yang setting PC klien nanti tinggal baca nama ini dari layar, tidak
+        // perlu ipconfig, dan tidak akan basi walau IP-nya berubah tiap restart
+        // (nama Windows tidak pernah berubah sendiri, beda dari IP hasil DHCP).
+        TxtNamaPcServer.Text = Environment.MachineName;
+        // TxtKlienUrl SENGAJA tetap contoh generik ("NAMA-PC-SERVER", lihat XAML) -
+        // BUKAN diisi Environment.MachineName PC ini sendiri, karena PC yang sedang
+        // disetup sebagai klien BUKAN PC yang namanya perlu diisi di sini (yang
+        // perlu diisi adalah nama PC LAIN yang berperan sebagai server).
     }
 
     private void ModePilihan_Changed(object sender, RoutedEventArgs e)
@@ -48,7 +57,7 @@ public partial class SetupWizardWindow : Window
             var url = TxtKlienUrl.Text.Trim();
             if (url == "" || !(url.StartsWith("http://") || url.StartsWith("https://")))
             {
-                TampilkanError("Alamat PC server harus diawali http:// atau https://, contoh: http://192.168.1.10:5250");
+                TampilkanError("Alamat PC server harus diawali http:// atau https://, contoh: http://NAMA-PC-SERVER:5250");
                 return;
             }
             _config.Mode = "klien";

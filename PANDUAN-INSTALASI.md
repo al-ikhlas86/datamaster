@@ -260,31 +260,46 @@ Pilihan Mandiri/Server/Klien ini sekarang ditanyakan lewat layar wizard
 begitu `DataMaster.exe` pertama kali dibuka (lihat bagian 1 langkah 2) -
 tidak perlu edit `appsettings.json` manual lagi. Urutan setup-nya:
 
+Alamatnya pakai **NAMA PC, bukan alamat IP** - sengaja dipilih begini krn
+IP bisa berubah-ubah sendiri tiap PC dinyalakan ulang (dibagikan otomatis
+oleh router), sedangkan nama PC Windows TIDAK PERNAH berubah sendiri
+kecuali memang sengaja diganti manual. Jadi sekali diisi nama PC saat
+setup, tidak akan pernah basi walau PC dimatikan/dinyalakan berkali-kali,
+beda dari kalau pakai IP.
+
 ### Setup PC server (PC 1)
 
-1. Cari tahu IP lokal PC ini di jaringan kantor (`ipconfig` di Command
-   Prompt, lihat baris "IPv4 Address", contoh `192.168.1.10`). **Minta staf
-   jaringan mereservasi IP ini di router (DHCP reservation)** supaya
-   alamatnya tidak berubah-ubah tiap PC dinyalakan ulang - kalau berubah,
-   PC klien akan kehilangan koneksi sampai alamatnya disetel ulang manual.
-2. Pasang aplikasi seperti biasa (bagian 1 di atas). Di layar wizard
-   pertama, pilih **"PC ini jadi SERVER"**, isi port (default 5250 sudah
-   cukup, tidak perlu diubah kecuali bentrok dgn aplikasi lain), klik
-   Lanjutkan.
-3. Izinkan port ini masuk lewat Windows Firewall PC ini (Control Panel →
+1. Pasang aplikasi seperti biasa (bagian 1 di atas). Di layar wizard
+   pertama, pilih **"PC ini jadi SERVER"** - layar akan langsung
+   menampilkan **nama PC ini** (dicatat/screenshot, ini yang nanti diisi
+   di PC klien), isi port (default 5250 sudah cukup, tidak perlu diubah
+   kecuali bentrok dgn aplikasi lain), klik Lanjutkan.
+2. Izinkan port ini masuk lewat Windows Firewall PC ini (Control Panel →
    Windows Defender Firewall → Pengaturan lanjutan → Inbound Rules → New
    Rule → Port → TCP 5250 → Allow). Tanpa ini PC lain akan gagal konek
    walau sudah 1 jaringan.
+3. Pastikan "Network Discovery" menyala di PC ini (Control Panel →
+   Network and Sharing Center → Change advanced sharing settings → Turn
+   on network discovery) - ini yang membuat PC lain di jaringan yang sama
+   bisa menemukan PC ini lewat namanya, biasanya sudah menyala default
+   di jaringan rumah/kantor kecil (profil "Private"), jarang perlu diubah.
 
 ### Setup PC klien (PC 2, PC 3, dst)
 
 1. Pasang aplikasi seperti biasa (bagian 1 di atas). Di layar wizard
    pertama, pilih **"PC ini ikut PC lain (klien)"**, isi alamat PC server
-   (IP yang dicatat di langkah 1 setup server + port-nya, contoh
-   `http://192.168.1.10:5250`), klik Lanjutkan.
+   (NAMA PC yang tampil di layar server tadi + port-nya, contoh
+   `http://NAMA-PC-SERVER:5250`), klik Lanjutkan.
 2. Selesai - jendelanya langsung menampilkan data dari PC server, seolah-
    olah memakai aplikasi yang sama persis. Tidak perlu isi Setup Awal
    sendiri (PC ini tidak punya database sendiri).
+
+**Kalau PC klien tidak bisa konek pakai nama PC** (jarang terjadi, biasanya
+krn "Network Discovery" mati atau jaringan kantor pakai pengaturan
+khusus): sebagai jalan pintas, boleh pakai alamat IP PC server sbg
+gantinya (`ipconfig` di PC server, baris "IPv4 Address") - tapi minta
+staf jaringan mereservasi IP itu di router (DHCP reservation) supaya
+tidak berubah-ubah, karena IP TIDAK punya jaminan permanen seperti nama PC.
 
 Update otomatis (token GitHub, bagian 1 langkah 3) tetap perlu diisi di
 SEMUA PC (server maupun klien) - masing-masing tetap punya salinan
