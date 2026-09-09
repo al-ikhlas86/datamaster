@@ -35,6 +35,26 @@ public partial class App : Application
                 "Data Master - Kesalahan", MessageBoxButton.OK, MessageBoxImage.Error);
             args.Handled = true; // jangan langsung matikan aplikasi kalau masih bisa dipulihkan
         };
+
+        // Wizard cara-pakai (mandiri/server/klien) ditampilkan SEKALI saja sebelum
+        // MainWindow pernah ada - lihat komentar App.xaml soal StartupUri yang
+        // sengaja dihapus. Kalau user menutup wizard tanpa memilih (tombol X),
+        // keluar bersih - jangan lanjut dgn config yang belum sempat disimpan.
+        var config = LauncherConfig.Load();
+        if (!config.SetupSelesai)
+        {
+            var wizard = new SetupWizardWindow(config);
+            var selesai = wizard.ShowDialog();
+            if (selesai != true)
+            {
+                Shutdown();
+                return;
+            }
+        }
+
+        var main = new MainWindow();
+        MainWindow = main;
+        main.Show();
     }
 
     private static void CatatErrorFatal(Exception ex)

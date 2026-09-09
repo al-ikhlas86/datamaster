@@ -44,6 +44,14 @@ public sealed class LauncherConfig
     // langkah manual, lihat PANDUAN-INSTALASI.md §5.
     public int ServerPort { get; set; } = 5250;
 
+    // false = wizard SetupWizardWindow WAJIB ditampilkan sebelum MainWindow
+    // (lihat App.xaml.cs) - dipakai supaya Mode/dst bisa dipilih lewat layar
+    // biasa saat instalasi pertama, TANPA staf IT perlu buka file appsettings.json
+    // manual (keluhan nyata: "kok harus edit file sendiri, kirain tinggal pilih").
+    // Di-set true otomatis begitu wizard pertama kali diselesaikan - TIDAK
+    // pernah muncul lagi sesudahnya kecuali file config ini dihapus manual.
+    public bool SetupSelesai { get; set; }
+
     private static string ConfigPath => Path.Combine(AppContext.BaseDirectory, "appsettings.json");
 
     public static LauncherConfig Load()
@@ -65,6 +73,11 @@ public sealed class LauncherConfig
             return new LauncherConfig();
         }
     }
+
+    // Publik (beda dari private Save() di bawah) - dipanggil SetupWizardWindow
+    // setelah pengguna memilih Mode dst, supaya pilihannya langsung tersimpan
+    // tanpa perlu tahu detail internal lokasi/format file config ini.
+    public void SaveKe() => Save(this);
 
     private static void Save(LauncherConfig config)
     {

@@ -1,0 +1,53 @@
+<Window x:Class="DataMaster.Launcher.SetupWizardWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Data Master - Setup Awal" Height="560" Width="620"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="SingleBorderWindow" ResizeMode="NoResize">
+    <Grid Margin="32">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,20">
+            <TextBlock Text="Cara pakai PC ini" FontSize="22" FontWeight="Bold"/>
+            <TextBlock Text="Pilihan ini cuma ditanyakan SEKALI, saat pertama kali dibuka. Bisa diubah lagi nanti lewat file appsettings.json kalau perlu." FontSize="12" Foreground="#6B7280" Margin="0,4,0,0" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Margin="0,0,0,16">
+            <RadioButton x:Name="RbMandiri" Content="PC ini berdiri sendiri (paling umum)" FontWeight="SemiBold" FontSize="14" IsChecked="True" Checked="ModePilihan_Changed" Margin="0,0,0,4"/>
+            <TextBlock Text="Data &amp; server ada di PC ini saja. Pilih ini kalau cuma 1 PC di unit ini (mis. PC TU TK)." FontSize="12" Foreground="#6B7280" Margin="24,0,0,16" TextWrapping="Wrap"/>
+
+            <RadioButton x:Name="RbServer" Content="PC ini jadi SERVER (dipakai bareng PC lain di jaringan yang sama)" FontWeight="SemiBold" FontSize="14" Checked="ModePilihan_Changed" Margin="0,0,0,4"/>
+            <TextBlock Text="Pilih ini di 1 PC saja (yang paling jarang dimatikan) - PC lain akan menampilkan data dari PC ini." FontSize="12" Foreground="#6B7280" Margin="24,0,0,16" TextWrapping="Wrap"/>
+
+            <RadioButton x:Name="RbKlien" Content="PC ini ikut PC lain (klien)" FontWeight="SemiBold" FontSize="14" Checked="ModePilihan_Changed" Margin="0,0,0,4"/>
+            <TextBlock Text="Pilih ini kalau ada PC lain di unit ini yang sudah diatur sebagai 'Server' - PC ini tidak punya data sendiri, cuma menampilkan data PC server." FontSize="12" Foreground="#6B7280" Margin="24,0,0,0" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <Border x:Name="BorderDetail" Grid.Row="2" Background="#F3F4F6" CornerRadius="8" Padding="16" VerticalAlignment="Top" Visibility="Collapsed">
+            <StackPanel>
+                <StackPanel x:Name="PanelServer" Visibility="Collapsed">
+                    <TextBlock Text="Port server" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4"/>
+                    <TextBox x:Name="TxtServerPort" Text="5250" Width="120" HorizontalAlignment="Left" Padding="6"/>
+                    <TextBlock Margin="0,10,0,0" FontSize="12" Foreground="#6B7280" TextWrapping="Wrap"
+                               Text="Setelah ini, izinkan port di atas masuk lewat Windows Firewall PC ini (Control Panel → Windows Defender Firewall → Pengaturan lanjutan → Inbound Rules → New Rule → Port), supaya PC klien bisa menyambung."/>
+                </StackPanel>
+                <StackPanel x:Name="PanelKlien" Visibility="Collapsed">
+                    <TextBlock Text="Alamat PC server di jaringan ini" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4"/>
+                    <TextBox x:Name="TxtKlienUrl" Text="http://192.168.1.10:5250" Padding="6"/>
+                    <TextBlock Margin="0,10,0,0" FontSize="12" Foreground="#6B7280" TextWrapping="Wrap"
+                               Text="Isi alamat IP PC yang sudah diatur sebagai 'Server' di jaringan yang sama, diikuti port-nya (contoh di atas)."/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <TextBlock x:Name="TxtError" Foreground="#DC2626" FontSize="12" VerticalAlignment="Center" Margin="0,0,16,0" Visibility="Collapsed"/>
+            <Button x:Name="BtnLanjut" Content="Lanjutkan" Padding="20,10" FontWeight="SemiBold" Click="BtnLanjut_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>
