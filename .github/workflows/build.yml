@@ -119,17 +119,24 @@ jobs:
   # Artefak build MEMAKAN KUOTA STORAGE GitHub Actions (jatah 500 MB paket Free,
   # gabungan LINTAS SEMUA repo privat di akun) - Presensi pernah terukur nyata
   # 38 artefak/~4,1 GB numpuk cuma dari 1 repo, jauh di atas jatah (2026-09-02).
-  # Simpan 3 RUN terbaru saja, sisanya dihapus. Menghapus run TIDAK menyentuh
-  # GitHub Release (dibuktikan langsung di Presensi, bukan cuma dokumentasi) -
-  # zip yang sudah TERBIT di Release permanen tersimpan terpisah, tidak kena
-  # jatah 500 MB ini, dan Launcher/UpdateChecker.cs narik dari situ bukan dari
-  # artefak Actions, jadi auto-update tetap jalan normal biarpun run lama dihapus.
+  # Simpan 3 RUN terbaru saja, sisanya dihapus - ini TIDAK menyentuh GitHub
+  # Release dengan sendirinya (dibuktikan langsung di Presensi).
+  #
+  # SELAIN itu (langkah kedua di bawah, permintaan eksplisit 2026-09-09): daftar
+  # Release itu SENDIRI juga dibatasi 3 terbaru - rilis lama otomatis dihapus
+  # (Release + tag git-nya) begitu rilis baru ke-4 terbit, supaya halaman
+  # Releases tidak menumpuk. AMAN krn Launcher/UpdateChecker.cs SELALU menarik
+  # release "latest" lewat API - tidak pernah merujuk versi lama yang sengaja
+  # dihapus ini.
   cleanup:
     needs: [build, release]
     if: always()
     runs-on: ubuntu-latest
     permissions:
       actions: write
+      # contents: write WAJIB utk hapus Release/tag lama di step kedua di bawah -
+      # job lain (build) sengaja TIDAK diberi ini (prinsip izin seminim mungkin).
+      contents: write
     steps:
       - name: Bersihkan run build lama (simpan 3 terbaru)
         env:
@@ -141,4 +148,23 @@ jobs:
             | while read -r id; do
                 echo "hapus run lama id=$id"
                 gh api -X DELETE "repos/${{ github.repository }}/actions/runs/$id" || true
+              done
+
+      # Rilis (Release + tag git-nya) SENGAJA JUGA dibatasi 3 terbaru (beda dari
+      # dugaan awal "Release permanen selamanya" - permintaan eksplisit user,
+      # bukan cuma ikut pola Presensi yang TIDAK melakukan ini di kodenya sendiri,
+      # sudah dicek ulang). Aman krn UpdateChecker.cs SELALU menarik "latest"
+      # release lewat API - versi lama yang dihapus tidak pernah dirujuk lagi
+      # oleh PC manapun yang sudah ter-update.
+      - name: Bersihkan Release lama (simpan 3 terbaru)
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list --repo "${{ github.repository }}" --limit 100 \
+            --json tagName,createdAt \
+            --jq 'sort_by(.createdAt) | reverse | .[3:] | .[].tagName' \
+            | while read -r tag; do
+                echo "hapus release+tag lama: $tag"
+                gh release delete "$tag" --repo "${{ github.repository }}" --cleanup-tag --yes || true
               done
