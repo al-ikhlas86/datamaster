@@ -58,6 +58,12 @@ D:\DataMaster\
      beberapa PC yang harus melihat data yang sama (lihat bagian 4).
    - **"PC ini ikut PC lain (klien)"** - pilih di PC ke-2/ke-3 dst, isi
      alamat PC yang sudah dipilih "Server" tadi.
+
+   Di layar yang sama ada kolom **"Update otomatis"** - isi token GitHub
+   di sini SEKALIAN supaya tidak perlu hapus+download ulang manual tiap
+   ada rilis baru ke depannya (lihat cara buat tokennya di Langkah 3 di
+   bawah - boleh dilewati dulu & diisi belakangan lewat file
+   `appsettings.json` kalau belum siap).
 3. Muncul jendela splash "Cek update...", lalu jendela utama aplikasi
    (mesin Chromium/WebView2 - kalau Windows-nya belum pernah pasang
    "Microsoft Edge WebView2 Runtime", akan diminta pasang dulu sekali, ini
@@ -79,10 +85,13 @@ D:\DataMaster\
 ### Langkah 3 - Aktifkan update otomatis (opsional tapi sangat disarankan)
 
 Tanpa langkah ini aplikasi tetap jalan normal, cuma tidak akan pernah cek
-rilis baru sendiri (harus update manual/unduh ulang tiap ada perbaikan).
+rilis baru sendiri (harus hapus & download ulang manual tiap ada
+perbaikan - dilewati diam-diam, BUKAN error, kalau kolom ini kosong).
 
-1. Buka https://github.com/settings/tokens?type=beta (harus login akun
-   GitHub yang sudah diundang ke repo).
+1. Di layar wizard "Cara pakai PC ini" (Langkah 2 di atas), klik link
+   **"Belum punya token? Buat token GitHub di sini"** di bawah kolom
+   Update Otomatis - ini membuka https://github.com/settings/tokens?type=beta
+   di browser (harus login akun GitHub yang sudah diundang ke repo).
 2. "Generate new token" (Fine-grained token):
    - **Repository access**: pilih "Only select repositories" → pilih
      `al-ikhlas86/datamaster-desktop` SAJA (jangan kasih akses ke repo
@@ -93,21 +102,21 @@ rilis baru sendiri (harus update manual/unduh ulang tiap ada perbaikan).
      kalau ada), supaya tidak perlu diulang tiap beberapa bulan.
 3. Generate, salin tokennya (formatnya diawali `github_pat_...`, cuma
    ditampilkan SEKALI, kalau kelewat harus generate baru).
-4. Buka file `appsettings.json` di folder yang sama dengan `DataMaster.exe`
-   (kalau belum ada, jalankan `DataMaster.exe` sekali dulu - file ini
-   otomatis dibuat kosong saat aplikasi pertama kali start).
-5. Isi seperti ini, lalu simpan:
-   ```json
-   {
-     "GithubToken": "github_pat_xxxxxxxxxxxxxxxxxxxxx"
-   }
-   ```
-6. Tutup & buka lagi `DataMaster.exe`. Mulai sekarang, tiap ada rilis baru
-   di GitHub, aplikasi akan otomatis mengunduh & memasang sendiri saat
-   dibuka (proses: cek versi → unduh di latar belakang → tutup server
-   internal → timpa file lama → buka lagi otomatis - tanpa perlu
-   uninstall/reinstall manual, tanpa installer, tanpa campur tangan orang
-   sekolah).
+4. Balik ke jendela wizard, tempel token itu di kolom "Update otomatis",
+   klik Lanjutkan (atau Buat Akun Admin kalau sudah di layar Setup Awal -
+   kolom ini ada di wizard PERTAMA, sebelum Setup Awal, jangan tertukar
+   dengan kolom "Token Hub API" yang beda lagi di Setup Awal).
+
+Mulai sekarang, tiap ada rilis baru di GitHub, aplikasi akan otomatis
+mengunduh & memasang sendiri saat dibuka (proses: cek versi → unduh di
+latar belakang → tutup server internal → timpa file lama → buka lagi
+otomatis - tanpa perlu uninstall/reinstall manual, tanpa installer, tanpa
+campur tangan orang sekolah).
+
+**Kalau token ini dilewati saat wizard**: bisa diisi belakangan dengan
+buka file `appsettings.json` di folder yang sama dengan `DataMaster.exe`,
+tambahkan baris `"GithubToken": "github_pat_xxxxxxxxxxxxxxxxxxxxx"`, lalu
+tutup & buka lagi aplikasinya.
 
 **Token ini JANGAN pernah disebar/di-commit ke git** - dia cuma bisa
 *membaca* rilis repo ini (tidak bisa ubah kode/data apapun), tapi tetap
