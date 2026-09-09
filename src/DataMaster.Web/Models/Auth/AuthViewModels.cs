@@ -28,4 +28,11 @@ public class SetupInput
 
     [Required(ErrorMessage = "Konfirmasi kata sandi wajib diisi.")]
     public string PasswordKonfirmasi { get; set; } = "";
+
+    // Opsional - kalau diisi, langsung ditulis ke appsettings.json (AppSettings)
+    // supaya PC ini otomatis sinkron ke Hub API sejak awal, TANPA perlu buka file
+    // manual (lihat AuthController.Setup()). Boleh dikosongkan & diisi belakangan
+    // lewat menu Pengaturan kalau token belum siap saat instalasi.
+    public string? HubApiUrl { get; set; }
+    public string? HubApiToken { get; set; }
 }

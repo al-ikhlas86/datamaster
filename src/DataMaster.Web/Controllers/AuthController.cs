@@ -22,7 +22,7 @@ namespace DataMaster.Web.Controllers;
 // bisa daftar dapat akses penuh tanpa RBAC).
 [AllowAnonymous]
 [Route("")]
-public class AuthController(DataMasterDbContext db, LoginThrottleService throttle) : Controller
+public class AuthController(DataMasterDbContext db, LoginThrottleService throttle, AppSettingsWriterService appSettingsWriter, IHostApplicationLifetime lifetime) : Controller
 {
     [HttpGet("login")]
     public async Task<IActionResult> Login()
@@ -106,7 +106,24 @@ public class AuthController(DataMasterDbContext db, LoginThrottleService throttl
         await db.SaveChangesAsync();
 
         await SignInAsync(user, ingatLogin: false);
-        TempData["message"] = "Akun admin berhasil dibuat.";
+
+        // Opsional - kalau token Hub API diisi sekalian pas Setup Awal, langsung
+        // tulis ke appsettings.json (tidak perlu staf IT buka file manual) lalu
+        // restart proses supaya AppOptions (IOptions<AppOptions>, TIDAK hot-reload)
+        // kebaca ulang dari nilai baru sejak proses fresh - Launcher yang menjalankan
+        // ulang otomatis, pola SAMA PERSIS restart-setelah-restore-database.
+        var tokenDiisi = !string.IsNullOrWhiteSpace(input.HubApiToken);
+        if (tokenDiisi)
+        {
+            await appSettingsWriter.SetHubApiConfigAsync(input.HubApiUrl, input.HubApiToken);
+            TempData["message"] = "Akun admin berhasil dibuat. Menyalakan ulang sebentar untuk mengaktifkan sinkronisasi Hub API...";
+            lifetime.StopApplication();
+        }
+        else
+        {
+            TempData["message"] = "Akun admin berhasil dibuat.";
+        }
+
         return RedirectToAction("Index", "Home");
     }
 

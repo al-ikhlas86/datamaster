@@ -61,6 +61,21 @@
                             <label class="form-label">Konfirmasi Kata Sandi *</label>
                             <input type="password" name="PasswordKonfirmasi" class="form-control" minlength="8" required>
                         </div>
+
+                        <hr class="my-4">
+                        <p class="fs-12 fw-medium text-muted mb-2">Sinkronisasi Hub API (opsional - boleh dilewati &amp; diisi belakangan lewat menu Pengaturan).</p>
+                        <div class="mb-3">
+                            <label class="form-label">Alamat Hub API</label>
+                            <input type="text" id="hubApiUrl" name="HubApiUrl" class="form-control" placeholder="https://alamat-server-anda.com/hub-api/public" value="@Model.HubApiUrl">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Token Hub API</label>
+                            <input type="text" id="hubApiToken" name="HubApiToken" class="form-control" placeholder="Tempel token di sini" value="@Model.HubApiToken">
+                        </div>
+                        <div class="mb-4">
+                            <a href="#" id="linkGenerateToken" target="_blank" class="fs-12">Belum punya token? Buka halaman Buat Token &raquo;</a>
+                        </div>
+
                         <button type="submit" class="btn btn-lg btn-primary w-100">Buat Akun Admin</button>
                     </form>
                 </div>
@@ -70,5 +85,24 @@
     <script src="~/assets/vendors/js/vendors.min.js"></script>
     <script src="~/assets/js/common-init.min.js"></script>
     <script src="~/assets/js/theme-customizer-init.min.js"></script>
+    <script>
+        (function () {
+            // Link "Buat Token" dibangun dari alamat Hub API yang diketik user sendiri
+            // (bukan alamat tetap - tiap sekolah/deployment beda server) - halaman
+            // /admin ada di server Hub API yang SAMA, cuma path-nya beda dari /api/v1.
+            var urlInput = document.getElementById('hubApiUrl');
+            var link = document.getElementById('linkGenerateToken');
+            link.addEventListener('click', function (e) {
+                var url = (urlInput.value || '').trim().replace(/\/+$/, '');
+                if (!url) {
+                    e.preventDefault();
+                    alert('Isi dulu "Alamat Hub API" di atas, baru klik link ini.');
+                    urlInput.focus();
+                    return;
+                }
+                link.href = url + '/admin';
+            });
+        })();
+    </script>
 </body>
 </html>
