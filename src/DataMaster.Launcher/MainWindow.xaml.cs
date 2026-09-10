@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Threading;
@@ -123,5 +124,32 @@ public partial class MainWindow : Window
     {
         _closingIntentionally = true;
         _server.StopIntentionally();
+    }
+
+    // Dipakai kasus nyata: laptop mode Klien berpindah ruangan/jaringan (server
+    // yang tadinya dituju sudah beda) - tanpa tombol ini, satu2nya cara ganti
+    // KlienServerUrl/Mode adalah edit appsettings.json manual atau hapus baris
+    // "SetupSelesai" (kasar, mereset kesan "instalasi baru"). Wizard yang SAMA
+    // dipakai ulang di sini (sudah di-prefill dari config existing - lihat
+    // SetupWizardWindow ctor) - bukan wizard baru terpisah, supaya UI/aturan
+    // validasinya tidak dobel dirawat di 2 tempat.
+    //
+    // Restart PROSES PENUH (bukan cuma StartAsync ulang) SENGAJA dipilih drpd
+    // hot-swap - ServerProcessManager & WebView2 (kalau Mandiri/Server) sudah
+    // terlanjur dalam keadaan "siap pakai" dgn config LAMA; menukar Mode/URL
+    // di tengah jalan tanpa restart penuh berisiko WebView2 tetap menampilkan
+    // sesi lama sementara server di baliknya sudah beda, jauh lebih rawan bug
+    // drpd 1 restart singkat yang jelas & bisa diuji.
+    private void BtnGantiJaringan_Click(object sender, RoutedEventArgs e)
+    {
+        var config = LauncherConfig.Load();
+        var wizard = new SetupWizardWindow(config) { Owner = this };
+        var selesai = wizard.ShowDialog();
+        if (selesai != true) return; // dibatalkan (tombol X) - config lama TIDAK disentuh
+
+        _closingIntentionally = true;
+        _server.StopIntentionally();
+        Process.Start(Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule!.FileName!);
+        Application.Current.Shutdown();
     }
 }

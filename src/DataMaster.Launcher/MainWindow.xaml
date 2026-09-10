@@ -31,5 +31,16 @@
                            Foreground="#D1D5DB" HorizontalAlignment="Center" Margin="0,16,0,0"/>
             </StackPanel>
         </Grid>
+
+        <!-- Elemen PALING TERAKHIR di Grid ini = tampil PALING ATAS (di atas
+             Browser MAUPUN SplashOverlay) - sengaja begitu supaya PC mode Klien
+             yang berpindah ruangan/jaringan (mis. mau ganti dari server A ke
+             server B) selalu bisa akses ini TANPA perlu tahu URL server MANA
+             yang sedang ditampilkan WebView2 di baliknya. -->
+        <Button x:Name="BtnGantiJaringan" Content="⚙ Ganti Pengaturan Jaringan"
+                Click="BtnGantiJaringan_Click"
+                HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,8,0"
+                Padding="8,4" FontSize="11" Opacity="0.55"
+                Background="#1F2937" Foreground="White" BorderThickness="0"/>
     </Grid>
 </Window>

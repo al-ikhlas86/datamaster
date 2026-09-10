@@ -14,7 +14,7 @@
 
         <StackPanel Grid.Row="0" Margin="0,0,0,20">
             <TextBlock Text="Cara pakai PC ini" FontSize="22" FontWeight="Bold"/>
-            <TextBlock Text="Pilihan ini cuma ditanyakan SEKALI, saat pertama kali dibuka. Bisa diubah lagi nanti lewat file appsettings.json kalau perlu." FontSize="12" Foreground="#6B7280" Margin="0,4,0,0" TextWrapping="Wrap"/>
+            <TextBlock Text="Pilihan ini ditanyakan saat pertama kali dibuka. Bisa diubah lagi kapan saja lewat tombol 'Ganti Pengaturan Jaringan' di pojok jendela utama." FontSize="12" Foreground="#6B7280" Margin="0,4,0,0" TextWrapping="Wrap"/>
         </StackPanel>
 
         <StackPanel Grid.Row="1" Margin="0,0,0,16">

@@ -14,7 +14,7 @@ public partial class App : Application
     // pun - default-nya aplikasi langsung mati tanpa jejak. Dicatat ke berkas log
     // yang sama dgn log server child supaya diagnosis kegagalan (mis. gagal
     // restart setelah restore) tidak butuh debugger terpasang.
-    protected override void OnStartup(StartupEventArgs e)
+    protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
@@ -35,6 +35,22 @@ public partial class App : Application
                 "Data Master - Kesalahan", MessageBoxButton.OK, MessageBoxImage.Error);
             args.Handled = true; // jangan langsung matikan aplikasi kalau masih bisa dipulihkan
         };
+
+        // Cek update SEDINI mungkin - SEBELUM wizard pun sempat tampil. Dulu
+        // UpdateChecker cuma jalan di dalam MainWindow, yang baru ada SETELAH
+        // wizard selesai diisi - artinya PC yang baru instal & belum pernah
+        // menyelesaikan wizard TIDAK PERNAH ke-cek update sama sekali, staf IT
+        // terpaksa unduh manual dari GitHub Releases sendiri (gap nyata,
+        // ditemukan langsung saat uji instalasi bersih v1.0.5/v1.0.6). Splash
+        // kecil terpisah (BUKAN splash MainWindow, krn MainWindow belum ada di
+        // titik ini) supaya unduhan besar tidak berjalan diam-diam tanpa tanda.
+        var splash = new UpdateSplashWindow();
+        splash.Show();
+        var updateChecker = new UpdateChecker();
+        updateChecker.StatusChanged += status => { if (status is not null) splash.SetStatus(status); };
+        var updateApplied = await updateChecker.CheckAndApplyAsync(new ServerProcessManager(), CancellationToken.None);
+        if (updateApplied) return; // Shutdown() sudah dipanggil di dalam - jangan lanjut apapun lagi
+        splash.Close();
 
         // Wizard cara-pakai (mandiri/server/klien) ditampilkan SEKALI saja sebelum
         // MainWindow pernah ada - lihat komentar App.xaml soal StartupUri yang

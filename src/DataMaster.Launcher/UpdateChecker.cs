@@ -34,13 +34,16 @@ public class UpdateChecker
     private const string ApiLatestReleaseUrl = "https://api.github.com/repos/al-ikhlas86/datamaster-desktop/releases/latest";
     private const string ApiAssetUrlTemplate = "https://api.github.com/repos/al-ikhlas86/datamaster-desktop/releases/assets/{0}";
 
-    public async Task CheckAndApplyAsync(ServerProcessManager server, CancellationToken ct)
+    // Kembalikan true kalau update DITERAPKAN (artinya Application.Current.Shutdown()
+    // SUDAH dipanggil di dalam ApplyAndRestart - pemanggil WAJIB berhenti lanjut,
+    // JANGAN membuka wizard/MainWindow lagi krn proses ini sudah dalam proses mati).
+    public async Task<bool> CheckAndApplyAsync(ServerProcessManager server, CancellationToken ct)
     {
         try
         {
             var config = LauncherConfig.Load();
             var token = config.EffectiveGithubToken;
-            if (string.IsNullOrWhiteSpace(token)) return; // belum dikonfigurasi - dilewati diam2, bukan error
+            if (string.IsNullOrWhiteSpace(token)) return false; // belum dikonfigurasi - dilewati diam2, bukan error
 
             var installed = Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0);
 
@@ -54,8 +57,8 @@ public class UpdateChecker
             using var doc = JsonDocument.Parse(releaseJson);
             var tagName = doc.RootElement.GetProperty("tag_name").GetString() ?? "";
 
-            if (!Version.TryParse(NormalizeVersion(tagName.TrimStart('v', 'V')), out var remote)) return;
-            if (remote <= installed) return; // sudah versi terbaru
+            if (!Version.TryParse(NormalizeVersion(tagName.TrimStart('v', 'V')), out var remote)) return false;
+            if (remote <= installed) return false; // sudah versi terbaru
 
             long assetId = 0;
             long assetSize = 0;
@@ -68,7 +71,7 @@ public class UpdateChecker
                     break;
                 }
             }
-            if (assetId == 0) return; // rilis ada tapi belum ada asset yang cocok - dilewati
+            if (assetId == 0) return false; // rilis ada tapi belum ada asset yang cocok - dilewati
 
             var sizeMb = assetSize > 0 ? $"{assetSize / 1024.0 / 1024.0:F0} MB" : "ukuran tidak diketahui";
             StatusChanged?.Invoke($"Memperbarui ke versi {remote} ({sizeMb}) - JANGAN TUTUP APLIKASI INI sampai selesai...");
@@ -83,6 +86,7 @@ public class UpdateChecker
 
             StatusChanged?.Invoke("Update selesai diunduh - aplikasi akan tertutup sebentar lalu terbuka lagi otomatis...");
             ApplyAndRestart(zipBytes, server);
+            return true;
         }
         catch
         {
@@ -91,6 +95,7 @@ public class UpdateChecker
             // dicoba lagi kesempatan berikutnya (start berikutnya). Banner
             // disembunyikan lagi - JANGAN dibiarkan nyangkut "sedang mengunduh".
             StatusChanged?.Invoke(null);
+            return false;
         }
     }
 
