@@ -59,11 +59,9 @@ D:\DataMaster\
    - **"PC ini ikut PC lain (klien)"** - pilih di PC ke-2/ke-3 dst, isi
      alamat PC yang sudah dipilih "Server" tadi.
 
-   Di layar yang sama ada kolom **"Update otomatis"** - isi token GitHub
-   di sini SEKALIAN supaya tidak perlu hapus+download ulang manual tiap
-   ada rilis baru ke depannya (lihat cara buat tokennya di Langkah 3 di
-   bawah - boleh dilewati dulu & diisi belakangan lewat file
-   `appsettings.json` kalau belum siap).
+   Tidak ada kolom token yang perlu diisi di layar ini - **update otomatis
+   sudah aktif dengan sendirinya** sejak PC pertama kali dibuka (lihat
+   penjelasan di bawah, bagian "Soal update otomatis").
 3. Muncul jendela splash "Cek update...", lalu jendela utama aplikasi
    (mesin Chromium/WebView2 - kalau Windows-nya belum pernah pasang
    "Microsoft Edge WebView2 Runtime", akan diminta pasang dulu sekali, ini
@@ -82,41 +80,25 @@ D:\DataMaster\
    diisi data sekolah (Tahun Ajaran, Kelas, Guru, Siswa, dst, urutannya
    sama seperti versi web PHP yang sekarang dipakai PC TU SD).
 
-### Langkah 3 - Aktifkan update otomatis (opsional tapi sangat disarankan)
+### Soal update otomatis
 
-Tanpa langkah ini aplikasi tetap jalan normal, cuma tidak akan pernah cek
-rilis baru sendiri (harus hapus & download ulang manual tiap ada
-perbaikan - dilewati diam-diam, BUKAN error, kalau kolom ini kosong).
+Sejak v1.0.5, **tidak ada langkah apapun yang perlu dilakukan** - setiap
+instalasi baru sudah otomatis aktif cek pembaruan. Tiap ada rilis baru di
+GitHub, aplikasi otomatis mengunduh & memasang sendiri begitu dibuka
+(proses: cek versi → unduh di latar belakang → tutup server internal →
+timpa file lama → buka lagi otomatis - tanpa uninstall/reinstall manual,
+tanpa installer, tanpa campur tangan orang sekolah).
 
-1. Di layar wizard "Cara pakai PC ini" (Langkah 2 di atas), klik link
-   **"Belum punya token? Buat token GitHub di sini"** di bawah kolom
-   Update Otomatis - ini membuka https://github.com/settings/tokens?type=beta
-   di browser (harus login akun GitHub yang sudah diundang ke repo).
-2. "Generate new token" (Fine-grained token):
-   - **Repository access**: pilih "Only select repositories" → pilih
-     `al-ikhlas86/datamaster-desktop` SAJA (jangan kasih akses ke repo
-     lain, prinsip izin seminimal mungkin).
-   - **Permissions**: `Contents` → set ke **Read-only**. Yang lain biarkan
-     "No access".
-   - Masa berlaku: pilih yang paling panjang tersedia (atau "No expiration"
-     kalau ada), supaya tidak perlu diulang tiap beberapa bulan.
-3. Generate, salin tokennya (formatnya diawali `github_pat_...`, cuma
-   ditampilkan SEKALI, kalau kelewat harus generate baru).
-4. Balik ke jendela wizard, tempel token itu di kolom "Update otomatis",
-   klik Lanjutkan (atau Buat Akun Admin kalau sudah di layar Setup Awal -
-   kolom ini ada di wizard PERTAMA, sebelum Setup Awal, jangan tertukar
-   dengan kolom "Token Hub API" yang beda lagi di Setup Awal).
-
-Mulai sekarang, tiap ada rilis baru di GitHub, aplikasi akan otomatis
-mengunduh & memasang sendiri saat dibuka (proses: cek versi → unduh di
-latar belakang → tutup server internal → timpa file lama → buka lagi
-otomatis - tanpa perlu uninstall/reinstall manual, tanpa installer, tanpa
-campur tangan orang sekolah).
-
-**Kalau token ini dilewati saat wizard**: bisa diisi belakangan dengan
-buka file `appsettings.json` di folder yang sama dengan `DataMaster.exe`,
-tambahkan baris `"GithubToken": "github_pat_xxxxxxxxxxxxxxxxxxxxx"`, lalu
-tutup & buka lagi aplikasinya.
+Ini bekerja lewat 1 token GitHub bawaan yang sudah ditanam di dalam
+aplikasi sendiri (bukan diisi tiap PC) - keputusan sadar supaya staf TU
+sekolah tidak perlu mengerti cara bikin token GitHub sendiri. Kalau suatu
+saat token bawaan ini perlu diganti (mis. dicabut/kedaluwarsa), staf IT
+lanjutan bisa menimpa dengan token sendiri: buka `appsettings.json` di
+folder yang sama dengan `DataMaster.exe`, tambahkan baris
+`"GithubToken": "github_pat_xxxxxxxxxxxxxxxxxxxxx"` (token fine-grained
+baru, Repository access → `datamaster-desktop` saja, Permissions →
+Contents → Read-only), lalu tutup & buka lagi aplikasinya - token manual
+ini SELALU diprioritaskan di atas token bawaan kalau diisi.
 
 **Token ini JANGAN pernah disebar/di-commit ke git** - dia cuma bisa
 *membaca* rilis repo ini (tidak bisa ubah kode/data apapun), tapi tetap
@@ -218,8 +200,9 @@ tekan F5.
 5. Begitu tag ke-push, GitHub Actions otomatis: compile, bikin paket zip,
    terbitkan sebagai Release baru di halaman Releases. Prosesnya bisa
    dipantau di tab "Actions" repo GitHub (biasanya selesai dalam beberapa
-   menit). Setelah itu, PC sekolah yang sudah diisi token (lihat bagian 1
-   langkah 3) otomatis menawarkan update begitu aplikasi dibuka.
+   menit). Setelah itu, semua PC yang sudah terpasang aplikasi ini otomatis
+   menawarkan update begitu dibuka - tidak perlu setting apapun (lihat
+   "Soal update otomatis" di bagian 1).
 6. Kalau cuma mau coba build tanpa bikin rilis resmi (misal ngetes apakah
    compile-nya sukses di lingkungan CI), jalankan workflow secara manual
    dari tab Actions → "Build Data Master" → "Run workflow" (tidak perlu
@@ -310,8 +293,8 @@ gantinya (`ipconfig` di PC server, baris "IPv4 Address") - tapi minta
 staf jaringan mereservasi IP itu di router (DHCP reservation) supaya
 tidak berubah-ubah, karena IP TIDAK punya jaminan permanen seperti nama PC.
 
-Update otomatis (token GitHub, bagian 1 langkah 3) tetap perlu diisi di
-SEMUA PC (server maupun klien) - masing-masing tetap punya salinan
+Update otomatis sudah aktif dengan sendirinya di SEMUA PC (server maupun
+klien) tanpa perlu diisi apapun - masing-masing tetap punya salinan
 program sendiri yang perlu diperbarui, cuma DATA-nya yang dipusatkan di
 PC server.
 
