@@ -5,11 +5,11 @@
     // Port 1:1 dari app/Views/templates/topbar.php. Data user (username/email/foto)
     // tidak ada di cookie claims (sengaja tipis, cuma id+nama+role) - diambil
     // sekali per request lewat query ringan by PK (indexed, instan).
-    string username = "", email = "", userImage = "default.png";
+    string username = "", userImage = "default.png";
     if (User.Identity?.IsAuthenticated == true && int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var uid))
     {
         var u = await Db.Users.FindAsync(uid);
-        if (u is not null) { username = u.Username ?? u.Email; email = u.Email; userImage = u.UserImage ?? "default.png"; }
+        if (u is not null) { username = u.Username ?? u.Email; userImage = u.UserImage ?? "default.png"; }
     }
 }
 <header class="nxl-header">
@@ -66,7 +66,6 @@
                                 <img src="@imgPath" alt="@username" class="img-fluid user-avtar rounded-circle" style="width:44px;height:44px;object-fit:cover;" onerror="this.src='@fallback'">
                                 <div>
                                     <h6 class="mb-0 fw-bold">@username</h6>
-                                    <span class="fs-12 fw-medium text-muted">@email</span>
                                 </div>
                             </div>
                         </div>

@@ -45,12 +45,9 @@
 
                     <form asp-controller="Auth" asp-action="Setup" method="post" class="w-100 mt-3">
                         <div class="mb-3">
-                            <label class="form-label">Email *</label>
-                            <input type="email" name="Email" class="form-control" value="@Model.Email" required autofocus>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Username (opsional)</label>
-                            <input type="text" name="Username" class="form-control" value="@Model.Username" maxlength="30">
+                            <label class="form-label">ID *</label>
+                            <input type="text" name="Username" class="form-control" value="@Model.Username" minlength="3" maxlength="30" required autofocus>
+                            <div class="form-text">Dipakai untuk login - bisa diganti kapan saja lewat menu Pengaturan setelah masuk.</div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Kata Sandi *</label>

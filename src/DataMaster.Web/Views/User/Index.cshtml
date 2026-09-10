@@ -18,13 +18,10 @@
                 <form asp-controller="User" asp-action="Update" method="post" enctype="multipart/form-data" class="mt-3 text-start">
                     <input type="file" id="inputFoto" name="user_image" accept=".jpg,.jpeg,.png" class="d-none" onchange="document.getElementById('previewFoto').src=URL.createObjectURL(this.files[0])" />
                     <div class="form-text mb-2">Klik foto untuk mengganti. JPG/PNG, maksimal 500KB.</div>
-                    <div class="mb-2">
-                        <label class="form-label">Email</label>
-                        <input type="text" class="form-control" value="@Model.Email" readonly />
-                    </div>
                     <div class="mb-3">
-                        <label class="form-label">Username</label>
+                        <label class="form-label">ID</label>
                         <input type="text" name="username" class="form-control" value="@Model.Username" minlength="3" maxlength="30" required />
+                        <div class="form-text">Dipakai untuk login - ganti kapan saja, berlaku mulai login berikutnya.</div>
                     </div>
                     <button type="submit" class="btn btn-primary w-100">Simpan Profil</button>
                 </form>

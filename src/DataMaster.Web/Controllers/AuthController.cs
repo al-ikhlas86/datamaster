@@ -89,8 +89,14 @@ public class AuthController(DataMasterDbContext db, LoginThrottleService throttl
             return View(input);
         }
 
+        var uname = input.Username.Trim();
+        // Kolom Email SENGAJA disi otomatis (bukan diminta ke pengguna) - sekolah
+        // ini tidak benar-benar pakai alamat email nyata utk akun-akun ini, ID
+        // (Username) yang jadi identitas login utama. Kolom Email tetap harus
+        // terisi (NOT NULL+UNIQUE di skema) supaya kompatibel dgn struktur data
+        // warisan Myth Auth PHP tanpa perlu migrasi skema terpisah.
         var hasher = new PasswordHasher<User>();
-        var user = new User { Email = input.Email.Trim(), Username = input.Username?.Trim(), PasswordHash = "" };
+        var user = new User { Email = $"{uname.Replace(" ", "")}@datamaster.local", Username = uname, PasswordHash = "" };
         user.PasswordHash = hasher.HashPassword(user, input.Password);
         db.Users.Add(user);
         await db.SaveChangesAsync();

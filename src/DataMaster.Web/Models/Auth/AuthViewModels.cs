@@ -15,12 +15,16 @@ public class LoginInput
 
 public class SetupInput
 {
-    [Required(ErrorMessage = "Email wajib diisi.")]
-    [EmailAddress(ErrorMessage = "Format email tidak valid.")]
-    public string Email { get; set; } = "";
-
-    [StringLength(30, MinimumLength = 3, ErrorMessage = "Username 3-30 karakter.")]
-    public string? Username { get; set; }
+    // ID login utama - SENGAJA bukan email (sekolah ini tidak benar-benar pakai
+    // alamat email nyata utk akun-akun ini). Kolom Email di database tetap ADA
+    // (NOT NULL di skema, warisan pola Myth Auth PHP) tapi diisi OTOMATIS dari
+    // ID ini di AuthController.Setup() - pengguna TIDAK PERNAH melihat/mengisi
+    // email sama sekali. Username tetap BISA diganti belakangan lewat menu
+    // Pengaturan (UserController.Update() sudah mendukung ini).
+    [Required(ErrorMessage = "ID wajib diisi.")]
+    [StringLength(30, MinimumLength = 3, ErrorMessage = "ID 3-30 karakter.")]
+    [RegularExpression(@"^[a-zA-Z0-9\s]+$", ErrorMessage = "ID hanya boleh huruf, angka, dan spasi.")]
+    public string Username { get; set; } = "";
 
     [Required(ErrorMessage = "Kata sandi wajib diisi.")]
     [StringLength(100, MinimumLength = 8, ErrorMessage = "Kata sandi minimal 8 karakter.")]
