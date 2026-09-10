@@ -1,6 +1,4 @@
-using System.Diagnostics;
 using System.Windows;
-using System.Windows.Navigation;
 
 namespace DataMaster.Launcher;
 
@@ -71,12 +69,6 @@ public partial class SetupWizardWindow : Window
             _config.KlienServerUrl = null;
         }
 
-        // Update otomatis - lepas dari pilihan Mandiri/Server/Klien di atas,
-        // berlaku sama di ketiga mode (tiap PC tetap punya salinan program
-        // sendiri yang perlu diperbarui, cuma DATA-nya yang beda per mode).
-        var githubToken = TxtGithubToken.Text.Trim();
-        if (githubToken != "") _config.GithubToken = githubToken;
-
         _config.SetupSelesai = true;
         _config.SaveKe();
 
@@ -88,14 +80,5 @@ public partial class SetupWizardWindow : Window
     {
         TxtError.Text = pesan;
         TxtError.Visibility = Visibility.Visible;
-    }
-
-    private void LinkBuatTokenGithub_RequestNavigate(object sender, RequestNavigateEventArgs e)
-    {
-        // Hyperlink WPF TIDAK otomatis membuka browser (beda dari HTML <a>) -
-        // harus dipicu manual lewat proses OS, UseShellExecute WAJIB true supaya
-        // Windows yang menentukan browser default, bukan dijalankan sbg .exe.
-        Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true });
-        e.Handled = true;
     }
 }

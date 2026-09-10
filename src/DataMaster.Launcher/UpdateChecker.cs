@@ -39,7 +39,7 @@ public class UpdateChecker
         try
         {
             var config = LauncherConfig.Load();
-            var token = config.GithubToken;
+            var token = config.EffectiveGithubToken;
             if (string.IsNullOrWhiteSpace(token)) return; // belum dikonfigurasi - dilewati diam2, bukan error
 
             var installed = Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0);

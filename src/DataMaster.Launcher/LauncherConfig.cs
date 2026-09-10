@@ -3,20 +3,38 @@ using System.Text.Json;
 
 namespace DataMaster.Launcher;
 
-// Konfigurasi per-PC - file JSON terpisah di sebelah .exe (BUKAN ditanam di kode
-// terkompilasi) supaya token tidak pernah ikut ke repo/hasil build publik, dan
-// tiap PC bisa diatur sendiri tanpa build ulang. Pola identik AppConfig.cs milik
-// Presensi (D:\Presensi\src\Presensi\Services\AppConfig.cs) - proyek saudara yang
-// sudah terbukti jalan di lapangan dgn pola yang SAMA PERSIS (repo privat + token
-// fine-grained read-only).
+// Konfigurasi per-PC - file JSON terpisah di sebelah .exe, tiap PC bisa
+// menimpa nilai bawaan di bawah tanpa build ulang kalau perlu.
 public sealed class LauncherConfig
 {
+    // Token GitHub SENGAJA ditanam langsung di kode (beda dari rencana awal
+    // "appsettings.json saja") - keputusan sadar 2026-09-10 setelah diskusi
+    // ulang: end-user (staf TU sekolah) TIDAK mengerti cara bikin Personal
+    // Access Token sendiri ("saya kira tinggal keygen"), jadi 1 token dibuat
+    // SEKALI oleh pemilik proyek lalu ditanam di sini - PC manapun yang instal
+    // aplikasi ini otomatis dapat auto-update aktif SEJAK AWAL, tanpa perlu
+    // mengisi apapun sama sekali. Risiko diterima secara sadar: scope token
+    // ini CUMA "Contents: Read-only" pada 1 repo privat ini (datamaster-desktop)
+    // - kalau file .exe berhasil dibongkar & token diekstrak, dampaknya
+    // terbatas (baca kode sumber, TIDAK BISA ubah apapun) dan bisa dicabut
+    // kapan saja dari github.com/settings/tokens tanpa mematikan aplikasi yang
+    // sudah berjalan (cuma auto-update-nya berhenti sampai token baru terbit).
+    private const string EmbeddedGithubToken = "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";
+
     // Fine-grained PAT GitHub, scope "Contents: Read-only" KHUSUS repo
     // "datamaster-desktop" - dipakai UpdateChecker cek/unduh rilis lewat REST API
     // krn repo ini PRIVAT (URL publik "releases/latest/download/..." SELALU 404
     // tanpa kredensial utk repo privat - dibuktikan Presensi 2026-09-01, bukan
-    // asumsi). Kosong = cek pembaruan dilewati diam-diam, aplikasi tetap jalan normal.
+    // asumsi). Property MENTAH ini biasanya kosong (null) - PC mana pun boleh
+    // mengisinya manual di appsettings.json kalau suatu saat mau pakai token
+    // sendiri (mis. token bawaan dicabut) - lihat EffectiveGithubToken di bawah
+    // untuk nilai yang SUNGGUHAN dipakai (fallback ke token tertanam).
     public string? GithubToken { get; set; }
+
+    // Ini yang WAJIB dipakai UpdateChecker (bukan GithubToken mentah di atas) -
+    // pakai token milik PC ini kalau sudah diisi manual, atau token bawaan
+    // tertanam kalau belum. Hasilnya: auto-update SELALU aktif tanpa syarat.
+    public string EffectiveGithubToken => string.IsNullOrWhiteSpace(GithubToken) ? EmbeddedGithubToken : GithubToken;
 
     // Mode multi-PC 1 jaringan lokal (LAN) - dipakai skenario "3 PC TU SD, 1
     // database utama dipakai bareng" supaya data 100% sama di semua PC (bukan
