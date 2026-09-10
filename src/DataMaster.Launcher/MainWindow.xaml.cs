@@ -42,6 +42,14 @@ public partial class MainWindow : Window
         Directory.CreateDirectory(envDataDir);
         var env = await CoreWebView2Environment.CreateAsync(userDataFolder: envDataDir);
         await Browser.EnsureCoreWebView2Async(env);
+        // Pastikan EKSPLISIT (bukan mengandalkan default runtime WebView2 yang
+        // terpasang di PC, yang bisa berbeda2/kena kebijakan GPO kantor) - staf
+        // TU minta ID+password bisa diingat otomatis persis spt browser biasa
+        // (mis. web Absen), supaya login berikutnya cuma tinggal klik "Masuk"
+        // tanpa ketik ulang. Profil WebView2 sudah PERSISTEN per-PC (envDataDir
+        // di atas), jadi begitu diaktifkan, tersimpan permanen lintas restart.
+        Browser.CoreWebView2.Settings.IsPasswordAutosaveEnabled = true;
+        Browser.CoreWebView2.Settings.IsGeneralAutofillEnabled = true;
 
         var ok = await _server.StartAsync(CancellationToken.None);
         if (!ok)
@@ -124,6 +132,11 @@ public partial class MainWindow : Window
     {
         _closingIntentionally = true;
         _server.StopIntentionally();
+        // WAJIB eksplisit sejak App.xaml pakai ShutdownMode="OnExplicitShutdown"
+        // (lihat komentar di sana) - tanpa ini, menutup MainWindow normal (tombol
+        // X) cuma menutup jendelanya, proses Launcher tetap hidup di background
+        // tanpa jendela apapun, tidak pernah benar2 keluar.
+        Application.Current.Shutdown();
     }
 
     // Dipakai kasus nyata: laptop mode Klien berpindah ruangan/jaringan (server

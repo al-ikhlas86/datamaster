@@ -1,11 +1,21 @@
 ﻿<Application x:Class="DataMaster.Launcher.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:DataMaster.Launcher">
+             xmlns:local="clr-namespace:DataMaster.Launcher"
+             ShutdownMode="OnExplicitShutdown">
     <!-- StartupUri SENGAJA dihapus (dulu "MainWindow.xaml") - jendela mana yang
          tampil duluan sekarang diputuskan manual di App.xaml.cs OnStartup(),
          supaya SetupWizardWindow bisa disisipkan SEBELUM MainWindow saat
-         LauncherConfig.SetupSelesai masih false. -->
+         LauncherConfig.SetupSelesai masih false.
+
+         ShutdownMode="OnExplicitShutdown" JUGA WAJIB (bug nyata v1.0.7): default
+         WPF "OnLastWindowClose" bikin aplikasi MATI SENDIRI begitu splash cek-
+         update ditutup (splash.Close() di App.xaml.cs) - krn saat itu splash
+         adalah SATU2NYA jendela terbuka, WPF anggap "jendela terakhir ditutup =
+         waktunya keluar", SEBELUM sempat membuka wizard/MainWindow sama sekali.
+         Dengan mode ini, penutupan jendela APAPUN di tengah alur startup TIDAK
+         memicu keluar otomatis - Shutdown() HARUS dipanggil eksplisit di semua
+         titik keluar sungguhan (lihat App.xaml.cs & MainWindow.xaml.cs). -->
     <Application.Resources>
 
     </Application.Resources>
