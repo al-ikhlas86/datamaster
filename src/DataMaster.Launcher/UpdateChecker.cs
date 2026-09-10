@@ -41,13 +41,27 @@ public class UpdateChecker
     {
         try
         {
+            Log("Mulai cek update...");
             var config = LauncherConfig.Load();
             var token = config.EffectiveGithubToken;
-            if (string.IsNullOrWhiteSpace(token)) return false; // belum dikonfigurasi - dilewati diam2, bukan error
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                Log("Dilewati - token GitHub kosong.");
+                return false; // belum dikonfigurasi - dilewati diam2, bukan error
+            }
 
             var installed = Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0);
+            Log($"Versi terpasang: {installed}.");
 
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+            // BUKAN 30 detik (dulu) - itu berlaku utk SELURUH request TERMASUK
+            // unduhan asset ~150MB di bawah, bukan cuma cek versi. Root cause
+            // NYATA ditemukan 2026-09-10: setiap update yang benar2 ketemu akan
+            // SELALU gagal di tengah unduhan (TaskCanceledException, dulu diam2
+            // tertelan tanpa log) krn 150MB nyaris tidak mungkin selesai dlm 30
+            // detik di koneksi sekolah biasa. 20 menit generous utk internet
+            // lambat sekalipun - cek metadata di atas tetap cepat, batas tinggi
+            // di sini cuma jaga2, bukan bikin "nunggu 20 menit tiap buka app".
+            using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(20) };
             // GitHub API MEWAJIBKAN User-Agent (request tanpa ini ditolak 403).
             http.DefaultRequestHeaders.UserAgent.ParseAdd("DataMaster-AlIkhlas86-Updater");
             http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -56,9 +70,18 @@ public class UpdateChecker
             var releaseJson = await http.GetStringAsync(ApiLatestReleaseUrl, ct);
             using var doc = JsonDocument.Parse(releaseJson);
             var tagName = doc.RootElement.GetProperty("tag_name").GetString() ?? "";
+            Log($"Rilis terbaru di GitHub: {tagName}.");
 
-            if (!Version.TryParse(NormalizeVersion(tagName.TrimStart('v', 'V')), out var remote)) return false;
-            if (remote <= installed) return false; // sudah versi terbaru
+            if (!Version.TryParse(NormalizeVersion(tagName.TrimStart('v', 'V')), out var remote))
+            {
+                Log($"GAGAL parse tag_name '{tagName}' sbg versi - dilewati.");
+                return false;
+            }
+            if (remote <= installed)
+            {
+                Log($"Sudah versi terbaru ({installed} >= {remote}) - tidak ada yang diunduh.");
+                return false; // sudah versi terbaru
+            }
 
             long assetId = 0;
             long assetSize = 0;
@@ -71,9 +94,14 @@ public class UpdateChecker
                     break;
                 }
             }
-            if (assetId == 0) return false; // rilis ada tapi belum ada asset yang cocok - dilewati
+            if (assetId == 0)
+            {
+                Log($"Rilis {tagName} ADA tapi asset '{AssetName}' TIDAK DITEMUKAN - dilewati.");
+                return false; // rilis ada tapi belum ada asset yang cocok - dilewati
+            }
 
             var sizeMb = assetSize > 0 ? $"{assetSize / 1024.0 / 1024.0:F0} MB" : "ukuran tidak diketahui";
+            Log($"Update ditemukan: {installed} -> {remote} ({sizeMb}). Mulai unduh asset id={assetId}...");
             StatusChanged?.Invoke($"Memperbarui ke versi {remote} ({sizeMb}) - JANGAN TUTUP APLIKASI INI sampai selesai...");
 
             using var assetReq = new HttpRequestMessage(HttpMethod.Get, string.Format(ApiAssetUrlTemplate, assetId));
@@ -83,20 +111,42 @@ public class UpdateChecker
             using var assetResp = await http.SendAsync(assetReq, ct);
             assetResp.EnsureSuccessStatusCode();
             var zipBytes = await assetResp.Content.ReadAsByteArrayAsync(ct);
+            Log($"Unduhan selesai ({zipBytes.Length} bytes). Menerapkan pembaruan...");
 
             StatusChanged?.Invoke("Update selesai diunduh - aplikasi akan tertutup sebentar lalu terbuka lagi otomatis...");
             ApplyAndRestart(zipBytes, server);
+            Log("ApplyAndRestart selesai dipanggil, Shutdown() diminta.");
             return true;
         }
-        catch
+        catch (Exception ex)
         {
             // Gagal cek/unduh (internet mati, token keliru/kedaluwarsa, GitHub
             // tidak terjangkau) TIDAK BOLEH mengganggu fungsi utama aplikasi -
             // dicoba lagi kesempatan berikutnya (start berikutnya). Banner
             // disembunyikan lagi - JANGAN dibiarkan nyangkut "sedang mengunduh".
+            // DICATAT KE LOG (sebelumnya diam total - gap nyata yang bikin
+            // kegagalan auto-update MUSTAHIL didiagnosis dari jarak jauh,
+            // ditemukan 2026-09-10 saat update v1.1.0->v1.2.0 gagal tanpa jejak
+            // sama sekali).
+            Log($"GAGAL cek/terapkan update: {ex}");
             StatusChanged?.Invoke(null);
             return false;
         }
+    }
+
+    // Log berkas TERPISAH dari launcher_{tanggal}.log (App.xaml.cs, cuma exception
+    // fatal) - update-checker dulu TIDAK PERNAH menulis apapun sama sekali walau
+    // gagal, bikin kegagalan mustahil didiagnosis dari jarak jauh. File ini bisa
+    // dibuka langsung staf/developer tanpa perlu debugger terpasang.
+    private static void Log(string pesan)
+    {
+        try
+        {
+            var logDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DataMaster", "logs");
+            Directory.CreateDirectory(logDir);
+            File.AppendAllText(Path.Combine(logDir, $"update_{DateTime.Now:yyyy-MM-dd}.log"), $"[{DateTime.Now:O}] {pesan}\n");
+        }
+        catch { /* logging tidak boleh ikut melempar error baru */ }
     }
 
     // "1.1.0" -> "1.1.0.0" - System.Version butuh >=2 bagian, dibuat selalu 4
