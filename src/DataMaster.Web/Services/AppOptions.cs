@@ -24,6 +24,15 @@ public class AppOptions
     // termigrasi dari alamat manapun yang pernah jadi bawaan resmi.
     public static readonly string[] HubApiUrlLama = [];
 
+    // Kunci BERSAMA (bukan token per-unit) yang ditanam di SEMUA instalasi
+    // Data Master - dipakai AuthController.Setup() memanggil POST /api/v1/register
+    // Hub API SENDIRI (tanpa staf TU pernah lihat/ketik kata "token" sama sekali).
+    // HARUS SAMA PERSIS dgn register.sharedKey di .env server Hub API. Kalau
+    // bocor: paling parah orang bikin unit PALSU (gampang dihapus dari panel
+    // admin), TIDAK BISA baca/ubah data unit lain manapun - lihat komentar
+    // RegisterController.php (hub-api) utk penjelasan lengkap.
+    public const string RegisterSharedKey = "84692fef821026acc9a8fb08a7f16e03636d3b1a3041093af19ab8a643e66037";
+
     public string InstallType { get; set; } = "pendidikan"; // pendidikan|perusahaan|pengembang
     public string HubApiUrl { get; set; } = "";
     public string HubApiToken { get; set; } = "";

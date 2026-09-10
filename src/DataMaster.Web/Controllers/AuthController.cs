@@ -1,4 +1,6 @@
+using System.Net.Http.Json;
 using System.Security.Claims;
+using System.Text.Json;
 using DataMaster.Data;
 using DataMaster.Data.Entities;
 using DataMaster.Web.Models.Auth;
@@ -22,7 +24,7 @@ namespace DataMaster.Web.Controllers;
 // bisa daftar dapat akses penuh tanpa RBAC).
 [AllowAnonymous]
 [Route("")]
-public class AuthController(DataMasterDbContext db, LoginThrottleService throttle, AppSettingsWriterService appSettingsWriter, IHostApplicationLifetime lifetime) : Controller
+public class AuthController(DataMasterDbContext db, LoginThrottleService throttle, AppSettingsWriterService appSettingsWriter, IHostApplicationLifetime lifetime, IHttpClientFactory httpClientFactory, ILogger<AuthController> logger) : Controller
 {
     [HttpGet("login")]
     public async Task<IActionResult> Login()
@@ -30,11 +32,7 @@ public class AuthController(DataMasterDbContext db, LoginThrottleService throttl
         if (User.Identity?.IsAuthenticated == true) return RedirectToAction("Index", "Home");
 
         var adaUser = await db.Users.AnyAsync();
-        // AppOptions.HubApiUrlResmi ditanam sbg bawaan Setup Awal (lihat komentar
-        // di sana) - staf TU TIDAK PERLU tahu/ketik alamat Hub API sama sekali,
-        // PERSIS pola EmbeddedGithubToken di Launcher. Tetap BOLEH ditimpa manual
-        // (field tidak read-only) utk kasus langka (deployment non-standar).
-        if (!adaUser) return View("Setup", new SetupInput { HubApiUrl = AppOptions.HubApiUrlResmi });
+        if (!adaUser) return View("Setup", new SetupInput());
 
         return View(new LoginInput());
     }
@@ -117,17 +115,30 @@ public class AuthController(DataMasterDbContext db, LoginThrottleService throttl
 
         await SignInAsync(user, ingatLogin: false);
 
-        // Opsional - kalau token Hub API diisi sekalian pas Setup Awal, langsung
-        // tulis ke appsettings.json (tidak perlu staf IT buka file manual) lalu
-        // restart proses supaya AppOptions (IOptions<AppOptions>, TIDAK hot-reload)
-        // kebaca ulang dari nilai baru sejak proses fresh - Launcher yang menjalankan
-        // ulang otomatis, pola SAMA PERSIS restart-setelah-restore-database.
-        var tokenDiisi = !string.IsNullOrWhiteSpace(input.HubApiToken);
-        if (tokenDiisi)
+        // Opsional - kalau Nama Unit diisi, DAFTARKAN OTOMATIS ke Hub API (POST
+        // /api/v1/register) - staf TU tidak pernah lihat/ketik "token"/"alamat
+        // server" sama sekali (lihat diskusi 2026-09-10, komentar SetupInput).
+        // Token hasil registrasi ditulis sendiri ke appsettings.json, lalu proses
+        // di-restart supaya AppOptions (IOptions<AppOptions>, TIDAK hot-reload)
+        // kebaca ulang dari nilai baru - Launcher yang menjalankan ulang otomatis,
+        // pola SAMA PERSIS restart-setelah-restore-database.
+        var namaUnit = (input.NamaUnit ?? "").Trim();
+        if (namaUnit != "")
         {
-            await appSettingsWriter.SetHubApiConfigAsync(input.HubApiUrl, input.HubApiToken);
-            TempData["message"] = "Akun admin berhasil dibuat. Menyalakan ulang sebentar untuk mengaktifkan sinkronisasi Hub API...";
-            lifetime.StopApplication();
+            var token = await DaftarKeHubApiAsync(namaUnit);
+            if (token is not null)
+            {
+                await appSettingsWriter.SetHubApiConfigAsync(AppOptions.HubApiUrlResmi, token);
+                TempData["message"] = "Akun admin berhasil dibuat. Menyalakan ulang sebentar untuk mengaktifkan sinkronisasi Hub API...";
+                lifetime.StopApplication();
+            }
+            else
+            {
+                // Non-fatal SENGAJA - kalau pendaftaran gagal (internet mati,
+                // server Hub API tidak terjangkau, dsb), akun admin TETAP
+                // berhasil dibuat. Sinkronisasi bisa diaktifkan lagi belakangan.
+                TempData["message"] = "Akun admin berhasil dibuat. Pendaftaran sinkronisasi Hub API gagal (cek koneksi internet) - bisa dicoba lagi belakangan.";
+            }
         }
         else
         {
@@ -135,6 +146,36 @@ public class AuthController(DataMasterDbContext db, LoginThrottleService throttl
         }
 
         return RedirectToAction("Index", "Home");
+    }
+
+    // Mengembalikan token asli kalau berhasil, null kalau gagal (dianggap
+    // non-fatal oleh pemanggil - lihat komentar Setup() POST).
+    private async Task<string?> DaftarKeHubApiAsync(string namaUnit)
+    {
+        try
+        {
+            using var http = httpClientFactory.CreateClient();
+            http.Timeout = TimeSpan.FromSeconds(15);
+            using var resp = await http.PostAsJsonAsync($"{AppOptions.HubApiUrlResmi}/api/v1/register",
+                new { kunci = AppOptions.RegisterSharedKey, nama = namaUnit });
+
+            var body = await resp.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+            if (!resp.IsSuccessStatusCode || !root.TryGetProperty("success", out var ok) || !ok.GetBoolean())
+            {
+                var pesan = root.TryGetProperty("message", out var m) ? m.GetString() : body;
+                logger.LogWarning("Pendaftaran Hub API ditolak: {Pesan}", pesan);
+                return null;
+            }
+
+            return root.GetProperty("token").GetString();
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Pendaftaran Hub API gagal - koneksi bermasalah.");
+            return null;
+        }
     }
 
     [HttpPost("logout")]

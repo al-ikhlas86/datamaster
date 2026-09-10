@@ -33,10 +33,12 @@ public class SetupInput
     [Required(ErrorMessage = "Konfirmasi kata sandi wajib diisi.")]
     public string PasswordKonfirmasi { get; set; } = "";
 
-    // Opsional - kalau diisi, langsung ditulis ke appsettings.json (AppSettings)
-    // supaya PC ini otomatis sinkron ke Hub API sejak awal, TANPA perlu buka file
-    // manual (lihat AuthController.Setup()). Boleh dikosongkan & diisi belakangan
-    // lewat menu Pengaturan kalau token belum siap saat instalasi.
-    public string? HubApiUrl { get; set; }
-    public string? HubApiToken { get; set; }
+    // Opsional - kalau diisi, AuthController.Setup() otomatis MENDAFTARKAN unit
+    // ini ke Hub API (POST /api/v1/register) & menyimpan token hasilnya sendiri -
+    // staf TU TIDAK PERNAH lihat/ketik kata "token" atau "alamat server" sama
+    // sekali (lihat diskusi 2026-09-10: alur lama - login admin panel + copy
+    // token manual - dianggap terlalu teknis utk non-programmer). Boleh
+    // dikosongkan kalau belum mau aktifkan sinkronisasi saat instalasi.
+    [StringLength(100, ErrorMessage = "Nama unit maksimal 100 karakter.")]
+    public string? NamaUnit { get; set; }
 }

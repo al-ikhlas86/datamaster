@@ -60,19 +60,11 @@
                         </div>
 
                         <hr class="my-4">
-                        <p class="fs-12 fw-medium text-muted mb-2">Sinkronisasi Hub API (opsional - boleh dilewati &amp; diisi belakangan lewat menu Pengaturan).</p>
-                        <div class="mb-3">
-                            <label class="form-label">Alamat Hub API</label>
-                            <input type="text" id="hubApiUrl" name="HubApiUrl" class="form-control" value="@Model.HubApiUrl">
-                            <div class="form-text">Sudah otomatis terisi alamat server resmi - biarkan saja kecuali diminta ganti.</div>
-                        </div>
-                        <div class="mb-2">
-                            <label class="form-label">Token Hub API</label>
-                            <input type="text" id="hubApiToken" name="HubApiToken" class="form-control" placeholder="Tempel token di sini" value="@Model.HubApiToken">
-                            <div class="form-text">Token BEDA per unit (TK/SD/dst) - minta ke pemilik proyek, atau buat sendiri lewat link di bawah kalau punya akses admin.</div>
-                        </div>
+                        <p class="fs-12 fw-medium text-muted mb-2">Sinkronisasi Hub API (opsional - boleh dilewati &amp; diaktifkan belakangan).</p>
                         <div class="mb-4">
-                            <a href="#" id="linkGenerateToken" target="_blank" class="fs-12">Belum punya token? Buka halaman Buat Token &raquo;</a>
+                            <label class="form-label">Nama Unit</label>
+                            <input type="text" id="namaUnit" name="NamaUnit" class="form-control" placeholder="Contoh: TK Al Ikhlas 86" value="@Model.NamaUnit">
+                            <div class="form-text">Isi supaya data unit ini otomatis tersambung ke Mobile-app/Webview - tidak perlu alamat server atau token apapun, cukup nama unitnya saja.</div>
                         </div>
 
                         <button type="submit" class="btn btn-lg btn-primary w-100">Buat Akun Admin</button>
@@ -84,24 +76,5 @@
     <script src="~/assets/vendors/js/vendors.min.js"></script>
     <script src="~/assets/js/common-init.min.js"></script>
     <script src="~/assets/js/theme-customizer-init.min.js"></script>
-    <script>
-        (function () {
-            // Link "Buat Token" dibangun dari alamat Hub API yang diketik user sendiri
-            // (bukan alamat tetap - tiap sekolah/deployment beda server) - halaman
-            // /admin ada di server Hub API yang SAMA, cuma path-nya beda dari /api/v1.
-            var urlInput = document.getElementById('hubApiUrl');
-            var link = document.getElementById('linkGenerateToken');
-            link.addEventListener('click', function (e) {
-                var url = (urlInput.value || '').trim().replace(/\/+$/, '');
-                if (!url) {
-                    e.preventDefault();
-                    alert('Isi dulu "Alamat Hub API" di atas, baru klik link ini.');
-                    urlInput.focus();
-                    return;
-                }
-                link.href = url + '/admin';
-            });
-        })();
-    </script>
 </body>
 </html>
