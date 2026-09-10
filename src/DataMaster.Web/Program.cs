@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using DataMaster.Data;
 using DataMaster.Web.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -5,6 +7,32 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.EntityFrameworkCore;
+
+// Migrasi otomatis alamat Hub API LAMA -> AppOptions.HubApiUrlResmi SAAT INI,
+// dijalankan PALING AWAL (sebelum WebApplication.CreateBuilder membaca
+// appsettings.json) - supaya PC yang SUDAH pernah Setup Awal (config lama
+// tersimpan) ikut pindah otomatis kalau suatu saat VPS/domain Hub API
+// berganti, TANPA staf mana pun perlu edit apapun manual - cukup tunggu
+// auto-update jalan seperti biasa. PC yang belum pernah setup (Setup Awal
+// belum pernah dijalankan) tidak terpengaruh sama sekali (AuthController yang
+// mengisi bawaan utk kasus itu). Non-fatal SENGAJA - gagal baca/tulis di sini
+// TIDAK BOLEH menghalangi aplikasi start sama sekali.
+try
+{
+    var appSettingsPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+    if (File.Exists(appSettingsPath) && AppOptions.HubApiUrlLama.Length > 0)
+    {
+        var json = File.ReadAllText(appSettingsPath);
+        var root = JsonNode.Parse(json)?.AsObject();
+        var urlSaatIni = root?["AppSettings"]?["HubApiUrl"]?.GetValue<string>();
+        if (urlSaatIni is not null && Array.IndexOf(AppOptions.HubApiUrlLama, urlSaatIni.TrimEnd('/')) >= 0)
+        {
+            root!["AppSettings"]!["HubApiUrl"] = AppOptions.HubApiUrlResmi;
+            File.WriteAllText(appSettingsPath, root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        }
+    }
+}
+catch { /* non-fatal - lihat komentar di atas */ }
 
 var builder = WebApplication.CreateBuilder(args);
 

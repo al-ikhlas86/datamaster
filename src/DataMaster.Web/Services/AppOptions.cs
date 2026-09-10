@@ -6,6 +6,24 @@ namespace DataMaster.Web.Services;
 // murni nilai KONFIGURASI, bukan nilai EFEKTIF setelah override).
 public class AppOptions
 {
+    // Alamat RESMI Hub API (VPS pemilik proyek) - SATU-SATUNYA tempat nilai ini
+    // ditulis di kode (dipakai AuthController utk bawaan Setup Awal, DAN
+    // Program.cs utk migrasi otomatis appsettings.json PC yang SUDAH pernah
+    // setup - lihat komentar Program.cs). Kalau suatu saat domain/VPS pindah:
+    // 1) ubah nilai ini, 2) tambahkan alamat LAMA ke HubApiUrlLama di bawah,
+    // 3) rilis versi baru - SEMUA PC (baru maupun yang sudah lama jalan) akan
+    // otomatis ikut pindah sendiri lewat auto-update, TANPA staf mana pun
+    // perlu edit apapun manual di PC-nya.
+    public const string HubApiUrlResmi = "https://alikhlas86.duckdns.org/hub-api";
+
+    // Riwayat alamat resmi SEBELUMNYA (kosong = belum pernah pindah) - dipakai
+    // Program.cs utk mengenali "ini alamat bawaan LAMA, bukan alamat custom
+    // yang sengaja diisi manual" sebelum menggantinya otomatis ke HubApiUrlResmi
+    // di atas. JANGAN dihapus riwayatnya - biarkan menumpuk supaya PC yang baru
+    // update setelah SEKIAN LAMA (lewat beberapa kali pindah VPS) tetap ikut
+    // termigrasi dari alamat manapun yang pernah jadi bawaan resmi.
+    public static readonly string[] HubApiUrlLama = [];
+
     public string InstallType { get; set; } = "pendidikan"; // pendidikan|perusahaan|pengembang
     public string HubApiUrl { get; set; } = "";
     public string HubApiToken { get; set; } = "";

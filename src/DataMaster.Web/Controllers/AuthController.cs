@@ -24,21 +24,17 @@ namespace DataMaster.Web.Controllers;
 [Route("")]
 public class AuthController(DataMasterDbContext db, LoginThrottleService throttle, AppSettingsWriterService appSettingsWriter, IHostApplicationLifetime lifetime) : Controller
 {
-    // Server Hub API RESMI (dikelola pemilik proyek, VPS Oracle - lihat catatan
-    // deploy 2026-09-10) - ditanam sbg nilai BAWAAN Setup Awal supaya staf TU
-    // TIDAK PERLU tahu/ketik alamat ini sama sekali (keluhan nyata: "kenapa user
-    // harus ketik manual localhost segala"), PERSIS pola EmbeddedGithubToken di
-    // Launcher. Tetap BOLEH ditimpa manual (field tidak read-only) utk kasus
-    // langka (mis. server ganti alamat, atau deployment terpisah non-standar).
-    private const string HubApiUrlBawaan = "https://alikhlas86.duckdns.org/hub-api";
-
     [HttpGet("login")]
     public async Task<IActionResult> Login()
     {
         if (User.Identity?.IsAuthenticated == true) return RedirectToAction("Index", "Home");
 
         var adaUser = await db.Users.AnyAsync();
-        if (!adaUser) return View("Setup", new SetupInput { HubApiUrl = HubApiUrlBawaan });
+        // AppOptions.HubApiUrlResmi ditanam sbg bawaan Setup Awal (lihat komentar
+        // di sana) - staf TU TIDAK PERLU tahu/ketik alamat Hub API sama sekali,
+        // PERSIS pola EmbeddedGithubToken di Launcher. Tetap BOLEH ditimpa manual
+        // (field tidak read-only) utk kasus langka (deployment non-standar).
+        if (!adaUser) return View("Setup", new SetupInput { HubApiUrl = AppOptions.HubApiUrlResmi });
 
         return View(new LoginInput());
     }
