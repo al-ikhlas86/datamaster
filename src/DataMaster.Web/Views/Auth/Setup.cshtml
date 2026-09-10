@@ -63,11 +63,13 @@
                         <p class="fs-12 fw-medium text-muted mb-2">Sinkronisasi Hub API (opsional - boleh dilewati &amp; diisi belakangan lewat menu Pengaturan).</p>
                         <div class="mb-3">
                             <label class="form-label">Alamat Hub API</label>
-                            <input type="text" id="hubApiUrl" name="HubApiUrl" class="form-control" placeholder="https://alamat-server-anda.com/hub-api/public" value="@Model.HubApiUrl">
+                            <input type="text" id="hubApiUrl" name="HubApiUrl" class="form-control" value="@Model.HubApiUrl">
+                            <div class="form-text">Sudah otomatis terisi alamat server resmi - biarkan saja kecuali diminta ganti.</div>
                         </div>
                         <div class="mb-2">
                             <label class="form-label">Token Hub API</label>
                             <input type="text" id="hubApiToken" name="HubApiToken" class="form-control" placeholder="Tempel token di sini" value="@Model.HubApiToken">
+                            <div class="form-text">Token BEDA per unit (TK/SD/dst) - minta ke pemilik proyek, atau buat sendiri lewat link di bawah kalau punya akses admin.</div>
                         </div>
                         <div class="mb-4">
                             <a href="#" id="linkGenerateToken" target="_blank" class="fs-12">Belum punya token? Buka halaman Buat Token &raquo;</a>
