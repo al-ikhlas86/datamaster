@@ -53,21 +53,26 @@ public class UpdateChecker
             var installed = Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0);
             Log($"Versi terpasang: {installed}.");
 
-            // BUKAN 30 detik (dulu) - itu berlaku utk SELURUH request TERMASUK
-            // unduhan asset ~150MB di bawah, bukan cuma cek versi. Root cause
-            // NYATA ditemukan 2026-09-10: setiap update yang benar2 ketemu akan
-            // SELALU gagal di tengah unduhan (TaskCanceledException, dulu diam2
-            // tertelan tanpa log) krn 150MB nyaris tidak mungkin selesai dlm 30
-            // detik di koneksi sekolah biasa. 20 menit generous utk internet
-            // lambat sekalipun - cek metadata di atas tetap cepat, batas tinggi
-            // di sini cuma jaga2, bukan bikin "nunggu 20 menit tiap buka app".
-            using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(20) };
+            // Timeout DIPISAH per-request (bukan 1 batas global) - HttpClient.Timeout
+            // dibiarkan TANPA batas di level klien, batasnya diterapkan PER PANGGILAN
+            // lewat CancellationTokenSource: 15 detik utk cek metadata (SEHARUSNYA
+            // instan - kalau lambat sampai 15 detik pun, itu tanda koneksi genuinely
+            // bermasalah, jangan bikin user nunggu lama di splash cuma buat cek versi),
+            // 20 menit KHUSUS unduhan asset ~150MB di bawah (root cause NYATA
+            // ditemukan 2026-09-10: 1 batas 30 detik utk KEDUANYA bikin unduhan
+            // SELALU gagal di tengah jalan, dulu diam2 tertelan tanpa log).
+            using var http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
             // GitHub API MEWAJIBKAN User-Agent (request tanpa ini ditolak 403).
             http.DefaultRequestHeaders.UserAgent.ParseAdd("DataMaster-AlIkhlas86-Updater");
             http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
 
-            var releaseJson = await http.GetStringAsync(ApiLatestReleaseUrl, ct);
+            string releaseJson;
+            using (var ctsMeta = CancellationTokenSource.CreateLinkedTokenSource(ct))
+            {
+                ctsMeta.CancelAfter(TimeSpan.FromSeconds(15));
+                releaseJson = await http.GetStringAsync(ApiLatestReleaseUrl, ctsMeta.Token);
+            }
             using var doc = JsonDocument.Parse(releaseJson);
             var tagName = doc.RootElement.GetProperty("tag_name").GetString() ?? "";
             Log($"Rilis terbaru di GitHub: {tagName}.");
@@ -108,9 +113,14 @@ public class UpdateChecker
             // Accept ini WAJIB - tanpa ini GitHub API balikin metadata JSON asset,
             // BUKAN isi berkasnya.
             assetReq.Headers.Accept.ParseAdd("application/octet-stream");
-            using var assetResp = await http.SendAsync(assetReq, ct);
-            assetResp.EnsureSuccessStatusCode();
-            var zipBytes = await assetResp.Content.ReadAsByteArrayAsync(ct);
+            byte[] zipBytes;
+            using (var ctsUnduh = CancellationTokenSource.CreateLinkedTokenSource(ct))
+            {
+                ctsUnduh.CancelAfter(TimeSpan.FromMinutes(20));
+                using var assetResp = await http.SendAsync(assetReq, ctsUnduh.Token);
+                assetResp.EnsureSuccessStatusCode();
+                zipBytes = await assetResp.Content.ReadAsByteArrayAsync(ctsUnduh.Token);
+            }
             Log($"Unduhan selesai ({zipBytes.Length} bytes). Menerapkan pembaruan...");
 
             StatusChanged?.Invoke("Update selesai diunduh - aplikasi akan tertutup sebentar lalu terbuka lagi otomatis...");
