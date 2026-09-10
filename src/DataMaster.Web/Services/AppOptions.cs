@@ -10,4 +10,12 @@ public class AppOptions
     public string HubApiUrl { get; set; } = "";
     public string HubApiToken { get; set; } = "";
     public string BackupPassphrase { get; set; } = "";
+
+    // Diisi Launcher (WPF) lewat environment variable saat mode LAN "server" -
+    // supaya staf TU yang lupa alamat PC klien tidak perlu buka lagi wizard
+    // setup awal (yang cuma tampil SEKALI), cukup lihat halaman Setting setelah
+    // login (lihat User/Index.cshtml). Kosong/"mandiri" di instalasi biasa.
+    public string LanMode { get; set; } = "mandiri";
+    public string LanHostname { get; set; } = "";
+    public int LanPort { get; set; }
 }

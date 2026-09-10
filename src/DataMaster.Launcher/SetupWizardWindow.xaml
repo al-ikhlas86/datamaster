@@ -34,7 +34,11 @@
                     <TextBlock Text="Port server" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4"/>
                     <TextBox x:Name="TxtServerPort" Text="5250" Width="120" HorizontalAlignment="Left" Padding="6"/>
                     <TextBlock Margin="0,14,0,0" FontSize="13" FontWeight="SemiBold" Text="Nama PC ini:"/>
-                    <TextBlock x:Name="TxtNamaPcServer" FontSize="16" FontWeight="Bold" Foreground="#1D4ED8" Margin="0,2,0,0"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                        <TextBlock x:Name="TxtNamaPcServer" FontSize="16" FontWeight="Bold" Foreground="#1D4ED8" VerticalAlignment="Center"/>
+                        <Button x:Name="BtnSalinAlamat" Content="Salin alamat" Padding="10,4" Margin="12,0,0,0" Click="BtnSalinAlamat_Click"/>
+                    </StackPanel>
+                    <TextBlock x:Name="TxtSalinSukses" Text="Alamat disalin - tinggal tempel (paste) di kotak 'Alamat PC server' di PC klien." FontSize="12" Foreground="#059669" Margin="0,4,0,0" Visibility="Collapsed"/>
                     <TextBlock Margin="0,4,0,0" FontSize="12" Foreground="#6B7280" TextWrapping="Wrap"
                                Text="Catat nama ini - saat setup PC klien nanti, alamat yang diisi di sana adalah nama ini (bukan alamat IP). Nama PC TIDAK PERNAH berubah walau PC dimatikan/dinyalakan ulang, beda dari IP yang bisa berubah-ubah - jadi pakai nama ini supaya tidak perlu diatur ulang lagi ke depannya."/>
                     <TextBlock Margin="0,10,0,0" FontSize="12" Foreground="#6B7280" TextWrapping="Wrap"

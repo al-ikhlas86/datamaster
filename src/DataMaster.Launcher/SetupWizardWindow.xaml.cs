@@ -81,4 +81,17 @@ public partial class SetupWizardWindow : Window
         TxtError.Text = pesan;
         TxtError.Visibility = Visibility.Visible;
     }
+
+    // Nama PC (TextBlock, bukan TextBox) sengaja tidak bisa di-drag-select biasa -
+    // tombol ini jalan pintasnya, langsung salin bentuk SIAP TEMPEL persis format
+    // yang diminta kotak "Alamat PC server" di PC klien (lihat placeholder
+    // TxtKlienUrl di XAML), bukan cuma nama polos - supaya staf TU tidak perlu
+    // mengetik ulang "http://" dan port-nya sendiri, sumber salah ketik yang nyata.
+    private void BtnSalinAlamat_Click(object sender, RoutedEventArgs e)
+    {
+        var port = TxtServerPort.Text.Trim();
+        if (port == "") port = "5250";
+        Clipboard.SetText($"http://{TxtNamaPcServer.Text}:{port}");
+        TxtSalinSukses.Visibility = Visibility.Visible;
+    }
 }

@@ -108,6 +108,13 @@ public sealed class ServerProcessManager : IDisposable
         psi.EnvironmentVariables["ASPNETCORE_URLS"] = listenUrl;
         psi.EnvironmentVariables["ASPNETCORE_ENVIRONMENT"] = "Production";
         psi.EnvironmentVariables["ConnectionStrings__DataMaster"] = $"Data Source={Path.Combine(appDataDir, "datamaster.db")}";
+        // Diteruskan ke halaman Setting (User/Index.cshtml) - supaya alamat PC
+        // klien tetap bisa dilihat/disalin ulang kapan saja SETELAH login, tidak
+        // cuma sekali muncul di wizard setup awal (keluhan nyata: staf TU lupa
+        // catat, wizard itu sendiri tidak muncul lagi sesudahnya).
+        psi.EnvironmentVariables["AppSettings__LanMode"] = _config.Mode;
+        psi.EnvironmentVariables["AppSettings__LanHostname"] = Environment.MachineName;
+        psi.EnvironmentVariables["AppSettings__LanPort"] = Port.ToString();
 
         _logWriter = new StreamWriter(File.Open(Path.Combine(logDir, $"web_{DateTime.Now:yyyy-MM-dd}.log"), FileMode.Append, FileAccess.Write, FileShare.Read)) { AutoFlush = true };
 

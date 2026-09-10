@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace DataMaster.Web.Controllers;
 
@@ -15,7 +16,7 @@ namespace DataMaster.Web.Controllers;
 // §1.5-1.6. role:admin (satu2nya grup dipakai nyata di sistem asli).
 [Authorize(Roles = "admin")]
 [Route("user")]
-public class UserController(DataMasterDbContext db, DatabaseBackupService backup) : Controller
+public class UserController(DataMasterDbContext db, DatabaseBackupService backup, IOptions<AppOptions> appOptions) : Controller
 {
     // REGEX_TEKS_PENDEK-setara utk username: alpha_numeric_space (BaseController.php
     // di PHP asli tidak dipakai di sini krn username punya aturan alpha_numeric_space
@@ -40,6 +41,9 @@ public class UserController(DataMasterDbContext db, DatabaseBackupService backup
             LastBackupManualAt = await backup.WaktuTerakhirAsync("last_backup_manual_at"),
             LastBackupOnlineAt = await backup.WaktuTerakhirAsync("last_backup_online_at"),
             JamBackupOnline = await backup.JamBackupOnlineAsync(),
+            LanMode = appOptions.Value.LanMode,
+            LanHostname = appOptions.Value.LanHostname,
+            LanPort = appOptions.Value.LanPort,
         };
         return View(vm);
     }

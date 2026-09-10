@@ -58,6 +58,24 @@
         </div>
     </div>
 
+    @if (Model.LanMode == "server")
+    {
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">Info Jaringan (PC ini jadi Server)</div>
+                <div class="card-body">
+                    <p class="mb-1 small text-muted">Alamat untuk diisi di PC klien</p>
+                    <div class="input-group mb-2">
+                        <input type="text" id="lanAddress" class="form-control" readonly value="http://@(Model.LanHostname):@(Model.LanPort)" />
+                        <button type="button" class="btn btn-outline-secondary" onclick="salinAlamatLan()">Salin</button>
+                    </div>
+                    <p id="lanCopiedMsg" class="small text-success mb-0 d-none">Alamat disalin ke clipboard.</p>
+                    <p class="small text-muted mt-2 mb-0">Tempel (paste) alamat ini di kotak "Alamat PC server" saat setup awal PC klien lain di jaringan yang sama.</p>
+                </div>
+            </div>
+        </div>
+    }
+
     <div class="col-lg-4">
         <div class="card">
             <div class="card-header">Backup &amp; Pemulihan</div>
@@ -118,3 +136,16 @@
         </div>
     </div>
 </div>
+
+@if (Model.LanMode == "server")
+{
+    <script>
+        function salinAlamatLan() {
+            var el = document.getElementById('lanAddress');
+            el.select();
+            navigator.clipboard.writeText(el.value).then(function () {
+                document.getElementById('lanCopiedMsg').classList.remove('d-none');
+            });
+        }
+    </script>
+}
