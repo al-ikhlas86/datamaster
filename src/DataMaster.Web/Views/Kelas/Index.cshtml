@@ -131,7 +131,7 @@
                                         // yang jadi wali ke-2/3 sempat bingung dikira "Wali Kelas" penuh).
                                         var s = slots[i];
                                         var titel = i == 0 ? "Wali Kelas" : "Pendamping";
-                                        <span class="badge bg-info text-dark js-wali-chip" data-guru-id="@s.GuruId" title="@titel"><small class="opacity-75">@titel:</small> @s.Nama <a href="#" class="text-dark js-wali-remove" style="text-decoration:none">&times;</a></span>
+                                        <span class="badge bg-info text-dark js-wali-chip" data-guru-id="@s.GuruId" data-nama="@s.Nama" title="@titel"><small class="opacity-75">@titel:</small> @s.Nama <a href="#" class="text-dark js-wali-remove" style="text-decoration:none">&times;</a></span>
                                     }
                                 </div>
                                 <div class="position-relative">
@@ -210,17 +210,37 @@
                     .catch(function () { errBox.textContent = 'Gagal menyimpan - periksa koneksi.'; errBox.style.display = ''; });
             }
 
-            function tambahChip(wrapper, guruId, nama) {
-                var ids = wrapper.dataset.guruIds.split(',').filter(Boolean);
-                if (ids.indexOf(String(guruId)) !== -1) return;
-                ids.push(String(guruId));
-                wrapper.dataset.guruIds = ids.join(',');
+            // Render ULANG SELURUH chip dari daftar {id,nama} - dipanggil tiap kali
+            // tambah/hapus wali (2026-09-11, poin #2 - celah nyata sebelumnya: hapus
+            // wali PERTAMA otomatis mempromosikan wali ke-2 jadi "Wali Kelas" di
+            // SERVER/database, TAPI label di layar tidak pernah ikut ter-refresh
+            // tanpa reload halaman - guru yang baru dipromosikan tetap kelihatan
+            // "Pendamping" di layar TU walau statusnya sudah benar di belakang
+            // layar). Titel SELALU dihitung ulang dari POSISI (index 0 = Wali
+            // Kelas) - tidak pernah disimpan statis di DOM.
+            function daftarWali(wrapper) {
+                return Array.prototype.map.call(wrapper.querySelectorAll('.js-wali-chip'), function (el) {
+                    return { id: el.dataset.guruId, nama: el.dataset.nama };
+                });
+            }
+
+            function renderChips(wrapper, list) {
                 var chips = wrapper.querySelector('.js-wali-chips');
-                var span = document.createElement('span');
-                span.className = 'badge bg-info text-dark js-wali-chip';
-                span.dataset.guruId = guruId;
-                span.innerHTML = nama.replace(/&/g, '&amp;').replace(/</g, '&lt;') + ' <a href="#" class="text-dark js-wali-remove" style="text-decoration:none">&times;</a>';
-                chips.appendChild(span);
+                chips.innerHTML = list.map(function (w, i) {
+                    var titel = i === 0 ? 'Wali Kelas' : 'Pendamping';
+                    var namaAman = String(w.nama).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+                    return '<span class="badge bg-info text-dark js-wali-chip" data-guru-id="' + w.id + '" data-nama="' + namaAman + '" title="' + titel + '">' +
+                        '<small class="opacity-75">' + titel + ':</small> ' + namaAman +
+                        ' <a href="#" class="text-dark js-wali-remove" style="text-decoration:none">&times;</a></span>';
+                }).join('');
+                wrapper.dataset.guruIds = list.map(function (w) { return w.id; }).join(',');
+            }
+
+            function tambahChip(wrapper, guruId, nama) {
+                var list = daftarWali(wrapper);
+                if (list.some(function (w) { return w.id === String(guruId); })) return;
+                list.push({ id: String(guruId), nama: nama });
+                renderChips(wrapper, list);
                 simpan(wrapper);
             }
 
@@ -264,9 +284,8 @@
                     if (!link) return;
                     e.preventDefault();
                     var chip = link.closest('.js-wali-chip');
-                    var ids = wrapper.dataset.guruIds.split(',').filter(function (id) { return id && id !== chip.dataset.guruId; });
-                    wrapper.dataset.guruIds = ids.join(',');
-                    chip.remove();
+                    var list = daftarWali(wrapper).filter(function (w) { return w.id !== chip.dataset.guruId; });
+                    renderChips(wrapper, list);
                     simpan(wrapper);
                 });
             });
