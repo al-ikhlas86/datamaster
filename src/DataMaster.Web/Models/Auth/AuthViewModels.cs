@@ -42,3 +42,31 @@ public class SetupInput
     [StringLength(100, ErrorMessage = "Nama unit maksimal 100 karakter.")]
     public string? NamaUnit { get; set; }
 }
+
+// Lupa Password (2026-09-11, poin #5) - lihat catatan lengkap di User.cs &
+// RecoveryCodeService.cs. Satu-satunya jalur pemulihan kalau admin lupa
+// password DAN belum login di perangkat mana pun.
+public class LupaPasswordInput
+{
+    [Required(ErrorMessage = "ID/Username wajib diisi.")]
+    public string Login { get; set; } = "";
+
+    [Required(ErrorMessage = "Kode Pemulihan wajib diisi.")]
+    public string KodePemulihan { get; set; } = "";
+
+    [Required(ErrorMessage = "Kata sandi baru wajib diisi.")]
+    [StringLength(100, MinimumLength = 8, ErrorMessage = "Kata sandi minimal 8 karakter.")]
+    public string PasswordBaru { get; set; } = "";
+
+    [Required(ErrorMessage = "Konfirmasi kata sandi wajib diisi.")]
+    public string PasswordBaruKonfirmasi { get; set; } = "";
+}
+
+// Ditampilkan SEKALI (dibawa lewat TempData, hilang setelah 1x tampil) -
+// setelah Setup Awal, setelah reset via Kode Pemulihan, atau setelah
+// generate ulang manual dari Pengaturan.
+public class KodePemulihanViewModel
+{
+    public required string Kode { get; set; }
+    public required string PesanKonteks { get; set; }
+}

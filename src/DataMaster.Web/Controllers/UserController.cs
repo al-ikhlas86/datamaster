@@ -239,4 +239,27 @@ public class UserController(DataMasterDbContext db, DatabaseBackupService backup
         lifetime.StopApplication();
         return RedirectToAction(nameof(Index));
     }
+
+    // Generate ulang Kode Pemulihan (2026-09-11, poin #5) - dipakai kalau kode
+    // lama hilang/lupa disimpan TAPI masih bisa login normal (beda dari alur
+    // Lupa Password di AuthController yang justru dipakai saat TIDAK bisa
+    // login). Kode LAMA otomatis tidak berlaku lagi begitu diganti (1 kode
+    // aktif per akun, bukan bertumpuk). Reuse halaman tampil-sekali yang sama
+    // dgn Setup Awal/Lupa Password lewat TempData - lintas controller aman
+    // krn TempData disimpan di cookie/session, bukan per-controller.
+    [HttpPost("kode-pemulihan/generate-ulang")]
+    public async Task<IActionResult> GenerateUlangKodePemulihan()
+    {
+        var user = await db.Users.FindAsync(CurrentUserId);
+        if (user is null) return RedirectToAction("Logout", "Auth");
+
+        var kodeBaru = RecoveryCodeService.Generate();
+        user.RecoveryCodeHash = RecoveryCodeService.Hash(kodeBaru);
+        await db.SaveChangesAsync();
+
+        TempData["kode_pemulihan"] = kodeBaru;
+        TempData["kode_pemulihan_konteks"] = "Kode Pemulihan baru berhasil dibuat. Kode LAMA (kalau ada) sudah tidak berlaku lagi - SIMPAN kode baru ini di tempat aman.";
+        TempData["kode_pemulihan_perlu_restart"] = false;
+        return RedirectToAction("TampilkanKodePemulihan", "Auth");
+    }
 }

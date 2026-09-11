@@ -102,10 +102,32 @@
                 this.value = '';
             }
         });
-        document.getElementById('formImport').addEventListener('submit', function () {
+        // Cek "layar abu-abu ERR_UPLOAD_FILE_CHANGED" (2026-09-11): browser
+        // menyimpan REFERENSI ke file di disk saat dipilih, bukan salinan
+        // isinya - kalau file itu masih terbuka & disimpan ulang di Excel
+        // SEBELUM upload benar2 dikirim, Chrome gagal membaca ulang isinya
+        // saat submit & menampilkan halaman error jaringan abu-abu bawaan
+        // browser (bukan dari kode kita, jadi tidak bisa ditangkap coba/tangkap
+        // biasa) - user cuma lihat layar kosong tanpa penjelasan. Coba baca 1
+        // byte pertama file via JS TEPAT SEBELUM submit sungguhan dikirim -
+        // kalau berhasil, file masih valid & submit dilanjutkan; kalau gagal,
+        // tampilkan pesan yang jelas & submit DIBATALKAN (bukan diteruskan ke
+        // browser dgn kemungkinan gagal lagi).
+        document.getElementById('formImport').addEventListener('submit', function (e) {
+            var form = this;
+            var file = document.getElementById('fileInput').files[0];
+            if (!file) return; // biarkan validasi "required" bawaan browser yang menangani
+
+            e.preventDefault();
             var btn = document.getElementById('btnSubmitImport');
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Sedang mengimport...';
+            file.slice(0, 1).arrayBuffer().then(function () {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Sedang mengimport...';
+                HTMLFormElement.prototype.submit.call(form);
+            }).catch(function () {
+                alert('File Excel ini sudah berubah atau tidak bisa dibaca lagi sejak dipilih - kemungkinan besar masih terbuka & baru saja disimpan ulang di Excel.\n\nTutup dulu file-nya di Excel (pastikan sudah tersimpan), lalu pilih ulang file itu di form ini sebelum upload.');
+                document.getElementById('fileInput').value = '';
+            });
         });
     </script>
 }

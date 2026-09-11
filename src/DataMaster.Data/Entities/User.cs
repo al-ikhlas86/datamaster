@@ -16,6 +16,18 @@ public class User
     public string? UserImage { get; set; }
     public bool Active { get; set; } = true;
     public bool ForcePassReset { get; set; }
+    // Kode Pemulihan (2026-09-11, poin #5) - jalan keluar SATU-SATUNYA kalau lupa
+    // password DAN belum login di mana pun (dialami LANGSUNG oleh pemilik proyek
+    // sendiri sesi ini - sebelum ini TIDAK ADA jalur pemulihan sama sekali).
+    // BUKAN OTP asli via SMS/WA - app desktop mandiri per-PC ini tidak punya
+    // infrastruktur pengiriman (nomor HP admin bahkan tidak pernah dikumpulkan),
+    // jadi dipakai kode pemulihan offline SEKALI PAKAI (ditampilkan SEKALI saat
+    // dibuat - saat Setup Awal & tiap kali di-generate ulang dari Pengaturan -
+    // user WAJIB menyimpannya sendiri, mis. dicetak/ditulis). Hash SAJA yang
+    // disimpan (SHA-256, pola sama token Hub API) - kode asli tidak pernah
+    // disimpan & TIDAK BISA dipulihkan kalau hilang, cuma bisa di-generate ulang
+    // (otomatis menggantikan yang lama, bukan menambah).
+    public string? RecoveryCodeHash { get; set; }
     public DateTime? CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public DateTime? DeletedAt { get; set; }

@@ -35,17 +35,47 @@
     </div>
     <div class="col-md-7">
         <div class="card"><div class="card-body">
-            <form asp-action="PreviewImport" method="post" enctype="multipart/form-data">
+            <form asp-action="PreviewImport" method="post" enctype="multipart/form-data" id="formImportGuru">
                 <div class="mb-3">
                     <label class="form-label">Pilih File Excel *</label>
-                    <input type="file" name="file" class="form-control" accept=".xlsx,.xls" required />
+                    <input type="file" name="file" id="fileInputGuru" class="form-control" accept=".xlsx,.xls" required />
                     <div class="form-text">Format file: .xlsx atau .xls (Max: 5MB)</div>
                 </div>
                 <div class="d-flex gap-2">
-                    <button type="submit" class="btn btn-primary btn-lg">Import Sekarang</button>
+                    <button type="submit" id="btnSubmitImportGuru" class="btn btn-primary btn-lg">Import Sekarang</button>
                     <a asp-action="Index" class="btn btn-outline-secondary btn-lg">Batal</a>
                 </div>
             </form>
         </div></div>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        document.getElementById('fileInputGuru').addEventListener('change', function () {
+            if (this.files[0] && this.files[0].size > 5 * 1024 * 1024) {
+                alert('Ukuran file terlalu besar! Maksimal 5MB.');
+                this.value = '';
+            }
+        });
+        // Sama seperti Import Siswa - cegah layar abu-abu ERR_UPLOAD_FILE_CHANGED
+        // bawaan browser kalau file masih terbuka/disimpan ulang di Excel pas
+        // upload dikirim (lihat catatan lengkap di Siswa/Import.cshtml).
+        document.getElementById('formImportGuru').addEventListener('submit', function (e) {
+            var form = this;
+            var file = document.getElementById('fileInputGuru').files[0];
+            if (!file) return;
+
+            e.preventDefault();
+            var btn = document.getElementById('btnSubmitImportGuru');
+            file.slice(0, 1).arrayBuffer().then(function () {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Sedang mengimport...';
+                HTMLFormElement.prototype.submit.call(form);
+            }).catch(function () {
+                alert('File Excel ini sudah berubah atau tidak bisa dibaca lagi sejak dipilih - kemungkinan besar masih terbuka & baru saja disimpan ulang di Excel.\n\nTutup dulu file-nya di Excel (pastikan sudah tersimpan), lalu pilih ulang file itu di form ini sebelum upload.');
+                document.getElementById('fileInputGuru').value = '';
+            });
+        });
+    </script>
+}

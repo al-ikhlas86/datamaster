@@ -51,6 +51,15 @@
             </div>
         </div>
         <div class="card mt-3">
+            <div class="card-header">Kode Pemulihan</div>
+            <div class="card-body">
+                <p class="fs-12 text-muted">Dipakai untuk reset password lewat halaman "Lupa Password" kalau suatu saat lupa & tidak bisa login. Simpan di tempat aman - hilang tidak bisa dilihat ulang, cuma bisa di-generate ulang (kode lama otomatis tidak berlaku).</p>
+                <form asp-controller="User" asp-action="GenerateUlangKodePemulihan" method="post" onsubmit="return confirm('Kode Pemulihan LAMA (kalau ada) akan langsung tidak berlaku. Lanjutkan buat kode baru?');">
+                    <button type="submit" class="btn btn-outline-secondary w-100">Buat Kode Pemulihan Baru</button>
+                </form>
+            </div>
+        </div>
+        <div class="card mt-3">
             <div class="card-header">Logout</div>
             <div class="card-body">
                 <a asp-controller="Auth" asp-action="Logout" class="btn btn-outline-danger w-100">Keluar</a>

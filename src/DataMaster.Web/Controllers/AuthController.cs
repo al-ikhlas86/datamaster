@@ -96,7 +96,14 @@ public class AuthController(DataMasterDbContext db, LoginThrottleService throttl
         // terisi (NOT NULL+UNIQUE di skema) supaya kompatibel dgn struktur data
         // warisan Myth Auth PHP tanpa perlu migrasi skema terpisah.
         var hasher = new PasswordHasher<User>();
-        var user = new User { Email = $"{uname.Replace(" ", "")}@datamaster.local", Username = uname, PasswordHash = "" };
+        var kodePemulihan = RecoveryCodeService.Generate();
+        var user = new User
+        {
+            Email = $"{uname.Replace(" ", "")}@datamaster.local",
+            Username = uname,
+            PasswordHash = "",
+            RecoveryCodeHash = RecoveryCodeService.Hash(kodePemulihan),
+        };
         user.PasswordHash = hasher.HashPassword(user, input.Password);
         db.Users.Add(user);
         await db.SaveChangesAsync();
@@ -121,6 +128,7 @@ public class AuthController(DataMasterDbContext db, LoginThrottleService throttl
         // kebaca ulang dari nilai baru - Launcher yang menjalankan ulang otomatis,
         // pola SAMA PERSIS restart-setelah-restore-database.
         var namaUnit = (input.NamaUnit ?? "").Trim();
+        var perluRestart = false;
         if (namaUnit != "")
         {
             var token = await hubApiRegistration.DaftarAsync(namaUnit);
@@ -128,7 +136,7 @@ public class AuthController(DataMasterDbContext db, LoginThrottleService throttl
             {
                 await appSettingsWriter.SetHubApiConfigAsync(AppOptions.HubApiUrlResmi, token);
                 TempData["message"] = "Akun admin berhasil dibuat. Menyalakan ulang sebentar untuk mengaktifkan sinkronisasi Hub API...";
-                lifetime.StopApplication();
+                perluRestart = true;
             }
             else
             {
@@ -143,7 +151,102 @@ public class AuthController(DataMasterDbContext db, LoginThrottleService throttl
             TempData["message"] = "Akun admin berhasil dibuat.";
         }
 
-        return RedirectToAction("Index", "Home");
+        // Kode Pemulihan WAJIB ditampilkan SEKALI di sini SEBELUM restart (kalau
+        // ada) benar2 dipicu - lihat TampilkanKodePemulihan() yg menyimpan flag
+        // restart via TempData supaya halaman kode-nya sendiri yang memicu
+        // StopApplication() SETELAH pengguna klik lanjut, bukan sebelum sempat
+        // membaca kodenya.
+        TempData["kode_pemulihan"] = kodePemulihan;
+        TempData["kode_pemulihan_konteks"] = "Akun admin Anda berhasil dibuat. SIMPAN kode ini di tempat aman (dicatat/dicetak) - ini SATU-SATUNYA cara memulihkan akses kalau nanti lupa password dan belum login di perangkat mana pun.";
+        TempData["kode_pemulihan_perlu_restart"] = perluRestart;
+        return RedirectToAction(nameof(TampilkanKodePemulihan));
+    }
+
+    [HttpGet("login/kode-pemulihan")]
+    public IActionResult TampilkanKodePemulihan()
+    {
+        if (TempData["kode_pemulihan"] is not string kode)
+        {
+            return RedirectToAction(nameof(Login));
+        }
+        // TempData.Peek dipakai (bukan biarkan konsumsi otomatis) supaya nilai
+        // ini SELAMAT lewat 1x refresh halaman tak sengaja, tapi tetap
+        // dihapus eksplisit begitu tombol "Lanjutkan" ditekan (lihat
+        // LanjutSetelahKodePemulihan) - kode SEKALI TAMPIL, bukan berulang.
+        var konteks = TempData.Peek("kode_pemulihan_konteks") as string ?? "";
+        TempData.Keep("kode_pemulihan");
+        TempData.Keep("kode_pemulihan_perlu_restart");
+        return View(new KodePemulihanViewModel { Kode = kode, PesanKonteks = konteks });
+    }
+
+    // Satu action dipakai bersama utk ketiga konteks (Setup Awal biasa, Setup
+    // Awal+restart Hub API, reset via Lupa Password) - dibedakan lewat
+    // User.Identity (Setup Awal sudah SignInAsync duluan, Lupa Password
+    // BELUM login sama sekali krn justru baru mau login lagi).
+    [HttpPost("login/kode-pemulihan/lanjut")]
+    public IActionResult LanjutSetelahKodePemulihan()
+    {
+        var perluRestart = TempData["kode_pemulihan_perlu_restart"] as bool? ?? false;
+        if (perluRestart)
+        {
+            lifetime.StopApplication();
+            return Content("Menyalakan ulang untuk mengaktifkan sinkronisasi Hub API... Halaman ini akan otomatis kembali normal dalam beberapa detik, silakan tunggu lalu muat ulang.");
+        }
+        return User.Identity?.IsAuthenticated == true
+            ? RedirectToAction("Index", "Home")
+            : RedirectToAction(nameof(Login));
+    }
+
+    // ------------------------------------------------------- Lupa Password (#5)
+
+    [HttpGet("login/lupa-password")]
+    public IActionResult LupaPassword() => View(new LupaPasswordInput());
+
+    [HttpPost("login/lupa-password")]
+    public async Task<IActionResult> LupaPassword(LupaPasswordInput input)
+    {
+        if (!ModelState.IsValid) return View(input);
+        if (input.PasswordBaru != input.PasswordBaruKonfirmasi)
+        {
+            ModelState.AddModelError("", "Konfirmasi kata sandi tidak cocok.");
+            return View(input);
+        }
+
+        var loginValue = input.Login.Trim();
+        // Throttle KUNCI KEAMANAN utama di sini - entropi kode (~83 bit) tidak
+        // berarti apa2 kalau penyerang boleh coba tak terbatas. Reuse throttle
+        // yang sama dgn login biasa (kunci gabungan "login-value", cukup krn
+        // per-akun, bukan per-jenis-percobaan).
+        var sisaTunggu = throttle.SisaTungguDetik(loginValue);
+        if (sisaTunggu > 0)
+        {
+            ModelState.AddModelError("", $"Terlalu banyak percobaan gagal. Coba lagi dalam {sisaTunggu} detik.");
+            return View(input);
+        }
+
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Email == loginValue || u.Username == loginValue);
+        if (user is null || !RecoveryCodeService.Cocok(input.KodePemulihan, user.RecoveryCodeHash))
+        {
+            throttle.CatatGagal(loginValue);
+            ModelState.AddModelError("", "ID/Username atau Kode Pemulihan salah.");
+            return View(input);
+        }
+
+        throttle.Reset(loginValue);
+        var hasher = new PasswordHasher<User>();
+        user.PasswordHash = hasher.HashPassword(user, input.PasswordBaru);
+        // Kode LAMA langsung tidak berlaku begitu dipakai (sekali pakai) -
+        // digantikan kode BARU supaya tetap ada jalur pemulihan ke depan,
+        // bukan dibiarkan kosong setelah dipakai sekali.
+        var kodeBaru = RecoveryCodeService.Generate();
+        user.RecoveryCodeHash = RecoveryCodeService.Hash(kodeBaru);
+        await db.SaveChangesAsync();
+
+        TempData["kode_pemulihan"] = kodeBaru;
+        TempData["kode_pemulihan_konteks"] = "Password berhasil direset. Kode Pemulihan LAMA sudah tidak berlaku - ini kode PENGGANTINYA, SIMPAN di tempat aman untuk pemulihan berikutnya.";
+        TempData["kode_pemulihan_perlu_restart"] = false;
+        TempData["message"] = "Password berhasil direset. Silakan login dengan password baru Anda.";
+        return RedirectToAction(nameof(TampilkanKodePemulihan));
     }
 
     [HttpPost("logout")]

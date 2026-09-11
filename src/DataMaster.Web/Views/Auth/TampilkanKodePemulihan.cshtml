@@ -1,0 +1,65 @@
+@model DataMaster.Web.Models.Auth.KodePemulihanViewModel
+@{
+    Layout = null;
+    ViewData["Title"] = "Kode Pemulihan";
+}
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Kode Pemulihan - Sistem Arsip Data SDIT AL IKHLAS 86</title>
+    <link rel="shortcut icon" type="image/x-icon" href="~/assets/images/logo-abbr.png">
+    <link rel="stylesheet" type="text/css" href="~/assets/css/bootstrap.min.css">
+    <link rel="stylesheet" type="text/css" href="~/assets/vendors/css/vendors.min.css">
+    <link rel="stylesheet" type="text/css" href="~/assets/css/theme.min.css">
+</head>
+<body>
+    <main class="auth-cover-wrapper">
+        <div class="auth-cover-content-inner">
+            <div class="auth-cover-content-wrapper">
+                <div class="auth-img">
+                    <img src="~/assets/images/logo-abbr.png" alt="Logo" class="img-fluid mx-auto d-block" style="width: 100%; max-width: 420px;">
+                </div>
+            </div>
+        </div>
+        <div class="auth-cover-sidebar-inner">
+            <div class="auth-cover-card-wrapper">
+                <div class="auth-cover-card p-sm-5">
+                    <h2 class="fs-20 fw-bolder mb-3">Kode Pemulihan Anda</h2>
+                    <div class="alert alert-warning">
+                        <strong>PENTING - simpan sekarang juga.</strong> Kode ini <u>hanya ditampilkan sekali</u> dan tidak bisa dilihat ulang lewat aplikasi (hanya hash-nya yang tersimpan). Catat atau cetak, simpan di tempat aman.
+                    </div>
+                    <p class="fs-12 fw-medium text-muted">@Model.PesanKonteks</p>
+
+                    <div class="text-center my-4">
+                        <span id="kodePemulihan" class="fs-24 fw-bolder" style="letter-spacing: 2px; font-family: monospace;">@Model.Kode</span>
+                    </div>
+                    <div class="text-center mb-4">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="salinKode()">Salin Kode</button>
+                    </div>
+
+                    <form asp-controller="Auth" asp-action="LanjutSetelahKodePemulihan" method="post" id="formLanjut">
+                        <div class="form-check mb-3">
+                            <input type="checkbox" class="form-check-input" id="chkSudahSimpan" required>
+                            <label class="form-check-label fs-12" for="chkSudahSimpan">Saya sudah menyimpan kode ini di tempat yang aman.</label>
+                        </div>
+                        <button type="submit" class="btn btn-lg btn-primary w-100">Lanjutkan</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </main>
+    <script src="~/assets/vendors/js/vendors.min.js"></script>
+    <script src="~/assets/js/common-init.min.js"></script>
+    <script src="~/assets/js/theme-customizer-init.min.js"></script>
+    <script>
+        function salinKode() {
+            navigator.clipboard.writeText(document.getElementById('kodePemulihan').textContent.trim())
+                .then(function () { alert('Kode disalin ke clipboard.'); })
+                .catch(function () { /* clipboard API bisa ditolak di beberapa konteks - abaikan, kode tetap terlihat di layar utk dicatat manual */ });
+        }
+    </script>
+</body>
+</html>

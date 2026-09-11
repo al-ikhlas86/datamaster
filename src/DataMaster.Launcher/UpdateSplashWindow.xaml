@@ -4,7 +4,7 @@
         Title="Data Master" Height="220" Width="420"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None" ResizeMode="NoResize" ShowInTaskbar="True"
-        Background="#1F2937" Topmost="True">
+        Background="#1F2937">
     <Grid>
         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Width="340">
             <TextBlock Text="Data Master" FontSize="28" FontWeight="Bold"
