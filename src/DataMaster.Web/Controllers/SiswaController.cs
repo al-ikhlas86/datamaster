@@ -402,6 +402,19 @@ public class SiswaController(DataMasterDbContext db, DocumentStorageService docs
         var headers = new[] { "Nama", "JK", "Nis", "NISN", "TTL", "ASAL TK", "Jalan", "RT", "RW", "Kel", "Kec", "Ayah", "Ibu", "Pekerjaan Ayah", "Pekerjaan Ibu", "No HP" };
         for (var i = 0; i < headers.Length; i++) ws.Cell(1, i + 1).Value = headers[i];
 
+        // Kolom "berbentuk angka tapi sebenarnya ID/nomor telepon" (Nis, NISN,
+        // No HP) DIPAKSA format Text ("@") SEBELUM diisi nilai apa pun - kalau
+        // tidak, Excel/ClosedXML menyimpannya sbg angka murni, dan angka NOL DI
+        // DEPAN hilang (mis. No HP "0812..." jadi "812...", NISN "0051..." jadi
+        // "51...") - baik pas ngetik manual maupun copy-paste dari sumber lain
+        // (dilaporkan user 2026-09-11: NIS/No HP dari luar selalu kehilangan
+        // 0 di depan). Kolom C=Nis, D=NISN, P=No HP - RENTANG SAMPAI baris 1000
+        // (bukan cuma 2-3 baris contoh) supaya baris BARU yang ditambah/ditempel
+        // user sendiri ikut kena format ini, bukan cuma baris contoh bawaan.
+        ws.Range("C2:C1000").Style.NumberFormat.Format = "@";
+        ws.Range("D2:D1000").Style.NumberFormat.Format = "@";
+        ws.Range("P2:P1000").Style.NumberFormat.Format = "@";
+
         var contoh1 = new object[] { "Budi Santoso", "L", "2024001", "0051234567", "Jakarta, 15 Mei 2018", "TK Al Ikhlas", "Jl. Merdeka No. 123", "001", "002", "Menteng", "Menteng", "Santoso", "Siti", "Wiraswasta", "Ibu Rumah Tangga", "081234567890" };
         var contoh2 = new object[] { "Siti Nurhaliza", "P", "2024002", "0051234568", "Bandung, 20 Agustus 2018", "TK Harapan Bunda", "Jl. Asia Afrika No. 456", "003", "004", "Braga", "Sumur Bandung", "Ahmad", "Dewi", "PNS", "Guru", "081298765432" };
         for (var i = 0; i < contoh1.Length; i++) { ws.Cell(2, i + 1).Value = contoh1[i].ToString(); ws.Cell(3, i + 1).Value = contoh2[i].ToString(); }
@@ -511,15 +524,7 @@ public class SiswaController(DataMasterDbContext db, DocumentStorageService docs
             DateOnly? tanggalLahir = null;
             if (ttl != "")
             {
-                var (t, tg) = ParseTtl(ttl);
-                if (tg is null)
-                {
-                    preview.Errors.Add($"Baris {rowNum}: TTL harus berformat 'Kota, 14 Maret 2018' atau 'Kota, 14-03-2018'");
-                    preview.ErrorCount++;
-                    continue;
-                }
-                tempatLahir = t;
-                tanggalLahir = tg;
+                (tempatLahir, tanggalLahir) = ParseTtl(ttl);
             }
 
             var existing = siswaAll.FirstOrDefault(s => s.Nis == nis);
@@ -708,14 +713,24 @@ public class SiswaController(DataMasterDbContext db, DocumentStorageService docs
 
     // ---------------------------------------------------------------- Helper
 
+    // SEBELUMNYA: kalau tidak ada koma ATAU bagian tanggal gagal di-parse,
+    // fungsi ini balikin (null, null), dan PEMANGGIL menolak SELURUH BARIS
+    // ("TTL harus berformat...") - padahal petunjuk sendiri bilang TTL itu
+    // OPSIONAL. Bug nyata ditemukan 2026-09-11: import 17 siswa TKIT GAGAL
+    // TOTAL ("Tidak ada baris valid") krn kolom TTL cuma diisi nama kota
+    // ("Jakarta") tanpa tanggal - data lain (nama/NIS/JK/dst) semuanya valid,
+    // tapi ikut terbuang gara2 1 kolom opsional ini. Sekarang best-effort:
+    // TIDAK PERNAH menolak baris krn TTL - tempat SELALU terisi (apa adanya
+    // kalau tidak ada koma/tanggal tidak valid), tanggal cuma diisi kalau
+    // benar2 berhasil di-parse, null kalau tidak (bukan alasan buang baris).
     private static (string? tempat, DateOnly? tanggal) ParseTtl(string ttl)
     {
         var parts = ttl.Split(',');
-        if (parts.Length < 2) return (null, null);
+        if (parts.Length < 2) return (ttl.Trim(), null);
         var tanggalRaw = parts[^1].Trim();
         var tempat = string.Join(",", parts[..^1]).Trim();
         var tanggal = IndonesianDateService.ParseIndonesianDate(tanggalRaw);
-        return tanggal is null ? (null, null) : (tempat, tanggal);
+        return tanggal is null ? (ttl.Trim(), null) : (tempat, tanggal);
     }
 
     private static string NormalizeHeader(string h) => Regex.Replace(h.Trim(), @"\s+", " ").ToUpperInvariant();

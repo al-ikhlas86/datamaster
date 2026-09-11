@@ -1,3 +1,4 @@
+@using System.Text.Json
 @using DataMaster.Web.Models.Siswa
 @{
     ViewData["Title"] = "Import Data Siswa";
@@ -5,6 +6,19 @@
 }
 
 <h3 class="mb-3">Import Data Siswa</h3>
+
+@if (TempData["import_errors"] is string errJson)
+{
+    <div class="alert alert-warning">
+        <strong>Baris yang dilewati:</strong>
+        <ul class="mb-0">
+            @foreach (var e in JsonSerializer.Deserialize<List<string>>(errJson) ?? [])
+            {
+                <li>@e</li>
+            }
+        </ul>
+    </div>
+}
 
 <div class="card border-primary mb-3">
     <div class="card-header bg-primary text-white">Petunjuk Import Data Siswa</div>

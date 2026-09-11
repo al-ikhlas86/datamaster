@@ -319,6 +319,10 @@ public class GuruController(DataMasterDbContext db, WaliKelasService waliKelas) 
         var ws = wb.Worksheets.Add("Guru");
         var headers = new[] { "Nama", "Jenis Kelamin", "Jabatan", "Gelar Terakhir", "No HP" };
         for (var i = 0; i < headers.Length; i++) ws.Cell(1, i + 1).Value = headers[i];
+        // Kolom No HP (E) DIPAKSA format Text ("@") - lihat catatan lengkap di
+        // SiswaController.DownloadTemplate(), masalah & alasan yang sama persis
+        // (angka 0 di depan hilang kalau kolom dibiarkan format Angka biasa).
+        ws.Range("E2:E1000").Style.NumberFormat.Format = "@";
         var c1 = new[] { "Rudi", "L", "Guru", "S1", "081234560001" };
         var c2 = new[] { "Siti Aisyah", "P", "Karyawan", "", "081234560002" };
         for (var i = 0; i < c1.Length; i++) { ws.Cell(2, i + 1).Value = c1[i]; ws.Cell(3, i + 1).Value = c2[i]; }

@@ -1,8 +1,22 @@
+@using System.Text.Json
 @{
     ViewData["Title"] = "Import Data Guru";
 }
 
 <h3 class="mb-3">Import Data Guru</h3>
+
+@if (TempData["import_errors"] is string errJson)
+{
+    <div class="alert alert-warning">
+        <strong>Baris yang dilewati:</strong>
+        <ul class="mb-0">
+            @foreach (var e in JsonSerializer.Deserialize<List<string>>(errJson) ?? [])
+            {
+                <li>@e</li>
+            }
+        </ul>
+    </div>
+}
 
 <div class="alert alert-info">
     <strong>Urutan kolom wajib tetap:</strong> Nama | Jenis Kelamin (opsional) | Jabatan (opsional) | Gelar Terakhir (opsional) | No HP
