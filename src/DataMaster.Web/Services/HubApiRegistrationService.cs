@@ -10,7 +10,13 @@ namespace DataMaster.Web.Services;
 // Gap nyata ditemukan 2026-09-11: token Hub API bisa ke-reset kosong (lihat
 // AppSettingsWriterService/ServerProcessManager) TANPA ada cara mengisi ulang
 // lewat UI sama sekali sebelum perbaikan ini.
-public class HubApiRegistrationService(IHttpClientFactory httpClientFactory, ILogger<HubApiRegistrationService> logger)
+// BUG NYATA 2026-09-11 (ditemukan user, dilaporkan lewat screenshot halaman
+// Setting crash): Program.cs mendaftarkan kelas ini via AddHttpClient<T>()
+// (typed client), yang MEWAJIBKAN konstruktornya menerima HttpClient LANGSUNG
+// - versi lama pakai IHttpClientFactory (pola client BIASA, bukan typed),
+// DI tidak bisa mencocokkan konstruktor sama sekali -> crash setiap kali
+// controller manapun (Setting, Setup Awal) butuh service ini.
+public class HubApiRegistrationService(HttpClient http, ILogger<HubApiRegistrationService> logger)
 {
     // Mengembalikan token asli kalau berhasil, null kalau gagal (non-fatal -
     // pemanggil TIDAK BOLEH menggagalkan alur utama cuma krn ini gagal, mis.
@@ -19,7 +25,6 @@ public class HubApiRegistrationService(IHttpClientFactory httpClientFactory, ILo
     {
         try
         {
-            using var http = httpClientFactory.CreateClient();
             http.Timeout = TimeSpan.FromSeconds(15);
             using var resp = await http.PostAsJsonAsync($"{AppOptions.HubApiUrlResmi}/api/v1/register",
                 new { kunci = AppOptions.RegisterSharedKey, nama = namaUnit });
