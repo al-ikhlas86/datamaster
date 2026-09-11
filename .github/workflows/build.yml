@@ -74,7 +74,7 @@ jobs:
         with:
           name: DataMaster-win-x64
           path: publish/DataMaster
-          retention-days: 30
+          retention-days: 3
 
       # Nama zip HARUS SAMA PERSIS dgn AssetName di UpdateChecker.cs
       # ("DataMaster-win-x64.zip") - itu yang dicari lewat GitHub API saat
@@ -86,13 +86,22 @@ jobs:
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Compress-Archive -Path "publish\DataMaster\*" -DestinationPath "dist\DataMaster-win-x64.zip" -Force
 
+      # retention-days DIPERPENDEK dari 90 hari jadi 1 (2026-09-11, kuota
+      # storage Actions BENAR2 penuh & memblokir rilis v1.4.0 gagal terbit -
+      # bukan cuma "sebaiknya", ini akar masalahnya) - artifact ini cuma
+      # jembatan SEMENTARA memindahkan zip dari job build ke job release DALAM
+      # 1 RUN YANG SAMA (selesai dalam hitungan detik), begitu Release-nya
+      # terbit (lihat job "release" di bawah) isinya 100% berlebihan - salinan
+      # PERMANEN yang benar ada di GitHub Releases, yang TIDAK ikut kena kuota
+      # storage Actions ini sama sekali. 90 hari x tiap rilis (~150MB) numpuk
+      # sampai menghabiskan seluruh 500MB jatah cuma dari repo ini sendirian.
       - name: Upload zip (utk dipublish job release)
         if: startsWith(github.ref, 'refs/tags/')
         uses: actions/upload-artifact@v6
         with:
           name: DataMaster-Zip
           path: dist/*.zip
-          retention-days: 90
+          retention-days: 1
 
   release:
     needs: build
