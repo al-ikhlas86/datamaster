@@ -89,7 +89,7 @@ public class KelasController(DataMasterDbContext db, WaliKelasService waliKelas)
             return RedirectToAction(nameof(Index));
         }
 
-        var namaKelas = FormatNamaKelas(tingkatKode, namaInput);
+        var namaKelas = FormatNamaKelas(namaInput);
         if (namaKelas.Length > 100)
         {
             TempData["error"] = "Nama lengkap kelas maksimal 100 karakter.";
@@ -131,7 +131,7 @@ public class KelasController(DataMasterDbContext db, WaliKelasService waliKelas)
             return View("Edit", kelas);
         }
 
-        var namaKelas = FormatNamaKelas(kelas.Tingkat, namaInput);
+        var namaKelas = FormatNamaKelas(namaInput);
         if (namaKelas.Length > 100)
         {
             TempData["error"] = "Nama lengkap kelas maksimal 100 karakter.";
@@ -290,17 +290,18 @@ public class KelasController(DataMasterDbContext db, WaliKelasService waliKelas)
         return int.TryParse(kode, out _) ? $"Kelas {kode}" : kode;
     }
 
-    // Port formatNamaKelas() - lihat §7.13. Tingkat non-numerik (mis. "TK-A") dipakai
-    // APA ADANYA sbg prefix (TANPA kata "Kelas"). Cegah double-prefix kalau user sudah
-    // mengetik nama yang diawali prefix itu sendiri.
-    private static string FormatNamaKelas(string tingkat, string nama)
+    // SEBELUMNYA (port formatNamaKelas() PHP, §7.13): kalau Kode Tingkat berupa
+    // angka, otomatis tempel prefix "Kelas {kode}" - mengasumsikan angka itu
+    // SELALU nomor jenjang SD (Kode="1".."6" -> "Kelas 1".."Kelas 6"). Bug
+    // NYATA ditemukan 2026-09-11: unit non-SD (mis. TK) yang kebetulan mengisi
+    // Kode Tingkat pakai angka urutan (1/2/3 utk PG/TK A/TK B, bukan nomor
+    // jenjang) ikut kena prefix ini - "AS SALAM" tingkat PG (Kode=1) jadi
+    // tersimpan permanen sbg "Kelas 1 AS SALAM", BUKAN yang diketik user.
+    // Diperbaiki jadi APA ADANYA (WYSIWYG) - nama kelas = persis yang diketik
+    // (cuma dirapikan spasi ganda), TIDAK PERNAH ditempeli prefix otomatis
+    // apa pun, utk SEMUA tingkat (SD/TK/dst) - diminta eksplisit oleh user.
+    private static string FormatNamaKelas(string nama)
     {
-        var namaBersih = Regex.Replace(nama.Trim(), @"\s+", " ");
-        var prefix = int.TryParse(tingkat, out _) ? $"Kelas {tingkat}" : tingkat;
-        if (Regex.IsMatch(namaBersih, $@"^{Regex.Escape(prefix)}\b", RegexOptions.IgnoreCase))
-        {
-            return namaBersih;
-        }
-        return $"{prefix} {namaBersih}".Trim();
+        return Regex.Replace(nama.Trim(), @"\s+", " ");
     }
 }
