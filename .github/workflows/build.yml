@@ -147,19 +147,30 @@ jobs:
       # job lain (build) sengaja TIDAK diberi ini (prinsip izin seminim mungkin).
       contents: write
     steps:
-      # CATATAN 2026-09-11: label langkah ini SEBELUMNYA salah tulis "simpan 3
-      # terbaru" - `tail -n +3` (setelah `sort -r`, terbaru duluan) SEBENARNYA
-      # SUDAH DARI DULU cuma menyisakan 2 baris TERATAS (skip 2 baris pertama,
-      # hapus baris ke-3 dst) - perilaku kodenya sudah cocok dgn permintaan
-      # terbaru user "cukup 2 terbaru", cuma labelnya yang diperbaiki di sini,
-      # TIDAK ada perubahan perilaku.
+      # KOREKSI 2026-09-11 (revisi ke-2, bug NYATA ditemukan lewat pengamatan
+      # user - Actions tab masih tampil 3 run, bukan 2, walau label sudah
+      # dibetulkan sebelumnya): analisa "tail -n +3 sudah otomatis keep-2"
+      # SEBELUMNYA SALAH krn tidak memperhitungkan bahwa run YANG SEDANG
+      # menjalankan langkah pembersihan ini SENDIRI belum berstatus
+      # "completed" di mata GitHub API saat query di bawah dijalankan (statusnya
+      # baru pindah ke completed SETELAH seluruh step run ini selesai, termasuk
+      # step ini sendiri) - jadi daftar "completed" yang dilihat query ini SELALU
+      # tidak menghitung dirinya sendiri. Efeknya: run baru ini nanti ikut jadi
+      # bagian "2 terbaru" begitu dia selesai, tapi baru dihitung PADA RUN
+      # BERIKUTNYA. Supaya steady-state-nya benar 2 (bukan 3), yang perlu
+      # disisakan dari daftar "completed" LAIN (tidak termasuk diri sendiri)
+      # cuma 1 - baru + 1 (dirinya sendiri, begitu selesai) = 2. Maka
+      # `tail -n +3` (skip 2, hapus sisanya) diperkecil jadi `tail -n +2`
+      # (skip 1, hapus sisanya). Diverifikasi lewat pengecekan nyata
+      # 2026-09-11: datamaster-desktop/presensi/mobile-app SEMUA menunjukkan
+      # persis 3 run tersisa di steady-state dgn +3, cocok dgn analisa ini.
       - name: Bersihkan run build lama (simpan 2 terbaru)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh api "repos/${{ github.repository }}/actions/workflows/build.yml/runs?per_page=100" \
             --jq '.workflow_runs[] | select(.status == "completed") | "\(.created_at) \(.id)"' \
-            | sort -r | tail -n +3 | awk '{print $2}' \
+            | sort -r | tail -n +2 | awk '{print $2}' \
             | while read -r id; do
                 echo "hapus run lama id=$id"
                 gh api -X DELETE "repos/${{ github.repository }}/actions/runs/$id" || true
