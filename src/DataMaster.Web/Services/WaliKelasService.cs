@@ -15,16 +15,29 @@ public class WaliKelasService(DataMasterDbContext db)
         return ta.TahunAjaranId;
     }
 
+    // Versi TIDAK MELEMPAR (2026-09-11) - dipakai method DISPLAY-ONLY di bawah
+    // (GetDisplayTextAsync dkk). Sebelumnya semuanya memakai ActiveTahunAjaranIdAsync()
+    // langsung, jadi kalau instalasi BARU belum sempat set Tahun Ajaran Aktif sama
+    // sekali, buka Detail Kelas/Guru manapun langsung CRASH TOTAL (halaman error
+    // generik ASP.NET Core) - dilaporkan user 2026-09-11 (instalasi TKIT baru).
+    // Method yang MENULIS/MENGUBAH data (assign wali kelas dkk) TETAP pakai versi
+    // melempar di atas - itu benar kalau ditolak keras, cuma method BACA yang
+    // seharusnya tetap tampil (tinggal kosongkan info yang butuh tahun aktif).
+    private async Task<int?> ActiveTahunAjaranIdOrNullAsync() =>
+        (await db.TahunAjaran.FirstOrDefaultAsync(t => t.IsActive))?.TahunAjaranId;
+
     public async Task<Kelas?> GetKelasByGuruAsync(int guruId, int? tahunAjaranId = null)
     {
-        var ta = tahunAjaranId ?? await ActiveTahunAjaranIdAsync();
+        var ta = tahunAjaranId ?? await ActiveTahunAjaranIdOrNullAsync();
+        if (ta is null) return null; // belum ada Tahun Ajaran Aktif - kosong, jangan crash (lihat GetDisplayTextAsync)
         return await db.WaliKelas.Where(w => w.GuruId == guruId && w.TahunAjaranId == ta)
             .Select(w => w.Kelas).FirstOrDefaultAsync();
     }
 
     public async Task<string?> GetDisplayTextAsync(int kelasId, int? tahunAjaranId = null)
     {
-        var ta = tahunAjaranId ?? await ActiveTahunAjaranIdAsync();
+        var ta = tahunAjaranId ?? await ActiveTahunAjaranIdOrNullAsync();
+        if (ta is null) return null; // belum ada Tahun Ajaran Aktif - tampilkan kosong, jangan crash
         var namaList = await db.WaliKelas.Where(w => w.KelasId == kelasId && w.TahunAjaranId == ta)
             .OrderBy(w => w.Urutan).Select(w => w.Guru.Nama).ToListAsync();
         return namaList.Count == 0 ? null : string.Join(" & ", namaList);
@@ -34,7 +47,8 @@ public class WaliKelasService(DataMasterDbContext db)
     // di halaman Kelola Kelas tanpa query N+1.
     public async Task<Dictionary<int, List<(int GuruId, string Nama)>>> GetSemuaDikelompokkanAsync(int? tahunAjaranId = null)
     {
-        var ta = tahunAjaranId ?? await ActiveTahunAjaranIdAsync();
+        var ta = tahunAjaranId ?? await ActiveTahunAjaranIdOrNullAsync();
+        if (ta is null) return []; // belum ada Tahun Ajaran Aktif - kosong, jangan crash (lihat GetDisplayTextAsync)
         var rows = await db.WaliKelas.Where(w => w.TahunAjaranId == ta && w.Kelas.IsActive)
             .OrderBy(w => w.Urutan)
             .Select(w => new { w.KelasId, w.GuruId, Nama = w.Guru.Nama })

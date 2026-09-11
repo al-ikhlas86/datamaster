@@ -61,7 +61,18 @@ public class PenugasanMengajarController(DataMasterDbContext db, WaliKelasServic
     public async Task<IActionResult> CariGuruKelas(string? q, int kecuali, int? tahun)
     {
         var kata = (q ?? "").Trim();
-        var ta = tahun ?? await waliKelas.ActiveTahunAjaranIdAsync();
+        // Belum ada Tahun Ajaran Aktif (instalasi baru) - kosongkan hasil, jangan
+        // 500 (ini dipanggil AJAX dari autocomplete, kalau throw request-nya cuma
+        // gagal diam2 di console browser - tetap diperbaiki krn related dgn bug
+        // crash 500 penuh yang dilaporkan user 2026-09-11 di path lain).
+        int ta;
+        if (tahun is { } t) ta = t;
+        else
+        {
+            var active = await db.TahunAjaran.FirstOrDefaultAsync(x => x.IsActive);
+            if (active is null) return Json(Array.Empty<object>());
+            ta = active.TahunAjaranId;
+        }
 
         var semua = await db.Guru.Where(g => g.StatusAktif && (g.Jabatan == JabatanGuru.guru_kelas || g.Jabatan == JabatanGuru.guru_bidang))
             .OrderBy(g => g.Nama).ToListAsync();

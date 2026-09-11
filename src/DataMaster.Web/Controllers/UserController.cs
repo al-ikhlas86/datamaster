@@ -16,7 +16,7 @@ namespace DataMaster.Web.Controllers;
 // §1.5-1.6. role:admin (satu2nya grup dipakai nyata di sistem asli).
 [Authorize(Roles = "admin")]
 [Route("user")]
-public class UserController(DataMasterDbContext db, DatabaseBackupService backup, IOptions<AppOptions> appOptions) : Controller
+public class UserController(DataMasterDbContext db, DatabaseBackupService backup, IOptions<AppOptions> appOptions, AppSettingsWriterService appSettingsWriter, HubApiRegistrationService hubApiRegistration, IHostApplicationLifetime lifetime) : Controller
 {
     // REGEX_TEKS_PENDEK-setara utk username: alpha_numeric_space (BaseController.php
     // di PHP asli tidak dipakai di sini krn username punya aturan alpha_numeric_space
@@ -44,6 +44,7 @@ public class UserController(DataMasterDbContext db, DatabaseBackupService backup
             LanMode = appOptions.Value.LanMode,
             LanHostname = appOptions.Value.LanHostname,
             LanPort = appOptions.Value.LanPort,
+            HubApiAktif = !string.IsNullOrWhiteSpace(appOptions.Value.HubApiUrl) && !string.IsNullOrWhiteSpace(appOptions.Value.HubApiToken),
         };
         return View(vm);
     }
@@ -207,6 +208,35 @@ public class UserController(DataMasterDbContext db, DatabaseBackupService backup
         {
             TempData["error"] = $"Gagal memulihkan: {ex.Message}";
         }
+        return RedirectToAction(nameof(Index));
+    }
+
+    // Sambungkan/daftarkan ulang ke Hub API (2026-09-11) - SEBELUM ini,
+    // satu2nya cara mengisi HubApiUrl/HubApiToken adalah Setup Awal, yang
+    // cuma tampil SEKALI selagi database kosong - kalau nilainya ke-reset
+    // (mis. bug lama, sudah diperbaiki - lihat AppSettingsWriterService)
+    // TIDAK ADA cara mengisi ulang lewat UI sama sekali. Reuse persis alur
+    // yang sama dgn Setup Awal (HubApiRegistrationService).
+    [HttpPost("hub-api/sambungkan")]
+    public async Task<IActionResult> SambungkanHubApi(string? nama_unit)
+    {
+        var namaUnit = (nama_unit ?? "").Trim();
+        if (namaUnit == "")
+        {
+            TempData["error"] = "Nama unit wajib diisi.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var token = await hubApiRegistration.DaftarAsync(namaUnit);
+        if (token is null)
+        {
+            TempData["error"] = "Gagal menyambungkan ke Hub API - cek koneksi internet, lalu coba lagi.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        await appSettingsWriter.SetHubApiConfigAsync(AppOptions.HubApiUrlResmi, token);
+        TempData["message"] = "Berhasil disambungkan ke Hub API. Menyalakan ulang sebentar untuk mengaktifkan sinkronisasi...";
+        lifetime.StopApplication();
         return RedirectToAction(nameof(Index));
     }
 }

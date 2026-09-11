@@ -95,6 +95,7 @@ builder.Services.AddScoped<WaliKelasService>();
 builder.Services.AddScoped<KepalaSekolahService>();
 builder.Services.AddScoped<DatabaseBackupService>();
 builder.Services.AddScoped<AppSettingsWriterService>();
+builder.Services.AddHttpClient<HubApiRegistrationService>();
 
 // Sinkronisasi Hub API (port SyncPush.php, lihat 04-infra-auth-sync.md §7) & Backup
 // Awan terenkripsi (port BackupCloud.php, §8.2) - keduanya jalan sbg background

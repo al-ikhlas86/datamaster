@@ -1,6 +1,4 @@
-using System.Net.Http.Json;
 using System.Security.Claims;
-using System.Text.Json;
 using DataMaster.Data;
 using DataMaster.Data.Entities;
 using DataMaster.Web.Models.Auth;
@@ -24,7 +22,7 @@ namespace DataMaster.Web.Controllers;
 // bisa daftar dapat akses penuh tanpa RBAC).
 [AllowAnonymous]
 [Route("")]
-public class AuthController(DataMasterDbContext db, LoginThrottleService throttle, AppSettingsWriterService appSettingsWriter, IHostApplicationLifetime lifetime, IHttpClientFactory httpClientFactory, ILogger<AuthController> logger) : Controller
+public class AuthController(DataMasterDbContext db, LoginThrottleService throttle, AppSettingsWriterService appSettingsWriter, IHostApplicationLifetime lifetime, HubApiRegistrationService hubApiRegistration) : Controller
 {
     [HttpGet("login")]
     public async Task<IActionResult> Login()
@@ -125,7 +123,7 @@ public class AuthController(DataMasterDbContext db, LoginThrottleService throttl
         var namaUnit = (input.NamaUnit ?? "").Trim();
         if (namaUnit != "")
         {
-            var token = await DaftarKeHubApiAsync(namaUnit);
+            var token = await hubApiRegistration.DaftarAsync(namaUnit);
             if (token is not null)
             {
                 await appSettingsWriter.SetHubApiConfigAsync(AppOptions.HubApiUrlResmi, token);
@@ -146,36 +144,6 @@ public class AuthController(DataMasterDbContext db, LoginThrottleService throttl
         }
 
         return RedirectToAction("Index", "Home");
-    }
-
-    // Mengembalikan token asli kalau berhasil, null kalau gagal (dianggap
-    // non-fatal oleh pemanggil - lihat komentar Setup() POST).
-    private async Task<string?> DaftarKeHubApiAsync(string namaUnit)
-    {
-        try
-        {
-            using var http = httpClientFactory.CreateClient();
-            http.Timeout = TimeSpan.FromSeconds(15);
-            using var resp = await http.PostAsJsonAsync($"{AppOptions.HubApiUrlResmi}/api/v1/register",
-                new { kunci = AppOptions.RegisterSharedKey, nama = namaUnit });
-
-            var body = await resp.Content.ReadAsStringAsync();
-            using var doc = JsonDocument.Parse(body);
-            var root = doc.RootElement;
-            if (!resp.IsSuccessStatusCode || !root.TryGetProperty("success", out var ok) || !ok.GetBoolean())
-            {
-                var pesan = root.TryGetProperty("message", out var m) ? m.GetString() : body;
-                logger.LogWarning("Pendaftaran Hub API ditolak: {Pesan}", pesan);
-                return null;
-            }
-
-            return root.GetProperty("token").GetString();
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Pendaftaran Hub API gagal - koneksi bermasalah.");
-            return null;
-        }
     }
 
     [HttpPost("logout")]

@@ -116,6 +116,33 @@ public sealed class ServerProcessManager : IDisposable
         psi.EnvironmentVariables["AppSettings__LanHostname"] = Environment.MachineName;
         psi.EnvironmentVariables["AppSettings__LanPort"] = Port.ToString();
 
+        // Fix BUG NYATA 2026-09-11: HubApiUrl/HubApiToken SEBELUMNYA ditulis
+        // AppSettingsWriterService langsung ke web\appsettings.json (DI DALAM
+        // folder instalasi) - file itu ADA di source control & DIBUNDLE ulang
+        // di SETIAP rilis (nilai bawaannya kosong), jadi auto-update (xcopy /Y
+        // menimpa SEMUA file) diam2 MERESET token Hub API balik ke kosong tiap
+        // kali update terpasang - ditemukan nyata: instalasi TKIT yang sudah
+        // sukses sinkron sebelumnya, setelah beberapa kali auto-update, token-nya
+        // ternyata sudah kosong lagi tanpa siapa pun menyadari. Sekarang dibaca
+        // dari file TERPISAH di DataDirectory (bukan folder instalasi, AMAN dari
+        // ditimpa update - pola SAMA PERSIS ConnectionStrings di atas) sbg
+        // override lewat environment variable - MENANG di atas nilai appsettings.json
+        // bawaan apa pun yang datang dari rilis baru. AppSettingsWriterService.cs
+        // (DataMaster.Web) sudah diubah menulis ke file yang SAMA ini.
+        var hubApiConfigPath = Path.Combine(DataDirectory, "hubapi.json");
+        if (File.Exists(hubApiConfigPath))
+        {
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(hubApiConfigPath));
+                if (doc.RootElement.TryGetProperty("HubApiUrl", out var u) && u.ValueKind == System.Text.Json.JsonValueKind.String)
+                    psi.EnvironmentVariables["AppSettings__HubApiUrl"] = u.GetString();
+                if (doc.RootElement.TryGetProperty("HubApiToken", out var tok) && tok.ValueKind == System.Text.Json.JsonValueKind.String)
+                    psi.EnvironmentVariables["AppSettings__HubApiToken"] = tok.GetString();
+            }
+            catch { /* file rusak/tidak valid - biarkan appsettings.json bawaan yang berlaku, non-fatal */ }
+        }
+
         _logWriter = new StreamWriter(File.Open(Path.Combine(logDir, $"web_{DateTime.Now:yyyy-MM-dd}.log"), FileMode.Append, FileAccess.Write, FileShare.Read)) { AutoFlush = true };
 
         _process = new Process { StartInfo = psi, EnableRaisingEvents = true };
