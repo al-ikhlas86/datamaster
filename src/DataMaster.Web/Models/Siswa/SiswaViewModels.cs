@@ -64,6 +64,7 @@ public class SiswaFormInput
     public string? NamaIbu { get; set; }
     public string? PekerjaanIbu { get; set; }
     public string? NoHandphone { get; set; }
+    public string? NoHandphoneKedua { get; set; }
     public IFormFile? DokumenKk { get; set; }
     public IFormFile? DokumenAkta { get; set; }
     public IFormFile? DokumenKia { get; set; }
@@ -98,6 +99,7 @@ public class SiswaPrintRow
     public string? NamaAyah { get; set; }
     public string? NamaIbu { get; set; }
     public string? NoHandphone { get; set; }
+    public string? NoHandphoneKedua { get; set; }
 }
 
 // --- Alur Import Upsert 3-langkah (preview session -> apply), lihat 01-siswa-psb.md §3.13-15 ---
@@ -153,5 +155,6 @@ public static class ImportFieldLabels
         ["nama_ibu"] = "Nama Ibu",
         ["pekerjaan_ibu"] = "Pekerjaan Ibu",
         ["no_handphone"] = "No HP",
+        ["no_handphone_kedua"] = "No HP 2 (Ayah/Ibu)",
     };
 }

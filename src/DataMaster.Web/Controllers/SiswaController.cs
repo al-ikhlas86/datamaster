@@ -22,7 +22,7 @@ public class SiswaController(DataMasterDbContext db, DocumentStorageService docs
 {
     private static readonly int[] AllowedPerPage = [50, 100, 150, 200];
     private static readonly string[] ExpectedHeaders =
-        ["NAMA", "JK", "NIS", "NISN", "TTL", "ASAL TK", "JALAN", "RT", "RW", "KEL", "KEC", "AYAH", "IBU", "PEKERJAAN AYAH", "PEKERJAAN IBU", "NO HP"];
+        ["NAMA", "JK", "NIS", "NISN", "TTL", "ASAL TK", "JALAN", "RT", "RW", "KEL", "KEC", "AYAH", "IBU", "PEKERJAAN AYAH", "PEKERJAAN IBU", "NO HP", "NO HP 2"];
 
     private const string PreviewSessionKey = "preview_import_siswa";
 
@@ -131,6 +131,7 @@ public class SiswaController(DataMasterDbContext db, DocumentStorageService docs
             NamaIbu = NullIfEmpty(input.NamaIbu),
             PekerjaanIbu = NullIfEmpty(input.PekerjaanIbu),
             NoHandphone = OnlyDigits(input.NoHandphone),
+            NoHandphoneKedua = OnlyDigits(input.NoHandphoneKedua),
         };
 
         if (input.DokumenKk is { Length: > 0 } f1) siswa.DokumenKk = await docs.SaveAsync(f1);
@@ -181,6 +182,7 @@ public class SiswaController(DataMasterDbContext db, DocumentStorageService docs
             NamaIbu = siswa.NamaIbu,
             PekerjaanIbu = siswa.PekerjaanIbu,
             NoHandphone = siswa.NoHandphone,
+            NoHandphoneKedua = siswa.NoHandphoneKedua,
         },
         DokumenKkLama = siswa.DokumenKk,
         DokumenAktaLama = siswa.DokumenAkta,
@@ -223,6 +225,7 @@ public class SiswaController(DataMasterDbContext db, DocumentStorageService docs
         siswa.NamaIbu = NullIfEmpty(input.NamaIbu);
         siswa.PekerjaanIbu = NullIfEmpty(input.PekerjaanIbu);
         siswa.NoHandphone = OnlyDigits(input.NoHandphone);
+        siswa.NoHandphoneKedua = OnlyDigits(input.NoHandphoneKedua);
 
         // File baru diupload -> hapus dulu file lama, baru set nama baru. Tidak
         // ada file baru -> kolom TIDAK disentuh sama sekali (nilai lama dipertahankan).
@@ -327,6 +330,27 @@ public class SiswaController(DataMasterDbContext db, DocumentStorageService docs
         return RedirectToAction(nameof(Index));
     }
 
+    // Tandai Lulus (2026-09-11, poin #12 - kontinuitas TK->SD): TERPISAH dari
+    // Delete (arsip/keluar) - status 'lulus' SUDAH ADA di enum StatusSiswa
+    // sejak awal (lihat Enums.cs), tapi sebelum ini TIDAK ADA jalur UI utk
+    // mengisinya, cuma 'keluar' yang bisa dipilih lewat tombol Hapus. Siswa
+    // yang ditandai lulus otomatis ikut sync ke Hub API (status='lulus' di
+    // PushSiswaAsync) - dari situ Data Master unit LAIN (mis. SD) bisa
+    // menariknya sbg draft Calon Siswa lewat endpoint Hub API baru
+    // (/api/v1/siswa/lulusan), TETAP wajib direview manual lewat PSB seperti
+    // biasa - lihat CalonSiswaController.LulusanTk().
+    [HttpPost("{id:int}/tandai-lulus")]
+    public async Task<IActionResult> TandaiLulus(int id)
+    {
+        var siswa = await db.Siswa.FindAsync(id);
+        if (siswa is null) return NotFound($"Siswa dengan ID {id} tidak ditemukan.");
+
+        siswa.Status = StatusSiswa.lulus;
+        await db.SaveChangesAsync();
+        TempData["message"] = $"{siswa.Nama} ditandai lulus. Data ini bisa ditarik sekolah tujuan (mis. SD) sebagai draft Calon Siswa saat PSB dibuka di sana.";
+        return RedirectToAction(nameof(Index));
+    }
+
     [HttpPost("bulk-delete")]
     public async Task<IActionResult> BulkDelete(List<int>? ids)
     {
@@ -399,7 +423,7 @@ public class SiswaController(DataMasterDbContext db, DocumentStorageService docs
     {
         using var wb = new XLWorkbook();
         var ws = wb.Worksheets.Add("Siswa");
-        var headers = new[] { "Nama", "JK", "Nis", "NISN", "TTL", "ASAL TK", "Jalan", "RT", "RW", "Kel", "Kec", "Ayah", "Ibu", "Pekerjaan Ayah", "Pekerjaan Ibu", "No HP" };
+        var headers = new[] { "Nama", "JK", "Nis", "NISN", "TTL", "ASAL TK", "Jalan", "RT", "RW", "Kel", "Kec", "Ayah", "Ibu", "Pekerjaan Ayah", "Pekerjaan Ibu", "No HP", "No HP 2" };
         for (var i = 0; i < headers.Length; i++) ws.Cell(1, i + 1).Value = headers[i];
 
         // Kolom "berbentuk angka tapi sebenarnya ID/nomor telepon" (Nis, NISN,
@@ -408,15 +432,18 @@ public class SiswaController(DataMasterDbContext db, DocumentStorageService docs
         // DEPAN hilang (mis. No HP "0812..." jadi "812...", NISN "0051..." jadi
         // "51...") - baik pas ngetik manual maupun copy-paste dari sumber lain
         // (dilaporkan user 2026-09-11: NIS/No HP dari luar selalu kehilangan
-        // 0 di depan). Kolom C=Nis, D=NISN, P=No HP - RENTANG SAMPAI baris 1000
-        // (bukan cuma 2-3 baris contoh) supaya baris BARU yang ditambah/ditempel
-        // user sendiri ikut kena format ini, bukan cuma baris contoh bawaan.
+        // 0 di depan). Kolom C=Nis, D=NISN, P=No HP, Q=No HP 2 (2026-09-11,
+        // opsional - No HP orang tua kedua, ayah ataupun ibu, lihat poin #11) -
+        // RENTANG SAMPAI baris 1000 (bukan cuma 2-3 baris contoh) supaya baris
+        // BARU yang ditambah/ditempel user sendiri ikut kena format ini, bukan
+        // cuma baris contoh bawaan.
         ws.Range("C2:C1000").Style.NumberFormat.Format = "@";
         ws.Range("D2:D1000").Style.NumberFormat.Format = "@";
         ws.Range("P2:P1000").Style.NumberFormat.Format = "@";
+        ws.Range("Q2:Q1000").Style.NumberFormat.Format = "@";
 
-        var contoh1 = new object[] { "Budi Santoso", "L", "2024001", "0051234567", "Jakarta, 15 Mei 2018", "TK Al Ikhlas", "Jl. Merdeka No. 123", "001", "002", "Menteng", "Menteng", "Santoso", "Siti", "Wiraswasta", "Ibu Rumah Tangga", "081234567890" };
-        var contoh2 = new object[] { "Siti Nurhaliza", "P", "2024002", "0051234568", "Bandung, 20 Agustus 2018", "TK Harapan Bunda", "Jl. Asia Afrika No. 456", "003", "004", "Braga", "Sumur Bandung", "Ahmad", "Dewi", "PNS", "Guru", "081298765432" };
+        var contoh1 = new object[] { "Budi Santoso", "L", "2024001", "0051234567", "Jakarta, 15 Mei 2018", "TK Al Ikhlas", "Jl. Merdeka No. 123", "001", "002", "Menteng", "Menteng", "Santoso", "Siti", "Wiraswasta", "Ibu Rumah Tangga", "081234567890", "081200011122" };
+        var contoh2 = new object[] { "Siti Nurhaliza", "P", "2024002", "0051234568", "Bandung, 20 Agustus 2018", "TK Harapan Bunda", "Jl. Asia Afrika No. 456", "003", "004", "Braga", "Sumur Bandung", "Ahmad", "Dewi", "PNS", "Guru", "081298765432", "" };
         for (var i = 0; i < contoh1.Length; i++) { ws.Cell(2, i + 1).Value = contoh1[i].ToString(); ws.Cell(3, i + 1).Value = contoh2[i].ToString(); }
 
         using var stream = new MemoryStream();
@@ -513,6 +540,7 @@ public class SiswaController(DataMasterDbContext db, DocumentStorageService docs
             var pekerjaanAyah = Cell(14);
             var pekerjaanIbu = Cell(15);
             var noHp = Regex.Replace(Cell(16), @"\D+", "");
+            var noHpKedua = Regex.Replace(Cell(17), @"\D+", "");
 
             if (nama == "" && jk == "" && nis == "") continue; // baris kosong
 
@@ -558,6 +586,7 @@ public class SiswaController(DataMasterDbContext db, DocumentStorageService docs
                 if (ibu != "") Track("nama_ibu", existing.NamaIbu, ibu);
                 if (pekerjaanIbu != "") Track("pekerjaan_ibu", existing.PekerjaanIbu, pekerjaanIbu);
                 if (noHp != "") Track("no_handphone", existing.NoHandphone, noHp);
+                if (noHpKedua != "") Track("no_handphone_kedua", existing.NoHandphoneKedua, noHpKedua);
 
                 preview.Rows.Add(new ImportPreviewRow { RowNumber = rowNum, Nis = nis, Nama = nama, Type = "update", ExistingSiswaId = existing.SiswaId, Diff = diff, Data = data });
                 preview.UpdateCount++;
@@ -587,6 +616,7 @@ public class SiswaController(DataMasterDbContext db, DocumentStorageService docs
                 data["nama_ibu"] = ibu == "" ? null : ibu;
                 data["pekerjaan_ibu"] = pekerjaanIbu == "" ? null : pekerjaanIbu;
                 data["no_handphone"] = noHp;
+                data["no_handphone_kedua"] = noHpKedua == "" ? null : noHpKedua;
 
                 preview.Rows.Add(new ImportPreviewRow { RowNumber = rowNum, Nis = nis, Nama = nama, Type = "insert", Data = data });
                 preview.InsertCount++;
@@ -657,6 +687,7 @@ public class SiswaController(DataMasterDbContext db, DocumentStorageService docs
                         NamaIbu = row.Data.GetValueOrDefault("nama_ibu"),
                         PekerjaanIbu = row.Data.GetValueOrDefault("pekerjaan_ibu"),
                         NoHandphone = row.Data.GetValueOrDefault("no_handphone"),
+                        NoHandphoneKedua = row.Data.GetValueOrDefault("no_handphone_kedua"),
                     });
                     inserted++;
                 }
@@ -680,6 +711,7 @@ public class SiswaController(DataMasterDbContext db, DocumentStorageService docs
                     if (row.Data.ContainsKey("nama_ibu")) siswa.NamaIbu = row.Data["nama_ibu"];
                     if (row.Data.ContainsKey("pekerjaan_ibu")) siswa.PekerjaanIbu = row.Data["pekerjaan_ibu"];
                     if (row.Data.ContainsKey("no_handphone")) siswa.NoHandphone = row.Data["no_handphone"];
+                    if (row.Data.ContainsKey("no_handphone_kedua")) siswa.NoHandphoneKedua = row.Data["no_handphone_kedua"];
                     // KelasId & Status SENGAJA tidak disentuh - lihat §3.13 poin 11.
                     updated++;
                 }
@@ -827,6 +859,15 @@ public class SiswaController(DataMasterDbContext db, DocumentStorageService docs
         if (noHp == "") e["NoHandphone"] = "No Handphone wajib diisi - dipakai utk akun Orang Tua di aplikasi HP.";
         else if (noHp.Length > 20) e["NoHandphone"] = "No Handphone maksimal 20 karakter.";
         else if (!IsNumericLike(Regex.Replace(noHp, @"\D+", ""))) e["NoHandphone"] = "No Handphone hanya boleh berisi angka.";
+
+        // No Handphone Kedua (2026-09-11, poin #11) SELALU opsional - ayah
+        // ataupun ibu, siapa pun yang kedua, boleh tidak diisi sama sekali.
+        var noHpKedua = (input.NoHandphoneKedua ?? "").Trim();
+        if (noHpKedua != "")
+        {
+            if (noHpKedua.Length > 20) e["NoHandphoneKedua"] = "No Handphone ke-2 maksimal 20 karakter.";
+            else if (!IsNumericLike(Regex.Replace(noHpKedua, @"\D+", ""))) e["NoHandphoneKedua"] = "No Handphone ke-2 hanya boleh berisi angka.";
+        }
 
         foreach (var (file, label) in new (IFormFile?, string)[]
                  {

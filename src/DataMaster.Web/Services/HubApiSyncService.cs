@@ -210,6 +210,7 @@ public class HubApiSyncService(DataMasterDbContext db, HttpClient http, IOptions
             JenisKelamin = s.JenisKelamin.ToString(),
             KelasSourceId = s.KelasId,
             HpOrtu = s.NoHandphone,
+            HpOrtuKedua = s.NoHandphoneKedua,
             Status = s.Status.ToString(),
         }).ToList();
         await PostAsync(url, token, "/api/v1/sync/siswa", rows, full: false, "Siswa", ct);

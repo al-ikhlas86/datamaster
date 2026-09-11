@@ -16,7 +16,7 @@ namespace DataMaster.Web.Controllers;
 // jalur web ini maupun jalur sync Hub API/Mobile-app).
 [Authorize(Roles = "admin")]
 [Route("calon-siswa")]
-public class CalonSiswaController(DataMasterDbContext db, DocumentStorageService docs, PsbService psb) : Controller
+public class CalonSiswaController(DataMasterDbContext db, DocumentStorageService docs, PsbService psb, LulusanTkService lulusanTk) : Controller
 {
     private static readonly string[] StatusValid = ["menunggu", "diterima", "ditolak", "semua"];
 
@@ -109,6 +109,63 @@ public class CalonSiswaController(DataMasterDbContext db, DocumentStorageService
 
         TempData["message"] = "Calon siswa berhasil ditambahkan.";
         return RedirectToAction(nameof(Index));
+    }
+
+    // ------------------------------------------------------- Lulusan TK (#12)
+
+    // Daftar siswa berstatus 'lulus' dari unit sumber yang diizinkan (lihat
+    // psb.lulusanLink di Hub API) - PSB TETAP wajib: baris di sini HANYA
+    // draft, TU (di sini) yang memutuskan mengimpor jadi Calon Siswa lalu
+    // tetap direview/diterima/ditolak lewat alur PSB normal, tidak ada yang
+    // otomatis langsung jadi siswa aktif.
+    [HttpGet("lulusan-tk")]
+    public async Task<IActionResult> LulusanTk()
+    {
+        var semua = await lulusanTk.AmbilAsync(HttpContext.RequestAborted);
+        var sudahDiimpor = (await db.CalonSiswa
+                .Where(c => c.SumberLulusanId != null)
+                .Select(c => c.SumberLulusanId!.Value)
+                .ToListAsync())
+            .ToHashSet();
+
+        var vm = semua.Where(r => !sudahDiimpor.Contains(r.Id)).ToList();
+        return View(vm);
+    }
+
+    [HttpPost("lulusan-tk/{sumberLulusanId:int}/impor")]
+    public async Task<IActionResult> ImporLulusanTk(int sumberLulusanId)
+    {
+        // Cek dobel di sini juga (bukan cuma di tampilan list) - user bisa saja
+        // buka 2 tab atau submit ulang form yang sama.
+        if (await db.CalonSiswa.AnyAsync(c => c.SumberLulusanId == sumberLulusanId))
+        {
+            TempData["error"] = "Siswa ini sudah pernah diimpor sebelumnya.";
+            return RedirectToAction(nameof(LulusanTk));
+        }
+
+        var semua = await lulusanTk.AmbilAsync(HttpContext.RequestAborted);
+        var row = semua.FirstOrDefault(r => r.Id == sumberLulusanId);
+        if (row is null)
+        {
+            TempData["error"] = "Data lulusan tidak ditemukan lagi (mungkin sudah ditarik unit lain atau koneksi Hub API bermasalah).";
+            return RedirectToAction(nameof(LulusanTk));
+        }
+
+        var calon = new Data.Entities.CalonSiswa
+        {
+            Nama = row.Nama,
+            JenisKelamin = Enum.Parse<JenisKelamin>(row.JenisKelamin),
+            Nisn = NullIfEmpty(row.Nisn),
+            AsalSekolah = "TK Al-Ikhlas 86", // lihat catatan LulusanController.php - unit asal SELALU dari psb.lulusanLink milik sekolah sendiri
+            NoHandphone = OnlyDigitsOrNull(row.HpOrtu),
+            Status = StatusCalonSiswa.menunggu,
+            SumberLulusanId = row.Id,
+        };
+        db.CalonSiswa.Add(calon);
+        await db.SaveChangesAsync();
+
+        TempData["message"] = $"{row.Nama} berhasil diimpor sebagai Calon Siswa. Silakan lengkapi data lain (alamat, dokumen, dll) lalu proses lewat PSB seperti biasa.";
+        return RedirectToAction(nameof(Detail), new { id = calon.CalonSiswaId });
     }
 
     // --------------------------------------------------------------- Detail

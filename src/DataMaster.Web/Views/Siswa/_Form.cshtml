@@ -136,9 +136,16 @@
                     <div class="invalid-feedback">@Err("PekerjaanIbu")</div>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">No. Handphone *</label>
+                    <label class="form-label">No. Handphone (Utama) *</label>
                     <input type="text" name="NoHandphone" class="form-control @Cls("NoHandphone")" value="@Model.Input.NoHandphone" placeholder="Contoh: 08123456789" required />
+                    <div class="form-text">Dipakai membuat akun Orang Tua pertama di aplikasi HP.</div>
                     <div class="invalid-feedback">@Err("NoHandphone")</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">No. Handphone Ke-2 (Opsional)</label>
+                    <input type="text" name="NoHandphoneKedua" class="form-control @Cls("NoHandphoneKedua")" value="@Model.Input.NoHandphoneKedua" placeholder="Contoh: 08129876543 (ayah atau ibu, milik nomor pertama)" />
+                    <div class="form-text">Isi kalau ayah DAN ibu ingin masing-masing punya akun sendiri di aplikasi HP.</div>
+                    <div class="invalid-feedback">@Err("NoHandphoneKedua")</div>
                 </div>
             </div>
         </div>

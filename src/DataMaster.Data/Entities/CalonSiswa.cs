@@ -33,6 +33,13 @@ public class CalonSiswa
     public string? Catatan { get; set; }
     public StatusCalonSiswa Status { get; set; } = StatusCalonSiswa.menunggu;
     public int? SiswaId { get; set; }
+    // Kontinuitas TK->SD (2026-09-11, poin #12) - id baris sync_students di Hub
+    // API (BUKAN id lokal apa pun) asal baris ini diimpor, kalau dibuat lewat
+    // "Impor Lulusan TK" (CalonSiswaController.ImporLulusanTk). Null utk
+    // pendaftaran PSB biasa. Dipakai MENCEGAH IMPOR DOBEL - sebelum menampilkan
+    // daftar lulusan dari Hub API, baris yang SumberLulusanId-nya sudah cocok
+    // disembunyikan dari daftar (sudah pernah diimpor).
+    public int? SumberLulusanId { get; set; }
     public DateTime? CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
 

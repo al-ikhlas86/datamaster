@@ -30,6 +30,12 @@ public class Siswa
     public string? NamaIbu { get; set; }
     public string? PekerjaanIbu { get; set; }
     public string? NoHandphone { get; set; }
+    // No HP orang tua KEDUA (ayah ATAUPUN ibu, siapa pun yang kedua) - opsional,
+    // ditambahkan 2026-09-11 supaya kedua orang tua bisa punya akun HP sendiri2
+    // (login/notifikasi presensi/pembayaran/tugas independen - lihat diskusi
+    // poin #11). Berbeda dari NoHandphone (WAJIB, No HP 1) - field ini SELALU
+    // opsional di semua jalur (form, import baris insert MAUPUN update).
+    public string? NoHandphoneKedua { get; set; }
     public string? DokumenKk { get; set; }
     public string? DokumenAkta { get; set; }
     public string? DokumenKia { get; set; }

@@ -88,6 +88,9 @@
                     </td>
                     <td>
                         <a asp-action="Detail" asp-route-id="@s.SiswaId" class="btn btn-sm btn-outline-info">Detail</a>
+                        <form asp-action="TandaiLulus" asp-route-id="@s.SiswaId" method="post" class="d-inline form-tandai-lulus" data-nama="@s.Nama">
+                            <button type="submit" class="btn btn-sm btn-outline-success" title="Tandai Lulus - data ikut tersedia sbg calon siswa di sekolah tujuan"><i class="bi bi-mortarboard"></i></button>
+                        </form>
                         <form asp-action="Delete" asp-route-id="@s.SiswaId" method="post" class="d-inline form-delete-siswa" data-nama="@s.Nama">
                             <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
                         </form>

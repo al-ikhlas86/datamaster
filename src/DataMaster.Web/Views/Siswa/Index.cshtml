@@ -109,6 +109,13 @@
                         }
                     });
                 });
+                hasil.querySelectorAll('.form-tandai-lulus').forEach(function (f) {
+                    f.addEventListener('submit', function (e) {
+                        if (!confirm(this.dataset.nama + ' akan ditandai LULUS. Data ini akan tersedia utk ditarik sekolah tujuan (mis. SD) sbg draft calon siswa saat PSB dibuka. Lanjutkan?')) {
+                            e.preventDefault();
+                        }
+                    });
+                });
                 var checkAll = document.getElementById('checkAll');
                 var rowChecks = hasil.querySelectorAll('.js-row-check');
                 var toolbar = document.getElementById('bulkDeleteToolbar');

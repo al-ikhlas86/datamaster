@@ -102,6 +102,7 @@ builder.Services.AddHttpClient<HubApiRegistrationService>();
 // service DI DALAM proses yang sama (adaptasi dari Windows Task Scheduler +
 // proses CLI terpisah PHP asli, lihat komentar di masing2 HostedService).
 builder.Services.AddHttpClient<HubApiSyncService>();
+builder.Services.AddHttpClient<LulusanTkService>();
 builder.Services.AddHttpClient();
 builder.Services.AddHostedService<HubApiSyncHostedService>();
 builder.Services.AddHostedService<BackupCloudHostedService>();

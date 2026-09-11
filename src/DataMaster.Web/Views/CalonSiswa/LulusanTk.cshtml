@@ -1,0 +1,73 @@
+@model List<DataMaster.Web.Services.LulusanTkRow>
+@{
+    ViewData["Title"] = "Lulusan dari Sekolah Asal";
+}
+
+@section PageActions {
+    <a asp-action="Index" class="btn btn-outline-secondary btn-action"><i class="feather-arrow-left me-1"></i> Kembali ke Calon Siswa</a>
+}
+
+<div class="alert alert-info">
+    Daftar ini ditarik langsung dari sekolah asal (mis. TK) yang sudah menandai siswanya <strong>Lulus</strong>.
+    Mengimpor di sini <strong>TIDAK</strong> langsung menjadikan siswa aktif - data akan masuk sebagai
+    <strong>Calon Siswa berstatus Menunggu</strong>, tetap harus dilengkapi & diproses lewat PSB seperti biasa
+    (diterima/ditolak, generate NIS baru, dll).
+</div>
+
+@if (Model.Count == 0)
+{
+    <div class="text-center text-muted py-5">
+        Belum ada data lulusan yang bisa diimpor saat ini.<br />
+        <small>Kemungkinan penyebab: belum ada siswa yang ditandai lulus di sekolah asal, semua sudah diimpor, atau Hub API belum dikonfigurasi menghubungkan unit ini ke sekolah asal (hubungi Admin IT).</small>
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Nama</th>
+                    <th>JK</th>
+                    <th>NISN</th>
+                    <th>No HP Orang Tua</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in Model)
+                {
+                    <tr>
+                        <td>@r.Nama</td>
+                        <td><span class="badge @(r.JenisKelamin == "L" ? "bg-primary" : "bg-danger")">@r.JenisKelamin</span></td>
+                        <td>@(r.Nisn ?? "-")</td>
+                        <td>
+                            @r.HpOrtu
+                            @if (!string.IsNullOrEmpty(r.HpOrtuKedua))
+                            {
+                                <text> / @r.HpOrtuKedua</text>
+                            }
+                        </td>
+                        <td>
+                            <form asp-action="ImporLulusanTk" asp-route-sumberLulusanId="@r.Id" method="post" class="d-inline form-impor-lulusan" data-nama="@r.Nama">
+                                <button type="submit" class="btn btn-sm btn-success">Impor sebagai Calon Siswa</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@section Scripts {
+    <script>
+        document.querySelectorAll('.form-impor-lulusan').forEach(function (f) {
+            f.addEventListener('submit', function (e) {
+                if (!confirm(this.dataset.nama + ' akan diimpor sebagai Calon Siswa (masih perlu dilengkapi & diproses lewat PSB). Lanjutkan?')) {
+                    e.preventDefault();
+                }
+            });
+        });
+    </script>
+}
