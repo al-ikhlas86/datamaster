@@ -40,7 +40,11 @@ public class WaliKelasService(DataMasterDbContext db)
         if (ta is null) return null; // belum ada Tahun Ajaran Aktif - tampilkan kosong, jangan crash
         var namaList = await db.WaliKelas.Where(w => w.KelasId == kelasId && w.TahunAjaranId == ta)
             .OrderBy(w => w.Urutan).Select(w => w.Guru.Nama).ToListAsync();
-        return namaList.Count == 0 ? null : string.Join(" & ", namaList);
+        if (namaList.Count == 0) return null;
+        if (namaList.Count == 1) return namaList[0];
+        // Titel SAJA yang beda (2026-09-11, poin #2) - slot pertama tetap "Wali
+        // Kelas", sisanya "Pendamping" - lihat catatan lengkap di Kelas/Index.cshtml.
+        return $"{namaList[0]} (Wali Kelas)" + string.Concat(namaList.Skip(1).Select(n => $" & {n} (Pendamping)"));
     }
 
     // kelas_id -> daftar {guru_id, nama} terurut - dipakai membangun combobox multi-slot

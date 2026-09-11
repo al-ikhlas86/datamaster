@@ -122,9 +122,16 @@
                         <td style="min-width:260px">
                             <div class="js-wali-wrapper" data-kelas-id="@k.KelasId" data-guru-ids="@idsCsv">
                                 <div class="js-wali-chips d-flex flex-wrap gap-1 mb-1">
-                                    @foreach (var s in slots)
+                                    @for (var i = 0; i < slots.Count; i++)
                                     {
-                                        <span class="badge bg-info text-dark js-wali-chip" data-guru-id="@s.GuruId">@s.Nama <a href="#" class="text-dark js-wali-remove" style="text-decoration:none">&times;</a></span>
+                                        // Titel SAJA yang beda (2026-09-11, poin #2) - slot pertama (Urutan=1,
+                                        // GetSemuaDikelompokkanAsync sudah OrderBy Urutan) tetap "Wali Kelas",
+                                        // slot berikutnya ditulis "Pendamping" - FUNGSI/hak akses/sinkronisasi
+                                        // TIDAK berubah sama sekali, cuma label yang ditampilkan di sini (guru
+                                        // yang jadi wali ke-2/3 sempat bingung dikira "Wali Kelas" penuh).
+                                        var s = slots[i];
+                                        var titel = i == 0 ? "Wali Kelas" : "Pendamping";
+                                        <span class="badge bg-info text-dark js-wali-chip" data-guru-id="@s.GuruId" title="@titel"><small class="opacity-75">@titel:</small> @s.Nama <a href="#" class="text-dark js-wali-remove" style="text-decoration:none">&times;</a></span>
                                     }
                                 </div>
                                 <div class="position-relative">
