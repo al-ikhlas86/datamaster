@@ -7,35 +7,18 @@ namespace DataMaster.Launcher;
 // menimpa nilai bawaan di bawah tanpa build ulang kalau perlu.
 public sealed class LauncherConfig
 {
-    // Token GitHub SENGAJA ditanam langsung di kode (beda dari rencana awal
-    // "appsettings.json saja") - keputusan sadar 2026-09-10 setelah diskusi
-    // ulang: end-user (staf TU sekolah) TIDAK mengerti cara bikin Personal
-    // Access Token sendiri ("saya kira tinggal keygen"), jadi 1 token dibuat
-    // SEKALI oleh pemilik proyek lalu ditanam di sini - PC manapun yang instal
-    // aplikasi ini otomatis dapat auto-update aktif SEJAK AWAL, tanpa perlu
-    // mengisi apapun sama sekali. Risiko diterima secara sadar: scope token
-    // ini CUMA "Contents: Read-only" pada 1 repo privat ini (datamaster-desktop)
-    // - kalau file .exe berhasil dibongkar & token diekstrak, dampaknya
-    // terbatas (baca kode sumber, TIDAK BISA ubah apapun) dan bisa dicabut
-    // kapan saja dari github.com/settings/tokens tanpa mematikan aplikasi yang
-    // sudah berjalan (cuma auto-update-nya berhenti sampai token baru terbit).
-    private const string EmbeddedGithubToken = "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";
-
-    // Fine-grained PAT GitHub, scope "Contents: Read-only" KHUSUS repo
-    // "datamaster-desktop" - dipakai UpdateChecker cek/unduh rilis lewat REST API
-    // krn repo ini PRIVAT (URL publik "releases/latest/download/..." SELALU 404
-    // tanpa kredensial utk repo privat - dibuktikan Presensi 2026-09-01, bukan
-    // asumsi). Property MENTAH ini biasanya kosong (null) - PC mana pun boleh
-    // mengisinya manual di appsettings.json kalau suatu saat mau pakai token
-    // sendiri (mis. token bawaan dicabut) - lihat EffectiveGithubToken di bawah
-    // untuk nilai yang SUNGGUHAN dipakai (fallback ke token tertanam).
-    public string? GithubToken { get; set; }
-
-    // Ini yang WAJIB dipakai UpdateChecker (bukan GithubToken mentah di atas) -
-    // pakai token milik PC ini kalau sudah diisi manual, atau token bawaan
-    // tertanam kalau belum. Hasilnya: auto-update SELALU aktif tanpa syarat.
-    public string EffectiveGithubToken => string.IsNullOrWhiteSpace(GithubToken) ? EmbeddedGithubToken : GithubToken;
-
+    // Token GitHub TIDAK ADA LAGI (2026-09-12) - repo "datamaster-desktop"
+    // diubah jadi PUBLIC supaya CI/CD tidak lagi kena limit storage GitHub
+    // Actions (Artifacts/Cache SELALU gratis tak terbatas utk repo public,
+    // beda dari repo privat yang punya kuota kecil). Efek sampingnya:
+    // UpdateChecker.cs sekarang cek/unduh rilis TANPA otentikasi apa pun -
+    // endpoint GitHub REST API repo public bisa diakses siapa saja, sama
+    // seperti pola Presensi. Properti token yang DULU ada di sini (termasuk
+    // 1 PAT asli yang sempat tertanam di kode) sudah dihapus total, bukan
+    // dipindah kemana pun - PAT lama itu WAJIB dicabut manual di
+    // github.com/settings/tokens SEBELUM repo ini benar2 di-flip ke public
+    // (riwayat commit lama yang masih memuat nilai token itu ikut kebuka).
+    //
     // Mode multi-PC 1 jaringan lokal (LAN) - dipakai skenario "3 PC TU SD, 1
     // database utama dipakai bareng" supaya data 100% sama di semua PC (bukan
     // sinkron berkala, tapi LITERAL 1 server/1 database yang sama, PC lain

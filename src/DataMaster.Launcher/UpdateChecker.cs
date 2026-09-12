@@ -3,7 +3,6 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text.Json;
 using System.Windows;
@@ -14,19 +13,20 @@ using Application = System.Windows.Application;
 
 namespace DataMaster.Launcher;
 
-// Auto-update lewat GitHub REST API (BUKAN URL publik "releases/latest/download/
-// ..." - repo "datamaster-desktop" PRIVAT, dan URL semacam itu TERBUKTI SELALU
-// 404 tanpa kredensial utk repo privat - dibuktikan langsung proyek saudara
-// Presensi 2026-09-01, bukan asumsi. Lihat D:\Presensi\src\Presensi\Services\
-// UpdateService.cs - kelas ini adalah ADAPTASI LANGSUNG dari pola itu yang
-// sudah terbukti jalan di lapangan, disesuaikan utk: (1) satu target win-x64
-// self-contained saja (DataMaster tidak perlu dukungan net48 spt kiosk lama),
-// (2) proses ANAK (DataMaster.Web) yang juga harus dimatikan sebelum file
-// ditimpa - lihat ApplyAndRestart().
+// Auto-update lewat GitHub REST API. Kelas ini ADAPTASI dari pola Presensi
+// (D:\Presensi\src\Presensi\Services\UpdateService.cs), disesuaikan utk: (1)
+// satu target win-x64 self-contained saja (DataMaster tidak perlu dukungan
+// net48 spt kiosk lama), (2) proses ANAK (DataMaster.Web) yang juga harus
+// dimatikan sebelum file ditimpa - lihat ApplyAndRestart().
 //
-// Token GitHub disimpan di LauncherConfig (appsettings.json sebelah .exe),
-// BUKAN ditanam di kode - fine-grained PAT scope "Contents: Read-only" KHUSUS
-// repo ini. Kosong = cek update dilewati diam-diam, aplikasi tetap jalan normal.
+// TANPA token/Authorization header (2026-09-12, repo "datamaster-desktop"
+// diubah jadi PUBLIC) - endpoint REST API GitHub (metadata rilis MAUPUN
+// unduh asset lewat /releases/assets/{id}) bisa diakses SIAPA SAJA tanpa
+// kredensial apa pun kalau repo-nya public, PERSIS pola yang sudah lama
+// terbukti jalan di Presensi. Dulu, SEBELUM repo ini public, wajib pakai
+// fine-grained PAT tertanam di kode (LauncherConfig.EmbeddedGithubToken,
+// SUDAH DIHAPUS) krn endpoint API repo privat menolak permintaan anonim -
+// sekarang kebutuhan itu hilang sama sekali, bukan dipindah ke tempat lain.
 public class UpdateChecker
 {
     // Diamati MainWindow utk tampilkan status "jangan tutup aplikasi" di splash -
@@ -46,14 +46,6 @@ public class UpdateChecker
         try
         {
             Log("Mulai cek update...");
-            var config = LauncherConfig.Load();
-            var token = config.EffectiveGithubToken;
-            if (string.IsNullOrWhiteSpace(token))
-            {
-                Log("Dilewati - token GitHub kosong.");
-                return false; // belum dikonfigurasi - dilewati diam2, bukan error
-            }
-
             var installed = Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0);
             Log($"Versi terpasang: {installed}.");
 
@@ -68,7 +60,6 @@ public class UpdateChecker
             using var http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
             // GitHub API MEWAJIBKAN User-Agent (request tanpa ini ditolak 403).
             http.DefaultRequestHeaders.UserAgent.ParseAdd("DataMaster-AlIkhlas86-Updater");
-            http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
 
             string releaseJson;
