@@ -1,59 +1,84 @@
 <Window x:Class="DataMaster.Launcher.SetupWizardWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Data Master - Setup Awal" Height="560" Width="620"
+        Title="Data Master - Setup Awal" Height="600" Width="640"
+        MinHeight="420" MinWidth="560"
         WindowStartupLocation="CenterScreen"
-        WindowStyle="SingleBorderWindow" ResizeMode="CanMinimize">
-    <Grid Margin="32">
+        WindowStyle="SingleBorderWindow" ResizeMode="CanResize">
+    <!--
+    BUG FATAL NYATA (2026-09-12, dilaporkan user LANGSUNG di tengah instalasi
+    PC TK sungguhan): Grid akar SEBELUMNYA 4 baris "Auto" semua, TANPA area
+    scroll sama sekali, di jendela ResizeMode="CanMinimize" (user TIDAK BISA
+    memperbesar jendela sendiri sbg jalan keluar darurat). Begitu mode
+    "Server" dipilih, BorderDetail/PanelServer menampilkan blok teks+kontrol
+    yang cukup panjang (port, nama PC, tombol salin, 2 paragraf instruksi
+    firewall) - total tinggi konten gampang lewat dari tinggi jendela tetap
+    (560px), dan krn TIDAK ADA ScrollViewer, kelebihannya bukan bisa
+    digulir - tombol "Lanjutkan" di baris PALING BAWAH ikut terdorong keluar
+    area jendela yang terlihat, jadi SAMA SEKALI TIDAK BISA DIKLIK. User
+    sampai macet total di tengah instalasi produksi.
+
+    Diperbaiki dgn pola instalasi WAJAR (bukan trik baru): konten variabel
+    (header+pilihan+detail) dibungkus SATU ScrollViewer yang mengisi sisa
+    ruang (Row "*"), tombol aksi ditaruh di baris TERPISAH "Auto" yang
+    SELALU ada & SELALU di posisi sama - tidak peduli seberapa panjang
+    konten di atasnya, tombol tidak akan pernah ikut terdorong lagi.
+    ResizeMode juga diubah ke "CanResize" (dari "CanMinimize") sbg jaring
+    pengaman kedua - kalau suatu saat ada teks yang bahkan lebih panjang
+    lagi, user tetap punya jalan manual memperbesar jendela sendiri.
+    -->
+    <Grid Margin="32,32,32,0">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0" Margin="0,0,0,20">
-            <TextBlock Text="Cara pakai PC ini" FontSize="22" FontWeight="Bold"/>
-            <TextBlock Text="Pilihan ini ditanyakan saat pertama kali dibuka. Bisa diubah lagi kapan saja lewat tombol 'Ganti Pengaturan Jaringan' di pojok jendela utama." FontSize="12" Foreground="#6B7280" Margin="0,4,0,0" TextWrapping="Wrap"/>
-        </StackPanel>
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" Margin="0,0,-24,0">
+            <StackPanel Margin="0,0,24,0">
+                <StackPanel Margin="0,0,0,20">
+                    <TextBlock Text="Cara pakai PC ini" FontSize="22" FontWeight="Bold"/>
+                    <TextBlock Text="Pilihan ini ditanyakan saat pertama kali dibuka. Bisa diubah lagi kapan saja lewat tombol 'Ganti Pengaturan Jaringan' di pojok jendela utama." FontSize="12" Foreground="#6B7280" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
 
-        <StackPanel Grid.Row="1" Margin="0,0,0,16">
-            <RadioButton x:Name="RbMandiri" Content="PC ini berdiri sendiri (paling umum)" FontWeight="SemiBold" FontSize="14" IsChecked="True" Checked="ModePilihan_Changed" Margin="0,0,0,4"/>
-            <TextBlock Text="Data &amp; server ada di PC ini saja. Pilih ini kalau cuma 1 PC di unit ini (mis. PC TU TK)." FontSize="12" Foreground="#6B7280" Margin="24,0,0,16" TextWrapping="Wrap"/>
+                <StackPanel Margin="0,0,0,16">
+                    <RadioButton x:Name="RbMandiri" Content="PC ini berdiri sendiri (paling umum)" FontWeight="SemiBold" FontSize="14" IsChecked="True" Checked="ModePilihan_Changed" Margin="0,0,0,4"/>
+                    <TextBlock Text="Data &amp; server ada di PC ini saja. Pilih ini kalau cuma 1 PC di unit ini (mis. PC TU TK)." FontSize="12" Foreground="#6B7280" Margin="24,0,0,16" TextWrapping="Wrap"/>
 
-            <RadioButton x:Name="RbServer" Content="PC ini jadi SERVER (dipakai bareng PC lain di jaringan yang sama)" FontWeight="SemiBold" FontSize="14" Checked="ModePilihan_Changed" Margin="0,0,0,4"/>
-            <TextBlock Text="Pilih ini di 1 PC saja (yang paling jarang dimatikan) - PC lain akan menampilkan data dari PC ini." FontSize="12" Foreground="#6B7280" Margin="24,0,0,16" TextWrapping="Wrap"/>
+                    <RadioButton x:Name="RbServer" Content="PC ini jadi SERVER (dipakai bareng PC lain di jaringan yang sama)" FontWeight="SemiBold" FontSize="14" Checked="ModePilihan_Changed" Margin="0,0,0,4"/>
+                    <TextBlock Text="Pilih ini di 1 PC saja (yang paling jarang dimatikan) - PC lain akan menampilkan data dari PC ini." FontSize="12" Foreground="#6B7280" Margin="24,0,0,16" TextWrapping="Wrap"/>
 
-            <RadioButton x:Name="RbKlien" Content="PC ini ikut PC lain (klien)" FontWeight="SemiBold" FontSize="14" Checked="ModePilihan_Changed" Margin="0,0,0,4"/>
-            <TextBlock Text="Pilih ini kalau ada PC lain di unit ini yang sudah diatur sebagai 'Server' - PC ini tidak punya data sendiri, cuma menampilkan data PC server." FontSize="12" Foreground="#6B7280" Margin="24,0,0,0" TextWrapping="Wrap"/>
-        </StackPanel>
+                    <RadioButton x:Name="RbKlien" Content="PC ini ikut PC lain (klien)" FontWeight="SemiBold" FontSize="14" Checked="ModePilihan_Changed" Margin="0,0,0,4"/>
+                    <TextBlock Text="Pilih ini kalau ada PC lain di unit ini yang sudah diatur sebagai 'Server' - PC ini tidak punya data sendiri, cuma menampilkan data PC server." FontSize="12" Foreground="#6B7280" Margin="24,0,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
 
-        <Border x:Name="BorderDetail" Grid.Row="2" Background="#F3F4F6" CornerRadius="8" Padding="16" VerticalAlignment="Top" Visibility="Collapsed">
-            <StackPanel>
-                <StackPanel x:Name="PanelServer" Visibility="Collapsed">
-                    <TextBlock Text="Port server" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4"/>
-                    <TextBox x:Name="TxtServerPort" Text="5250" Width="120" HorizontalAlignment="Left" Padding="6"/>
-                    <TextBlock Margin="0,14,0,0" FontSize="13" FontWeight="SemiBold" Text="Nama PC ini:"/>
-                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                        <TextBlock x:Name="TxtNamaPcServer" FontSize="16" FontWeight="Bold" Foreground="#1D4ED8" VerticalAlignment="Center"/>
-                        <Button x:Name="BtnSalinAlamat" Content="Salin alamat" Padding="10,4" Margin="12,0,0,0" Click="BtnSalinAlamat_Click"/>
+                <Border x:Name="BorderDetail" Background="#F3F4F6" CornerRadius="8" Padding="16" Margin="0,0,0,16" VerticalAlignment="Top" Visibility="Collapsed">
+                    <StackPanel>
+                        <StackPanel x:Name="PanelServer" Visibility="Collapsed">
+                            <TextBlock Text="Port server" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4"/>
+                            <TextBox x:Name="TxtServerPort" Text="5250" Width="120" HorizontalAlignment="Left" Padding="6"/>
+                            <TextBlock Margin="0,14,0,0" FontSize="13" FontWeight="SemiBold" Text="Nama PC ini:"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                <TextBlock x:Name="TxtNamaPcServer" FontSize="16" FontWeight="Bold" Foreground="#1D4ED8" VerticalAlignment="Center"/>
+                                <Button x:Name="BtnSalinAlamat" Content="Salin alamat" Padding="10,4" Margin="12,0,0,0" Click="BtnSalinAlamat_Click"/>
+                            </StackPanel>
+                            <TextBlock x:Name="TxtSalinSukses" Text="Alamat disalin - tinggal tempel (paste) di kotak 'Alamat PC server' di PC klien." FontSize="12" Foreground="#059669" Margin="0,4,0,0" Visibility="Collapsed"/>
+                            <TextBlock Margin="0,4,0,0" FontSize="12" Foreground="#6B7280" TextWrapping="Wrap"
+                                       Text="Catat nama ini - saat setup PC klien nanti, alamat yang diisi di sana adalah nama ini (bukan alamat IP). Nama PC TIDAK PERNAH berubah walau PC dimatikan/dinyalakan ulang, beda dari IP yang bisa berubah-ubah - jadi pakai nama ini supaya tidak perlu diatur ulang lagi ke depannya."/>
+                            <TextBlock Margin="0,10,0,0" FontSize="12" Foreground="#6B7280" TextWrapping="Wrap"
+                                       Text="Setelah ini, izinkan port di atas masuk lewat Windows Firewall PC ini (Control Panel → Windows Defender Firewall → Pengaturan lanjutan → Inbound Rules → New Rule → Port), supaya PC klien bisa menyambung."/>
+                        </StackPanel>
+                        <StackPanel x:Name="PanelKlien" Visibility="Collapsed">
+                            <TextBlock Text="Alamat PC server di jaringan ini" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4"/>
+                            <TextBox x:Name="TxtKlienUrl" Text="http://NAMA-PC-SERVER:5250" Padding="6"/>
+                            <TextBlock Margin="0,10,0,0" FontSize="12" Foreground="#6B7280" TextWrapping="Wrap"
+                                       Text="Isi NAMA PC yang sudah diatur sebagai 'Server' (lihat layar 'Nama PC ini' di PC itu), diikuti port-nya - contoh di atas. Pakai nama PC, BUKAN alamat IP - nama tidak pernah berubah walau PC mati-nyala, IP bisa berubah-ubah tiap kali PC nyala ulang."/>
+                        </StackPanel>
                     </StackPanel>
-                    <TextBlock x:Name="TxtSalinSukses" Text="Alamat disalin - tinggal tempel (paste) di kotak 'Alamat PC server' di PC klien." FontSize="12" Foreground="#059669" Margin="0,4,0,0" Visibility="Collapsed"/>
-                    <TextBlock Margin="0,4,0,0" FontSize="12" Foreground="#6B7280" TextWrapping="Wrap"
-                               Text="Catat nama ini - saat setup PC klien nanti, alamat yang diisi di sana adalah nama ini (bukan alamat IP). Nama PC TIDAK PERNAH berubah walau PC dimatikan/dinyalakan ulang, beda dari IP yang bisa berubah-ubah - jadi pakai nama ini supaya tidak perlu diatur ulang lagi ke depannya."/>
-                    <TextBlock Margin="0,10,0,0" FontSize="12" Foreground="#6B7280" TextWrapping="Wrap"
-                               Text="Setelah ini, izinkan port di atas masuk lewat Windows Firewall PC ini (Control Panel → Windows Defender Firewall → Pengaturan lanjutan → Inbound Rules → New Rule → Port), supaya PC klien bisa menyambung."/>
-                </StackPanel>
-                <StackPanel x:Name="PanelKlien" Visibility="Collapsed">
-                    <TextBlock Text="Alamat PC server di jaringan ini" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4"/>
-                    <TextBox x:Name="TxtKlienUrl" Text="http://NAMA-PC-SERVER:5250" Padding="6"/>
-                    <TextBlock Margin="0,10,0,0" FontSize="12" Foreground="#6B7280" TextWrapping="Wrap"
-                               Text="Isi NAMA PC yang sudah diatur sebagai 'Server' (lihat layar 'Nama PC ini' di PC itu), diikuti port-nya - contoh di atas. Pakai nama PC, BUKAN alamat IP - nama tidak pernah berubah walau PC mati-nyala, IP bisa berubah-ubah tiap kali PC nyala ulang."/>
-                </StackPanel>
+                </Border>
             </StackPanel>
-        </Border>
+        </ScrollViewer>
 
-        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,24">
             <TextBlock x:Name="TxtError" Foreground="#DC2626" FontSize="12" VerticalAlignment="Center" Margin="0,0,16,0" Visibility="Collapsed"/>
             <Button x:Name="BtnLanjut" Content="Lanjutkan" Padding="20,10" FontWeight="SemiBold" Click="BtnLanjut_Click"/>
         </StackPanel>
