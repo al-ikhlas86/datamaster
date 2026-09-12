@@ -34,7 +34,69 @@ try
 }
 catch { /* non-fatal - lihat komentar di atas */ }
 
+// SELF-KONFIGURASI dari %LocalAppData%\DataMaster (2026-09-12, poin Windows
+// Service) - SEBELUM ini, path database & kredensial Hub API HANYA pernah
+// diisi lewat environment variable yang di-inject Launcher (WPF) saat
+// menjalankan ini sbg ANAK PROSES (lihat ServerProcessManager.cs) - begitu
+// app ini jadi Windows Service sungguhan (dijalankan Service Control
+// Manager, TANPA Launcher jadi induknya sama sekali), tidak ada lagi yang
+// meng-inject env var itu, app akan salah alamat database (balik ke
+// App_Data/datamaster.db bawaan di DALAM folder instalasi - hilang/salah
+// tiap auto-update).
+//
+// Diperbaiki: app ini SEKARANG membaca sendiri lokasi yang SAMA PERSIS yang
+// sudah dipakai (tidak ada migrasi data, path fisiknya IDENTIK) - HANYA
+// kalau env var belum diisi dari luar (`??=` semangatnya - kalau Launcher
+// versi lama ATAU sesi tes manual sudah men-set env var duluan, itu tetap
+// menang, tidak ditimpa - backward compatible penuh dgn cara lama & dgn
+// pola tes ConnectionStrings__DataMaster=... yang dipakai sepanjang sesi
+// pengembangan ini).
+try
+{
+    var dataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DataMaster");
+    var appDataDir = Path.Combine(dataDir, "App_Data");
+    Directory.CreateDirectory(appDataDir);
+
+    if (Environment.GetEnvironmentVariable("ConnectionStrings__DataMaster") is null)
+    {
+        Environment.SetEnvironmentVariable("ConnectionStrings__DataMaster", $"Data Source={Path.Combine(appDataDir, "datamaster.db")}");
+    }
+
+    var hubApiConfigPath = Path.Combine(dataDir, "hubapi.json");
+    if (Environment.GetEnvironmentVariable("AppSettings__HubApiUrl") is null && File.Exists(hubApiConfigPath))
+    {
+        using var doc = JsonDocument.Parse(File.ReadAllText(hubApiConfigPath));
+        if (doc.RootElement.TryGetProperty("HubApiUrl", out var u)) Environment.SetEnvironmentVariable("AppSettings__HubApiUrl", u.GetString());
+        if (doc.RootElement.TryGetProperty("HubApiToken", out var t)) Environment.SetEnvironmentVariable("AppSettings__HubApiToken", t.GetString());
+    }
+
+    // service-config.json (2026-09-12) - port/alamat dengar Kestrel, ditulis
+    // SEKALI oleh Launcher saat memasang Windows Service (lihat
+    // ServerProcessManager.PasangServiceAsync). Windows Service TIDAK PUNYA
+    // "proses induk" yang bisa inject ASPNETCORE_URLS via ProcessStartInfo
+    // (beda dari anak proses biasa) - satu2nya cara service ini tahu port
+    // mana yang harus didengarkan adalah baca sendiri dari file ini, pola
+    // SAMA PERSIS hubapi.json di atas.
+    var serviceConfigPath = Path.Combine(dataDir, "service-config.json");
+    if (Environment.GetEnvironmentVariable("ASPNETCORE_URLS") is null && File.Exists(serviceConfigPath))
+    {
+        using var doc = JsonDocument.Parse(File.ReadAllText(serviceConfigPath));
+        if (doc.RootElement.TryGetProperty("Port", out var p) && p.TryGetInt32(out var port))
+        {
+            Environment.SetEnvironmentVariable("ASPNETCORE_URLS", $"http://0.0.0.0:{port}");
+        }
+    }
+}
+catch { /* non-fatal - kalau gagal baca, fallback ke appsettings.json bawaan seperti biasa */ }
+
 var builder = WebApplication.CreateBuilder(args);
+// UseWindowsService() (2026-09-12) - HANYA benar2 aktif kalau proses ini
+// SUNGGUHAN dimulai Service Control Manager (Process.GetCurrentProcess()
+// parent != services.exe -> no-op otomatis) - 100% aman dipasang walau app
+// tetap sering dijalankan cara lama (anak proses Launcher) atau `dotnet run`
+// manual spt sepanjang sesi pengembangan ini, tidak mengubah perilaku
+// apa pun di kedua skenario itu.
+builder.Host.UseWindowsService();
 
 // Add services to the container.
 // Session dipakai utk alur preview-import 2 langkah (persis pola PHP

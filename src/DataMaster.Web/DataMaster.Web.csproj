@@ -10,6 +10,11 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <!-- Windows Service (2026-09-12) - lihat catatan panjang di Program.cs.
+         Paket ini AMAN dipasang walau app tetap dijalankan cara lama (anak
+         proses Launcher) - UseWindowsService() cuma aktif kalau proses BENAR2
+         dimulai Service Control Manager, no-op total di skenario lain. -->
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.0" />
   </ItemGroup>
 
   <PropertyGroup>

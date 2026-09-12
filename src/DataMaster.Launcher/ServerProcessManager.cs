@@ -66,6 +66,23 @@ public sealed class ServerProcessManager : IDisposable
 
         _intentionalStop = false;
         var isServerMode = _config.Mode == "server";
+        Directory.CreateDirectory(DataDirectory);
+
+        // Windows Service (2026-09-12, poin "server harus nyala sendiri tanpa
+        // buka aplikasi") - DICOBA DULUAN utk mode Mandiri/Server, sebelum jalur
+        // anak-proses lama. Port SELALU _config.ServerPort (5250 bawaan) di
+        // jalur ini (bukan port acak) - service persisten lintas restart PC,
+        // Launcher berikutnya harus tahu port yg SAMA tanpa ada yg
+        // memberitahunya ulang. Lihat WindowsServiceHelper.cs utk detail &
+        // kenapa fallback ke anak proses WAJIB ada.
+        if (TryPakaiWindowsService(isServerMode))
+        {
+            return await WaitUntilHealthyAsync(ct, checkLocalProcessAlive: false, timeoutSeconds: 30);
+        }
+
+        // --- Fallback: cara LAMA (anak proses) - dipertahankan APA ADANYA
+        // supaya PC yang gagal dipasangi service (mis. UAC ditolak/sc.exe
+        // error) TETAP BISA DIPAKAI, bukan mati total. ---
         Port = isServerMode ? _config.ServerPort : GetFreeTcpPort();
         // BaseUrl (dipakai WebView2 PC INI sendiri + healthz check lokal) SELALU
         // loopback - Kestrel yang didengarkan ke 0.0.0.0 tetap menjawab di
@@ -76,7 +93,6 @@ public sealed class ServerProcessManager : IDisposable
         BaseUrl = $"http://127.0.0.1:{Port}";
         var listenUrl = isServerMode ? $"http://0.0.0.0:{Port}" : BaseUrl;
 
-        Directory.CreateDirectory(DataDirectory);
         var logDir = Path.Combine(DataDirectory, "logs");
         Directory.CreateDirectory(logDir);
         LogCleanup.RotasiLogLama(logDir);
@@ -158,6 +174,53 @@ public sealed class ServerProcessManager : IDisposable
         _process.BeginErrorReadLine();
 
         return await WaitUntilHealthyAsync(ct, checkLocalProcessAlive: true, timeoutSeconds: 30);
+    }
+
+    // Coba jalur Windows Service (2026-09-12) - lihat catatan panjang di
+    // WindowsServiceHelper.cs & StartAsync di atas. Return false kalau jalur
+    // ini TIDAK berhasil disiapkan sama sekali (service belum ada & gagal
+    // dipasang, atau proses instalasi service.exe tidak ditemukan) - pemanggil
+    // WAJIB lanjut ke fallback anak proses, BUKAN anggap sukses.
+    private bool TryPakaiWindowsService(bool isServerMode)
+    {
+        if (WindowsServiceHelper.IsRunning())
+        {
+            Port = _config.ServerPort;
+            BaseUrl = $"http://127.0.0.1:{Port}";
+            return true;
+        }
+
+        if (WindowsServiceHelper.IsInstalled())
+        {
+            WindowsServiceHelper.EnsureStarted();
+            if (WindowsServiceHelper.IsRunning())
+            {
+                Port = _config.ServerPort;
+                BaseUrl = $"http://127.0.0.1:{Port}";
+                return true;
+            }
+            return false; // terpasang tapi gagal nyala - fallback, jangan paksa
+        }
+
+        // Belum pernah dipasang sama sekali - ini titik SEKALI SAJA yang
+        // memicu 1x prompt UAC (instalasi pertama fitur ini, atau PC yang
+        // baru pertama kali install Data Master versi ini). Kalau ditolak/
+        // gagal, TryInstallAndStart return false & StartAsync lanjut fallback
+        // - PC tetap bisa dipakai seperti sebelumnya, cuma belum dapat manfaat
+        // "server nyala sendiri" sampai instalasi service diulang lain kali.
+        string webExePath;
+        try
+        {
+            var (fileName, _, _) = LocateServerExecutable();
+            if (!fileName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) return false; // mode dev (dotnet <dll>) - service butuh exe asli
+            webExePath = fileName;
+        }
+        catch
+        {
+            return false;
+        }
+
+        return WindowsServiceHelper.TryInstallAndStart(webExePath, DataDirectory, _config.ServerPort);
     }
 
     private async Task<bool> WaitUntilHealthyAsync(CancellationToken ct, bool checkLocalProcessAlive, int timeoutSeconds)

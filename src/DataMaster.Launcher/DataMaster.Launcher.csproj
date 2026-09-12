@@ -6,6 +6,8 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4191.47" />
+    <!-- Windows Service (2026-09-12) - lihat WindowsServiceHelper.cs. -->
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.0" />
   </ItemGroup>
 
   <PropertyGroup>
