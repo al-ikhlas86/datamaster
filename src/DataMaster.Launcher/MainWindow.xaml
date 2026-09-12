@@ -7,6 +7,7 @@
         xmlns:local="clr-namespace:DataMaster.Launcher"
         mc:Ignorable="d"
         Title="Data Master" Height="800" Width="1280"
+        Icon="app.ico"
         WindowStartupLocation="CenterScreen"
         MinHeight="600" MinWidth="900"
         WindowStyle="SingleBorderWindow" ResizeMode="CanResize" WindowState="Maximized">

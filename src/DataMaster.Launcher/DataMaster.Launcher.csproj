@@ -10,6 +10,15 @@
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Dijadikan Resource (bukan cuma ApplicationIcon di atas) supaya URI
+         relatif "app.ico" pada atribut Icon= tiap Window (title bar/Alt-Tab)
+         benar2 bisa di-resolve WPF saat runtime - ApplicationIcon SENDIRI
+         cuma menempel jadi resource Win32 utk ikon .exe (Explorer/taskbar),
+         TIDAK otomatis ikut ke pack resource yang dipakai Window.Icon. -->
+    <Resource Include="app.ico" />
+  </ItemGroup>
+
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
@@ -23,6 +32,10 @@
     <!-- Dibandingkan UpdateChecker terhadap tag rilis GitHub (vX.Y.Z) - naikkan
          tiap kali CI/CD menerbitkan rilis baru. -->
     <Version>1.0.0</Version>
+    <!-- Logo resmi Yayasan Al-Ikhlas 86 (2026-09-12, permintaan eksplisit user)
+         - dipakai icon .exe (Explorer/taskbar) DAN icon tiap jendela (title
+         bar/Alt-Tab, lihat atribut Icon= di masing2 .xaml). -->
+    <ApplicationIcon>app.ico</ApplicationIcon>
   </PropertyGroup>
 
 </Project>
