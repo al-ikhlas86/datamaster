@@ -63,11 +63,20 @@ try
     }
 
     var hubApiConfigPath = Path.Combine(dataDir, "hubapi.json");
-    if (Environment.GetEnvironmentVariable("AppSettings__HubApiUrl") is null && File.Exists(hubApiConfigPath))
+    if (File.Exists(hubApiConfigPath))
     {
         using var doc = JsonDocument.Parse(File.ReadAllText(hubApiConfigPath));
-        if (doc.RootElement.TryGetProperty("HubApiUrl", out var u)) Environment.SetEnvironmentVariable("AppSettings__HubApiUrl", u.GetString());
-        if (doc.RootElement.TryGetProperty("HubApiToken", out var t)) Environment.SetEnvironmentVariable("AppSettings__HubApiToken", t.GetString());
+        if (Environment.GetEnvironmentVariable("AppSettings__HubApiUrl") is null && doc.RootElement.TryGetProperty("HubApiUrl", out var u))
+            Environment.SetEnvironmentVariable("AppSettings__HubApiUrl", u.GetString());
+        if (Environment.GetEnvironmentVariable("AppSettings__HubApiToken") is null && doc.RootElement.TryGetProperty("HubApiToken", out var t))
+            Environment.SetEnvironmentVariable("AppSettings__HubApiToken", t.GetString());
+        // BackupPassphrase (2026-09-12, BUG NYATA - lihat UserSettingsViewModel.
+        // BackupPassphraseAktif) - file JSON yang SAMA dgn Hub API (bukan file
+        // baru), field baru saja. Dulu TIDAK ADA jalur apa pun mengisi nilai ini
+        // (appsettings.json bawaan SELALU kosong) - backup awan diam2 tidak
+        // pernah jalan di instalasi manapun sejak fitur ini ada.
+        if (Environment.GetEnvironmentVariable("AppSettings__BackupPassphrase") is null && doc.RootElement.TryGetProperty("BackupPassphrase", out var bp))
+            Environment.SetEnvironmentVariable("AppSettings__BackupPassphrase", bp.GetString());
     }
 
     // service-config.json (2026-09-12) - port/alamat dengar Kestrel, ditulis

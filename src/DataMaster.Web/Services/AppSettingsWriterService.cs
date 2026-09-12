@@ -29,18 +29,10 @@ public class AppSettingsWriterService(ILogger<AppSettingsWriterService> logger)
     {
         try
         {
-            var path = PathHubApiEksternal;
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-
-            var root = File.Exists(path)
-                ? JsonNode.Parse(await File.ReadAllTextAsync(path))?.AsObject() ?? new JsonObject()
-                : new JsonObject();
-
+            var root = await BacaAsync();
             if (hubApiUrl is not null) root["HubApiUrl"] = hubApiUrl.Trim();
             if (hubApiToken is not null) root["HubApiToken"] = hubApiToken.Trim();
-
-            var options = new JsonSerializerOptions { WriteIndented = true };
-            await File.WriteAllTextAsync(path, root.ToJsonString(options));
+            await TulisAsync(root);
         }
         catch (Exception ex)
         {
@@ -50,5 +42,31 @@ public class AppSettingsWriterService(ILogger<AppSettingsWriterService> logger)
             // tulis config ikut menggagalkan Setup Awal sepenuhnya.
             logger.LogWarning(ex, "Gagal menulis konfigurasi Hub API ke file eksternal.");
         }
+    }
+
+    // Kata sandi enkripsi backup awan (2026-09-12, BUG NYATA - lihat catatan
+    // panjang di UserSettingsViewModel.BackupPassphraseAktif). Ditulis ke file
+    // EKSTERNAL yang SAMA (bukan file terpisah baru) - pola persis Hub API,
+    // aman dari auto-update & dibaca Program.cs dgn cara yang sama persis.
+    public async Task SetBackupPassphraseAsync(string passphrase)
+    {
+        var root = await BacaAsync();
+        root["BackupPassphrase"] = passphrase.Trim();
+        await TulisAsync(root);
+    }
+
+    private async Task<JsonObject> BacaAsync()
+    {
+        var path = PathHubApiEksternal;
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        return File.Exists(path)
+            ? JsonNode.Parse(await File.ReadAllTextAsync(path))?.AsObject() ?? new JsonObject()
+            : new JsonObject();
+    }
+
+    private static async Task TulisAsync(JsonObject root)
+    {
+        var options = new JsonSerializerOptions { WriteIndented = true };
+        await File.WriteAllTextAsync(PathHubApiEksternal, root.ToJsonString(options));
     }
 }

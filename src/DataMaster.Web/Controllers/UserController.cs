@@ -45,6 +45,7 @@ public class UserController(DataMasterDbContext db, DatabaseBackupService backup
             LanHostname = appOptions.Value.LanHostname,
             LanPort = appOptions.Value.LanPort,
             HubApiAktif = !string.IsNullOrWhiteSpace(appOptions.Value.HubApiUrl) && !string.IsNullOrWhiteSpace(appOptions.Value.HubApiToken),
+            BackupPassphraseAktif = !string.IsNullOrWhiteSpace(appOptions.Value.BackupPassphrase),
         };
         return View(vm);
     }
@@ -236,6 +237,28 @@ public class UserController(DataMasterDbContext db, DatabaseBackupService backup
 
         await appSettingsWriter.SetHubApiConfigAsync(AppOptions.HubApiUrlResmi, token);
         TempData["message"] = "Berhasil disambungkan ke Hub API. Menyalakan ulang sebentar untuk mengaktifkan sinkronisasi...";
+        lifetime.StopApplication();
+        return RedirectToAction(nameof(Index));
+    }
+
+    // Isi kata sandi enkripsi backup awan (2026-09-12, BUG NYATA - lihat
+    // UserSettingsViewModel.BackupPassphraseAktif utk kronologi lengkap: fitur
+    // backup awan sudah ADA & benar sejak awal, tapi TIDAK ADA satu pun jalur
+    // UI utk mengisi prasyaratnya - backup diam2 tidak pernah jalan di
+    // instalasi manapun). Restart diperlukan (pola sama SambungkanHubApi) -
+    // IOptions<AppOptions> singleton, tidak hot-reload.
+    [HttpPost("backup-passphrase")]
+    public async Task<IActionResult> SimpanBackupPassphrase(string? passphrase)
+    {
+        var nilai = (passphrase ?? "").Trim();
+        if (nilai.Length < 16)
+        {
+            TempData["error"] = "Kata sandi backup minimal 16 karakter.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        await appSettingsWriter.SetBackupPassphraseAsync(nilai);
+        TempData["message"] = "Kata sandi backup awan berhasil disimpan. Menyalakan ulang sebentar untuk mengaktifkannya...";
         lifetime.StopApplication();
         return RedirectToAction(nameof(Index));
     }

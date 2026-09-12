@@ -119,6 +119,21 @@
                 <p class="mb-1 small text-muted">Backup Online Terakhir</p>
                 <p class="mb-3">@(Model.LastBackupOnlineAt?.ToString("d MMM yyyy HH:mm") ?? "-")</p>
 
+                @if (!Model.BackupPassphraseAktif)
+                {
+                    <div class="alert alert-warning py-2 px-3 small mb-3">
+                        <strong>Backup Online belum aktif.</strong> Isi Kata Sandi Backup Awan di bawah dulu (sekali saja) - tanpa ini, Backup Online TIDAK PERNAH berjalan walau jam sudah diatur.
+                    </div>
+                }
+                <form asp-controller="User" asp-action="SimpanBackupPassphrase" method="post" class="mb-3">
+                    <label class="small text-muted mb-1">Kata Sandi Backup Awan @(Model.BackupPassphraseAktif ? "(sudah diisi - isi ulang utk mengganti)" : "(belum diisi)")</label>
+                    <div class="input-group">
+                        <input type="password" name="passphrase" class="form-control" minlength="16" placeholder="Minimal 16 karakter" required />
+                        <button type="submit" class="btn btn-outline-secondary">Simpan</button>
+                    </div>
+                    <p class="small text-muted mt-1 mb-0">Dipakai mengenkripsi backup sebelum dikirim ke luar - SIMPAN baik-baik, sandi hilang = backup lama tidak bisa dibuka lagi.</p>
+                </form>
+
                 <form asp-controller="User" asp-action="SimpanJadwalBackup" method="post" class="d-flex gap-2 mb-3">
                     <select name="jam_backup" class="form-select">
                         @for (var h = 0; h < 24; h++)
