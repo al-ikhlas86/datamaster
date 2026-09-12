@@ -241,7 +241,7 @@ public class CalonSiswaController(DataMasterDbContext db, DocumentStorageService
         var calon = await db.CalonSiswa.FindAsync(id);
         if (calon is null) return NotFound($"Calon siswa dengan ID {id} tidak ditemukan.");
 
-        var errors = await ValidateFormAsync(input);
+        var errors = await ValidateFormAsync(input, excludeId: id);
         if (errors.Count > 0)
         {
             var vm = await ToFormViewModelAsync(calon);
@@ -463,7 +463,7 @@ public class CalonSiswaController(DataMasterDbContext db, DocumentStorageService
     private static string? OnlyDigitsOrNull(string? s) => string.IsNullOrWhiteSpace(s) ? null : Regex.Replace(s, @"\D+", "");
     private static bool IsNumericLike(string s) => Regex.IsMatch(s, @"^-?\d+(\.\d+)?$");
 
-    private async Task<Dictionary<string, string>> ValidateFormAsync(CalonSiswaFormInput input)
+    private async Task<Dictionary<string, string>> ValidateFormAsync(CalonSiswaFormInput input, int? excludeId = null)
     {
         var e = new Dictionary<string, string>();
 
@@ -472,6 +472,27 @@ public class CalonSiswaController(DataMasterDbContext db, DocumentStorageService
         else if (nama.Length < 3) e["Nama"] = "Nama minimal 3 karakter.";
         else if (nama.Length > 100) e["Nama"] = "Nama maksimal 100 karakter.";
         else if (!Regex.IsMatch(nama, ValidationPatterns.RegexNama)) e["Nama"] = "Nama " + ValidationPatterns.PesanRegexNama;
+
+        // Cegah duplikat pendaftaran (2026-09-11, poin #14) - SEBELUMNYA tidak ada
+        // pengecekan sama sekali, ortu yang tidak sengaja submit formulir 2x (mis.
+        // koneksi lambat, klik dobel) atau daftar ulang anak yang sama tanpa sadar
+        // sudah pernah didaftarkan akan membuat 2 baris CalonSiswa utk 1 anak yang
+        // sama. Dicocokkan by Nama (case-insensitive) + Tanggal Lahir - HANYA
+        // terhadap baris berstatus 'menunggu' (yang SUDAH diterima/ditolak boleh
+        // didaftarkan ulang, mis. daftar ulang tahun ajaran lain). TanggalLahir
+        // kosong (opsional) -> cek Nama+NoHandphone sbg gantinya, supaya tetap ada
+        // sinyal duplikat walau TTL belum diisi.
+        if (nama != "" && !e.ContainsKey("Nama"))
+        {
+            var kandidat = db.CalonSiswa.Where(c => c.Status == StatusCalonSiswa.menunggu && c.Nama.ToLower() == nama.ToLower());
+            if (excludeId is not null) kandidat = kandidat.Where(c => c.CalonSiswaId != excludeId);
+
+            var cocok = input.TanggalLahir is not null
+                ? await kandidat.AnyAsync(c => c.TanggalLahir == input.TanggalLahir)
+                : (!string.IsNullOrWhiteSpace(input.NoHandphone) && await kandidat.AnyAsync(c => c.NoHandphone == OnlyDigitsOrNull(input.NoHandphone)));
+
+            if (cocok) e["Nama"] = $"Sudah ada pendaftaran atas nama \"{nama}\" yang masih menunggu diproses - cek daftar Calon Siswa dulu sebelum mendaftarkan ulang, kalau ini memang anak yang sama.";
+        }
 
         if (input.JenisKelamin != "L" && input.JenisKelamin != "P") e["JenisKelamin"] = "Jenis kelamin wajib dipilih.";
 
