@@ -69,13 +69,22 @@ public sealed class ServerProcessManager : IDisposable
         Directory.CreateDirectory(DataDirectory);
 
         // Windows Service (2026-09-12, poin "server harus nyala sendiri tanpa
-        // buka aplikasi") - DICOBA DULUAN utk mode Mandiri/Server, sebelum jalur
-        // anak-proses lama. Port SELALU _config.ServerPort (5250 bawaan) di
-        // jalur ini (bukan port acak) - service persisten lintas restart PC,
-        // Launcher berikutnya harus tahu port yg SAMA tanpa ada yg
-        // memberitahunya ulang. Lihat WindowsServiceHelper.cs utk detail &
-        // kenapa fallback ke anak proses WAJIB ada.
-        if (TryPakaiWindowsService(isServerMode))
+        // buka aplikasi") - HANYA utk mode "server" (PC yang benar2 dipakai PC
+        // klien LAIN di jaringan). Mode "mandiri" (individu, 1 PC, TIDAK ada
+        // klien lain yang bergantung) SENGAJA TIDAK PERNAH lewat jalur ini -
+        // kalau app-nya ditutup di PC mandiri, memang tidak ada yang perlu
+        // dilayani lagi, jadi tidak ada alasan menambah kerumitan/risiko UAC
+        // & Service Control Manager utk PC seperti itu. Bug nyata ditemukan:
+        // sebelum guard `isServerMode` ini, instalasi Individu di laptop dev
+        // ikut lewat jalur Windows Service, dan kalau PC itu KEBETULAN sudah
+        // punya `DataMasterWebService` basi dari instalasi/pengujian lain
+        // (path exe beda), TryPakaiWindowsService percaya begitu saja bahwa
+        // service basi itu representasi yang benar (WindowsServiceHelper.IsRunning()
+        // cuma cek STATUS, tidak cek exe mana yang sebenarnya didengarkan) -
+        // healthz tidak pernah menjawab, "Gagal Start" 30 detik. Lihat juga
+        // WindowsServiceHelper.TryPakaiOrPerbaiki() utk pertahanan tambahan
+        // (deteksi mismatch binPath) khusus kasus PC Server itu sendiri.
+        if (isServerMode && TryPakaiWindowsService())
         {
             return await WaitUntilHealthyAsync(ct, checkLocalProcessAlive: false, timeoutSeconds: 30);
         }
@@ -176,38 +185,18 @@ public sealed class ServerProcessManager : IDisposable
         return await WaitUntilHealthyAsync(ct, checkLocalProcessAlive: true, timeoutSeconds: 30);
     }
 
-    // Coba jalur Windows Service (2026-09-12) - lihat catatan panjang di
+    // Coba jalur Windows Service (2026-09-12, HANYA dipanggil utk mode
+    // "server" - lihat StartAsync) - lihat catatan panjang di
     // WindowsServiceHelper.cs & StartAsync di atas. Return false kalau jalur
     // ini TIDAK berhasil disiapkan sama sekali (service belum ada & gagal
     // dipasang, atau proses instalasi service.exe tidak ditemukan) - pemanggil
     // WAJIB lanjut ke fallback anak proses, BUKAN anggap sukses.
-    private bool TryPakaiWindowsService(bool isServerMode)
+    private bool TryPakaiWindowsService()
     {
-        if (WindowsServiceHelper.IsRunning())
-        {
-            Port = _config.ServerPort;
-            BaseUrl = $"http://127.0.0.1:{Port}";
-            return true;
-        }
-
-        if (WindowsServiceHelper.IsInstalled())
-        {
-            WindowsServiceHelper.EnsureStarted();
-            if (WindowsServiceHelper.IsRunning())
-            {
-                Port = _config.ServerPort;
-                BaseUrl = $"http://127.0.0.1:{Port}";
-                return true;
-            }
-            return false; // terpasang tapi gagal nyala - fallback, jangan paksa
-        }
-
-        // Belum pernah dipasang sama sekali - ini titik SEKALI SAJA yang
-        // memicu 1x prompt UAC (instalasi pertama fitur ini, atau PC yang
-        // baru pertama kali install Data Master versi ini). Kalau ditolak/
-        // gagal, TryInstallAndStart return false & StartAsync lanjut fallback
-        // - PC tetap bisa dipakai seperti sebelumnya, cuma belum dapat manfaat
-        // "server nyala sendiri" sampai instalasi service diulang lain kali.
+        // Path exe DataMaster.Web YANG SEHARUSNYA dipakai instalasi PC ini
+        // SEKARANG - dihitung DULU (bukan belakangan) supaya bisa dibandingkan
+        // ke binPath service yang MUNGKIN SUDAH ada, lihat komentar mismatch
+        // di bawah.
         string webExePath;
         try
         {
@@ -220,7 +209,43 @@ public sealed class ServerProcessManager : IDisposable
             return false;
         }
 
-        return WindowsServiceHelper.TryInstallAndStart(webExePath, DataDirectory, _config.ServerPort);
+        if (WindowsServiceHelper.IsInstalled())
+        {
+            // Bug nyata (2026-09-12): service yang SUDAH ada BELUM TENTU
+            // menunjuk ke exe instalasi PC ini - bisa basi dari pengujian/
+            // instalasi lain di path folder berbeda (mis. laptop dev yang
+            // punya beberapa folder Data Master). Kalau dibiarkan, Launcher
+            // akan mengira service itu representasi yang benar (statusnya
+            // memang "Running"), padahal itu proses ASING - healthz tidak
+            // pernah cocok/menjawab, "Gagal Start" 30 detik tanpa penjelasan
+            // jelas ke user. Deteksi & benahi (arahkan ulang) SEBELUM percaya
+            // status Running/Installed apa pun.
+            if (!WindowsServiceHelper.BinPathCocok(webExePath))
+            {
+                return WindowsServiceHelper.PerbaikiBinPathDanMulai(webExePath, _config.ServerPort)
+                    && SetelahServiceSiap();
+            }
+
+            WindowsServiceHelper.EnsureStarted();
+            if (WindowsServiceHelper.IsRunning()) return SetelahServiceSiap();
+            return false; // terpasang tapi gagal nyala - fallback, jangan paksa
+        }
+
+        // Belum pernah dipasang sama sekali - ini titik SEKALI SAJA yang
+        // memicu 1x prompt UAC (instalasi pertama fitur ini, atau PC yang
+        // baru pertama kali install Data Master versi ini). Kalau ditolak/
+        // gagal, TryInstallAndStart return false & StartAsync lanjut fallback
+        // - PC tetap bisa dipakai seperti sebelumnya, cuma belum dapat manfaat
+        // "server nyala sendiri" sampai instalasi service diulang lain kali.
+        return WindowsServiceHelper.TryInstallAndStart(webExePath, DataDirectory, _config.ServerPort)
+            && SetelahServiceSiap();
+    }
+
+    private bool SetelahServiceSiap()
+    {
+        Port = _config.ServerPort;
+        BaseUrl = $"http://127.0.0.1:{Port}";
+        return true;
     }
 
     private async Task<bool> WaitUntilHealthyAsync(CancellationToken ct, bool checkLocalProcessAlive, int timeoutSeconds)

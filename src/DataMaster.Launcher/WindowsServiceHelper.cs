@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.ServiceProcess;
 
 namespace DataMaster.Launcher;
@@ -42,6 +43,75 @@ public static class WindowsServiceHelper
         {
             using var sc = new ServiceController(ServiceName);
             sc.Refresh();
+            return sc.Status == ServiceControllerStatus.Running;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    // Bandingkan binPath TERDAFTAR service (bisa basi - lihat catatan panjang
+    // di ServerProcessManager.TryPakaiWindowsService) terhadap exe instalasi
+    // PC ini SEKARANG. `sc qc` dipakai (bukan System.Management/WMI, supaya
+    // tidak menambah dependency baru) - baris keluarannya persis
+    // "        BINARY_PATH_NAME   : <path>".
+    public static bool BinPathCocok(string webExePathSekarang)
+    {
+        var terdaftar = BacaBinPathTerdaftar();
+        return terdaftar is not null
+            && string.Equals(terdaftar.Trim(), webExePathSekarang.Trim(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string? BacaBinPathTerdaftar()
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "sc.exe",
+                Arguments = $"qc {ServiceName}",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                CreateNoWindow = true,
+            };
+            using var p = Process.Start(psi);
+            if (p is null) return null;
+            var output = p.StandardOutput.ReadToEnd();
+            p.WaitForExit(5000);
+            const string marker = "BINARY_PATH_NAME";
+            var line = output.Split('\n').FirstOrDefault(l => l.Contains(marker));
+            if (line is null) return null;
+            var idx = line.IndexOf(':');
+            return idx < 0 ? null : line[(idx + 1)..].Trim();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    // Service SUDAH ada tapi menunjuk exe yang SALAH (basi) - arahkan ulang
+    // (bukan delete+create, `sc config` cukup & tidak mengganggu recovery
+    // options yang sudah dipasang TryInstallAndStart sebelumnya) LALU restart
+    // supaya proses lama (exe basi) benar2 diganti proses baru (exe benar).
+    public static bool PerbaikiBinPathDanMulai(string webExePathBenar, int port)
+    {
+        try
+        {
+            // service-config.json (port) TIDAK ditulis ulang di sini - jalur
+            // mismatch ini murni "path exe salah", port dari instalasi
+            // pertama (kalau service memang sudah pernah benar sebelumnya)
+            // tetap berlaku, cukup config path + restart.
+            if (!RunElevated("sc.exe", $"config {ServiceName} binPath= \"{webExePathBenar}\"")) return false;
+            RunElevated("sc.exe", $"stop {ServiceName}");
+            using (var scWait = new ServiceController(ServiceName))
+            {
+                try { scWait.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(10)); } catch { /* mungkin sudah stop */ }
+            }
+            if (!RunElevated("sc.exe", $"start {ServiceName}")) return false;
+            using var sc = new ServiceController(ServiceName);
+            sc.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(20));
             return sc.Status == ServiceControllerStatus.Running;
         }
         catch
