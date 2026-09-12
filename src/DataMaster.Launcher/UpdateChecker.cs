@@ -7,6 +7,10 @@ using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text.Json;
 using System.Windows;
+// Alias eksplisit (2026-09-12) - sejak UseWindowsForms=true (utk NotifyIcon
+// system tray di MainWindow.xaml.cs), "Application" polos ambigu dgn
+// System.Windows.Forms.Application.
+using Application = System.Windows.Application;
 
 namespace DataMaster.Launcher;
 

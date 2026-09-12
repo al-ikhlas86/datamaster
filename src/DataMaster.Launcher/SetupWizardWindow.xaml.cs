@@ -1,4 +1,8 @@
 using System.Windows;
+// Alias eksplisit (2026-09-12) - sejak UseWindowsForms=true (utk NotifyIcon
+// system tray di MainWindow.xaml.cs), "Clipboard" polos ambigu dgn
+// System.Windows.Forms.Clipboard.
+using Clipboard = System.Windows.Clipboard;
 
 namespace DataMaster.Launcher;
 
