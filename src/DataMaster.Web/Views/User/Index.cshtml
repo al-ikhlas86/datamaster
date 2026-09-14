@@ -5,16 +5,22 @@
 
 <h3 class="mb-3">Setting</h3>
 
-@* Layout 2 kolom (bukan 3) - SENGAJA (2026-09-14, bug nyata dilaporkan user:
-   "kotak2 berantakan, ada yang lompat jauh ke bawah"). Akar masalah: grid
-   col-lg-4 (3 per baris) dipaksa menampung 4-5 kotak dgn tinggi SANGAT
-   berbeda (Backup & Pemulihan jauh lebih tinggi drpd Sinkronisasi Hub API
-   sejak kotak Kata Sandi Backup Awan ditambah) - begitu kotak sisa
-   melompat ke baris baru, Bootstrap tidak bisa menebak tinggi baris
-   sebelumnya scr rapi krn kombinasi jumlah kotak ganjil + tinggi timpang.
-   2 kolom mengelompokkan kotak setinggi mungkin bareng (kiri: identitas
-   akun, kanan: konektivitas & data) - jauh lebih tahan lama walau nanti
-   ada kotak baru ditambah lagi. *@
+@* Layout 2 KOLOM TETAP, bukan wrap-per-baris (revisi ke-2, 2026-09-14 -
+   percobaan pertama col-lg-6 datar MASIH berantakan: kotak Sinkronisasi
+   Hub API yang pendek terpaksa ikut "menunggu" tinggi kolom Ubah Kata
+   Sandi/dst di sebelahnya sebelum baris grid berikutnya boleh mulai -
+   jarak kosong besar muncul PERSIS di bawah kotak pendek itu, dibuktikan
+   screenshot user langsung). Akar masalah SEBENARNYA: col-lg-6 yang
+   ditaruh SEJAJAR/DATAR (5 <div class="col-lg-6"> berurutan) tetap
+   dianggap Bootstrap sbg baris-baris terpisah (wrap tiap 2), BUKAN 2
+   kolom independen - tinggi 1 "baris" tetap mengikuti kotak TERTINGGI
+   di baris itu.
+
+   FIX SEBENARNYA: cuma 2 <div class="col-lg-6"> di root (bukan 5) -
+   MASING-MASING isinya beberapa <div class="card mt-3"> ditumpuk
+   LANGSUNG di dalamnya, independen total dari tinggi kolom sebelah.
+   Kiri = identitas akun, kanan = konektivitas & data (Hub API tetap
+   pendek apa adanya, TIDAK ada lagi yang menunggu apa pun). *@
 <div class="row g-3">
     <div class="col-lg-6">
         <div class="card">
@@ -37,10 +43,8 @@
                 </form>
             </div>
         </div>
-    </div>
 
-    <div class="col-lg-6">
-        <div class="card">
+        <div class="card mt-3">
             <div class="card-header">Ubah Kata Sandi</div>
             <div class="card-body">
                 <form asp-controller="User" asp-action="UpdatePassword" method="post">
@@ -100,12 +104,10 @@
                 }
             </div>
         </div>
-    </div>
 
-    @if (Model.LanMode == "server")
-    {
-        <div class="col-lg-6">
-            <div class="card">
+        @if (Model.LanMode == "server")
+        {
+            <div class="card mt-3">
                 <div class="card-header">Info Jaringan (PC ini jadi Server)</div>
                 <div class="card-body">
                     <p class="mb-1 small text-muted">Alamat untuk diisi di PC klien</p>
@@ -117,11 +119,9 @@
                     <p class="small text-muted mt-2 mb-0">Tempel (paste) alamat ini di kotak "Alamat PC server" saat setup awal PC klien lain di jaringan yang sama.</p>
                 </div>
             </div>
-        </div>
-    }
+        }
 
-    <div class="col-lg-6">
-        <div class="card">
+        <div class="card mt-3">
             <div class="card-header">Backup &amp; Pemulihan</div>
             <div class="card-body">
                 <p class="mb-1 small text-muted">Backup Manual Terakhir</p>
