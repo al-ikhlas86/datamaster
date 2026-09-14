@@ -85,22 +85,35 @@
         <div class="card">
             <div class="card-header">Sinkronisasi Hub API</div>
             <div class="card-body">
+                @{
+                    var (hubBadge, hubLabel) = Model.HubApiStatus switch
+                    {
+                        "aktif" => ("bg-success", "Aktif"),
+                        "pending" => ("bg-warning text-dark", "Menunggu Persetujuan Admin"),
+                        "menyambungkan" => ("bg-info text-dark", "Menyambungkan..."),
+                        _ => ("bg-secondary", "Belum Tersambung"),
+                    };
+                }
                 <p class="mb-3">
-                    Status: <span class="badge @(Model.HubApiAktif ? "bg-success" : "bg-secondary")">@(Model.HubApiAktif ? "Aktif" : "Belum Tersambung")</span>
+                    Status: <span class="badge @hubBadge">@hubLabel</span>
                 </p>
-                @if (!Model.HubApiAktif)
+                @if (Model.HubApiStatus == "pending")
                 {
-                    <form asp-controller="User" asp-action="SambungkanHubApi" method="post"
-                          onsubmit="return confirm('Sambungkan unit ini ke Hub API? Aplikasi akan restart otomatis.')">
-                        <label class="form-label">Nama Unit</label>
-                        <input type="text" name="nama_unit" class="form-control mb-2" placeholder="Contoh: TK Al Ikhlas 86" required />
-                        <div class="form-text mb-2">Isi supaya data unit ini otomatis tersambung ke Mobile-app/Webview - cukup nama unitnya saja.</div>
-                        <button type="submit" class="btn btn-primary w-100">Sambungkan</button>
-                    </form>
+                    <p class="text-muted small mb-0">Unit ini sudah terdaftar, tapi Hub API BELUM menyetujuinya - hubungi admin Hub API untuk klik "Setujui" di panel admin. Sinkronisasi otomatis mulai jalan begitu disetujui, tanpa perlu apa pun dari sini.</p>
+                }
+                else if (Model.HubApiStatus is "aktif" or "menyambungkan")
+                {
+                    <p class="text-muted small mb-0">Sinkronisasi ke Mobile-app/Webview berjalan otomatis tiap 1 menit.</p>
                 }
                 else
                 {
-                    <p class="text-muted small mb-0">Sinkronisasi ke Mobile-app/Webview sudah berjalan otomatis tiap 1 menit.</p>
+                    <form asp-controller="User" asp-action="SambungkanHubApi" method="post"
+                          onsubmit="return confirm('Daftarkan unit ini ke Hub API? Perlu persetujuan admin dulu sebelum sinkronisasi mulai jalan. Aplikasi akan restart otomatis.')">
+                        <label class="form-label">Nama Unit</label>
+                        <input type="text" name="nama_unit" class="form-control mb-2" placeholder="Contoh: TK Al Ikhlas 86" required />
+                        <div class="form-text mb-2">Isi supaya data unit ini otomatis tersambung ke Mobile-app/Webview - cukup nama unitnya saja. Setelah didaftarkan, admin Hub API perlu menyetujui dulu sebelum sinkronisasi benar-benar mulai.</div>
+                        <button type="submit" class="btn btn-primary w-100">Daftarkan</button>
+                    </form>
                 }
             </div>
         </div>

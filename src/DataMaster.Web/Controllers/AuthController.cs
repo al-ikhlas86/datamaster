@@ -135,7 +135,10 @@ public class AuthController(DataMasterDbContext db, LoginThrottleService throttl
             if (token is not null)
             {
                 await appSettingsWriter.SetHubApiConfigAsync(AppOptions.HubApiUrlResmi, token);
-                TempData["message"] = "Akun admin berhasil dibuat. Menyalakan ulang sebentar untuk mengaktifkan sinkronisasi Hub API...";
+                // "mengaktifkan sinkronisasi" TIDAK BENAR sejak fitur persetujuan
+                // admin (2026-09-14) - unit baru SELALU masuk "menunggu persetujuan"
+                // dulu, lihat RegisterController.php sisi server.
+                TempData["message"] = "Akun admin berhasil dibuat & didaftarkan ke Hub API - MENUNGGU PERSETUJUAN admin dulu sebelum sinkronisasi mulai jalan. Menyalakan ulang sebentar...";
                 perluRestart = true;
             }
             else

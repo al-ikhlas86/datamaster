@@ -31,6 +31,19 @@ public class UserController(DataMasterDbContext db, DatabaseBackupService backup
         var user = await db.Users.FindAsync(CurrentUserId);
         if (user is null) return RedirectToAction("Logout", "Auth");
 
+        // Status Hub API JUJUR (2026-09-14, fitur persetujuan admin) - BUKAN
+        // cuma "apakah config lokal terisi" (yang lama, bisa nampilin "Aktif"
+        // padahal server MENOLAK tiap sync krn belum disetujui admin). Dilihat
+        // dari 2 timestamp yang dicatat HubApiSyncService: yang PALING BARU
+        // di antara kedua nilai itu yang menentukan status sungguhan saat ini.
+        var hubApiTerkonfigurasi = !string.IsNullOrWhiteSpace(appOptions.Value.HubApiUrl) && !string.IsNullOrWhiteSpace(appOptions.Value.HubApiToken);
+        var syncOkTerakhir = await backup.WaktuTerakhirAsync("last_hub_sync_ok_at");
+        var syncDitolakTerakhir = await backup.WaktuTerakhirAsync("last_hub_sync_unauthorized_at");
+        var hubApiStatus = !hubApiTerkonfigurasi ? "belum"
+            : syncOkTerakhir is null && syncDitolakTerakhir is null ? "menyambungkan"
+            : syncDitolakTerakhir > syncOkTerakhir ? "pending"
+            : "aktif";
+
         var vm = new UserSettingsViewModel
         {
             UserId = user.UserId,
@@ -44,7 +57,7 @@ public class UserController(DataMasterDbContext db, DatabaseBackupService backup
             LanMode = appOptions.Value.LanMode,
             LanHostname = appOptions.Value.LanHostname,
             LanPort = appOptions.Value.LanPort,
-            HubApiAktif = !string.IsNullOrWhiteSpace(appOptions.Value.HubApiUrl) && !string.IsNullOrWhiteSpace(appOptions.Value.HubApiToken),
+            HubApiStatus = hubApiStatus,
             BackupPassphraseAktif = !string.IsNullOrWhiteSpace(appOptions.Value.BackupPassphrase),
         };
         return View(vm);
@@ -236,7 +249,11 @@ public class UserController(DataMasterDbContext db, DatabaseBackupService backup
         }
 
         await appSettingsWriter.SetHubApiConfigAsync(AppOptions.HubApiUrlResmi, token);
-        TempData["message"] = "Berhasil disambungkan ke Hub API. Menyalakan ulang sebentar untuk mengaktifkan sinkronisasi...";
+        // "Aktif" langsung TIDAK BENAR sejak fitur persetujuan admin (2026-09-14)
+        // - pendaftaran mandiri sekarang SELALU masuk sbg "menunggu persetujuan"
+        // dulu di Hub API (lihat RegisterController.php sisi server), sinkronisasi
+        // baru sungguhan jalan setelah admin klik Setujui di panel Hub API.
+        TempData["message"] = "Berhasil didaftarkan ke Hub API - MENUNGGU PERSETUJUAN admin dulu sebelum sinkronisasi mulai jalan. Menyalakan ulang sebentar...";
         lifetime.StopApplication();
         return RedirectToAction(nameof(Index));
     }

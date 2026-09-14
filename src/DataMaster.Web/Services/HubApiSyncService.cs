@@ -24,6 +24,17 @@ public class HubApiSyncService(DataMasterDbContext db, HttpClient http, IOptions
     private const string ProtocolVersion = "v4-full";
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
 
+    // Deteksi 401 (2026-09-14, fitur persetujuan admin di Hub API) - dipakai
+    // Settings (User/Index.cshtml) supaya status "Sinkronisasi Hub API" JUJUR
+    // mencerminkan kenyataan (apakah SUNGGUH berhasil sinkron), bukan cuma
+    // "apakah config lokal terisi" spt sebelumnya - unit yang baru daftar
+    // TAPI belum disetujui admin dulu SALAH tampil "Aktif" (hijau) padahal
+    // sync-nya diam2 selalu gagal 401 tiap menit. Field instance AMAN dipakai
+    // sbg state "1 siklus ini" krn HubApiSyncHostedService bikin scope (jadi
+    // instance service ini) BARU tiap tick - tidak pernah nyangkut ke siklus
+    // berikutnya.
+    private bool _unauthorized;
+
     public async Task RunAsync(CancellationToken ct = default)
     {
         var url = (options.Value.HubApiUrl ?? "").Trim().TrimEnd('/');
@@ -34,6 +45,7 @@ public class HubApiSyncService(DataMasterDbContext db, HttpClient http, IOptions
             return;
         }
 
+        _unauthorized = false;
         var installType = (options.Value.InstallType ?? "pendidikan").Trim().ToLowerInvariant();
 
         if (installType != "perusahaan")
@@ -58,6 +70,22 @@ public class HubApiSyncService(DataMasterDbContext db, HttpClient http, IOptions
             await PushCalonSiswaAsync(url, token, ct);
             await PullKeputusanPsbAsync(url, token, ct);
         }
+
+        // Dicatat SETELAH seluruh siklus (bukan per-push) - cukup 1 sinyal
+        // "siklus ini ketemu 401 di salah satu push" utk anggap seluruh
+        // koneksi lagi ditolak (token yang sama dipakai semua push, wajar
+        // kalau satu 401 semua ikut 401). Kunci SystemSettings BEDA dgn
+        // punya DatabaseBackupService (last_backup_online_at) - ini soal
+        // sinkron data biasa, bukan backup terenkripsi.
+        await CatatWaktuAsync(_unauthorized ? "last_hub_sync_unauthorized_at" : "last_hub_sync_ok_at");
+    }
+
+    private async Task CatatWaktuAsync(string key)
+    {
+        var existing = await db.SystemSettings.FindAsync(key);
+        if (existing is null) db.SystemSettings.Add(new Data.Entities.SystemSetting { SettingKey = key, SettingValue = DateTime.Now.ToString("O"), UpdatedAt = DateTime.Now });
+        else { existing.SettingValue = DateTime.Now.ToString("O"); existing.UpdatedAt = DateTime.Now; }
+        await db.SaveChangesAsync();
     }
 
     // ---------------------------------------------------------------- Helpers
@@ -100,6 +128,7 @@ public class HubApiSyncService(DataMasterDbContext db, HttpClient http, IOptions
             var body = await resp.Content.ReadAsStringAsync(ct);
             if (!resp.IsSuccessStatusCode)
             {
+                if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized) _unauthorized = true;
                 logger.LogWarning("Sync {Label}: GAGAL HTTP {Status} - {Body}", label, (int)resp.StatusCode, body);
                 return null;
             }

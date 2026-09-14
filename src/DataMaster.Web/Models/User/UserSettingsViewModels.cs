@@ -14,12 +14,15 @@ public class UserSettingsViewModel
     public string LanHostname { get; set; } = "";
     public int LanPort { get; set; }
 
-    // Status Hub API (2026-09-11) - supaya staf tahu apakah sinkronisasi
-    // sedang aktif TANPA perlu buka file/tanya siapa pun, dan bisa
-    // sambungkan/daftarkan ulang sendiri kapan saja kalau ternyata kosong
-    // (lihat AppSettingsWriterService utk kronologi kenapa ini bisa kosong
-    // sendiri - dulu tidak ada UI sama sekali utk memperbaikinya).
-    public bool HubApiAktif { get; set; }
+    // Status Hub API (2026-09-11, diperluas 2026-09-14 jadi 3 nilai sejak
+    // fitur persetujuan admin) - "belum" (belum diisi sama sekali),
+    // "menyambungkan" (baru didaftarkan, belum ada hasil sync sama sekali
+    // sejak restart), "pending" (token ada tapi Hub API MENOLAK - biasanya
+    // sedang menunggu admin klik Setujui), "aktif" (sync sungguhan pernah
+    // berhasil paling baru). Dihitung dari 2 timestamp yang dicatat
+    // HubApiSyncService, BUKAN cuma "apakah config lokal terisi" - status
+    // lama itu bisa BOHONG bilang "Aktif" padahal server menolak terus.
+    public required string HubApiStatus { get; set; }
 
     // BUG NYATA ditemukan 2026-09-12 lewat audit VPS: BackupCloudHostedService
     // SENGAJA menolak jalan sama sekali tanpa BackupPassphrase (lihat
