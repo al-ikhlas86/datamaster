@@ -32,6 +32,21 @@
          - dipakai icon .exe (Explorer/taskbar) DAN icon tiap jendela (title
          bar/Alt-Tab, lihat atribut Icon= di masing2 .xaml). -->
     <ApplicationIcon>app.ico</ApplicationIcon>
+    <!-- BUG NYATA (2026-09-14, ketahuan lewat log auto-update sungguhan di
+         lapangan - unduhan v1.4.7 sukses, tapi ApplyAndRestart lempar
+         FileNotFoundException "System.IO.Compression.ZipFile"): publish
+         self-contained hasil GitHub Actions (windows-latest, SDK "10.0.x"
+         mengambang) diam2 TIDAK menyertakan System.IO.Compression.ZipFile.dll
+         dkk, padahal publish lokal (SDK 10.0.103) menyertakannya dgn benar -
+         dibuktikan langsung, bukan dugaan (lihat D:\Z Data Master hasil rilis
+         v1.4.6 CI: folder System.IO.Compression.* kosong sama sekali).
+         PublishTrimmed eksplisit false + TrimmerRootAssembly memaksa
+         assembly ini SELALU ikut apa pun versi SDK yang dipakai. -->
+    <PublishTrimmed>false</PublishTrimmed>
   </PropertyGroup>
+
+  <ItemGroup>
+    <TrimmerRootAssembly Include="System.IO.Compression.ZipFile" />
+  </ItemGroup>
 
 </Project>
