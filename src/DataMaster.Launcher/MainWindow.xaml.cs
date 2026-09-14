@@ -3,11 +3,6 @@ using System.IO;
 using System.Windows;
 using System.Windows.Threading;
 using Microsoft.Web.WebView2.Core;
-using WinForms = System.Windows.Forms;
-// Alias eksplisit (2026-09-12) - sejak UseWindowsForms=true, beberapa nama
-// tipe umum WPF jadi ambigu dgn versi System.Windows.Forms.
-using Application = System.Windows.Application;
-using MessageBox = System.Windows.MessageBox;
 
 namespace DataMaster.Launcher;
 
@@ -19,7 +14,6 @@ public partial class MainWindow : Window
     private readonly ServerProcessManager _server = new();
     private readonly UpdateChecker _updateChecker = new();
     private bool _closingIntentionally;
-    private WinForms.NotifyIcon? _trayIcon;
 
     public MainWindow()
     {
@@ -30,75 +24,6 @@ public partial class MainWindow : Window
         _updateChecker.StatusChanged += UpdateChecker_StatusChanged;
     }
 
-    // BUG NYATA (2026-09-12, dilaporkan LANGSUNG user saat instalasi produksi PC
-    // TK+laptop klien): tombol X SEBELUM INI SELALU mematikan server sepenuhnya
-    // di mode Mandiri/Server - begitu staf TU menutup jendela ini (mengira cuma
-    // "menyembunyikan", pola wajar aplikasi desktop pada umumnya), SEMUA PC
-    // klien yang tersambung ikut macet ("loading terus") krn server yang
-    // mereka tuju benar2 mati, bukan cuma jendelanya hilang. Padahal harapan
-    // user eksplisit: "server cukup nyala & terhubung sinyal, gaperlu harus
-    // buka aplikasinya" - benar, itu memang seharusnya cara kerja server yang
-    // wajar, bukan permintaan aneh.
-    //
-    // Diperbaiki dgn pola standar aplikasi Windows sejenis (mis. Discord,
-    // aplikasi antivirus, dsb) - KHUSUS mode Mandiri/Server (yang benar2
-    // menjalankan server sendiri, beda dari Klien yang cuma jendela penampil):
-    // tombol X TIDAK mematikan aplikasi, cuma menyembunyikan jendela ke
-    // system tray (ikon kecil dekat jam). Server tetap hidup di background
-    // selama proses Launcher belum benar2 di-exit. Ikon tray py menu klik-
-    // kanan "Buka Data Master" (tampilkan lagi jendelanya) dan "Keluar
-    // Sepenuhnya - Server Akan Berhenti" (baru benar2 mematikan, dgn
-    // peringatan eksplisit dampaknya ke PC klien lain). Mode Klien TETAP
-    // pakai perilaku X = keluar biasa (menutupnya cuma memutus PC itu
-    // sendiri, tidak ada PC lain yang terdampak, jadi tidak perlu tray).
-    private void SiapkanTrayIcon()
-    {
-        if (_server.IsKlien) return; // Klien: X = keluar biasa, tidak perlu tray sama sekali.
-
-        try
-        {
-            var exePath = Process.GetCurrentProcess().MainModule?.FileName;
-            var icon = exePath is not null ? System.Drawing.Icon.ExtractAssociatedIcon(exePath) : null;
-
-            var menu = new WinForms.ContextMenuStrip();
-            menu.Items.Add("Buka Data Master", null, (_, _) => TampilkanDariTray());
-            menu.Items.Add(new WinForms.ToolStripSeparator());
-            menu.Items.Add("Keluar Sepenuhnya (server akan berhenti)", null, (_, _) => KeluarSepenuhnyaDariTray());
-
-            _trayIcon = new WinForms.NotifyIcon
-            {
-                Icon = icon,
-                Visible = false,
-                Text = "Data Master - server sedang berjalan",
-                ContextMenuStrip = menu,
-            };
-            _trayIcon.DoubleClick += (_, _) => TampilkanDariTray();
-        }
-        catch
-        {
-            // Non-fatal - kalau ikon tray gagal disiapkan (mis. ekstraksi ikon
-            // gagal), fallback ke perilaku lama (X = keluar biasa) drpd
-            // membuat aplikasi tidak bisa dipakai sama sekali.
-            _trayIcon = null;
-        }
-    }
-
-    private void TampilkanDariTray()
-    {
-        Show();
-        WindowState = WindowState.Normal;
-        Activate();
-        if (_trayIcon is not null) _trayIcon.Visible = false;
-    }
-
-    private void KeluarSepenuhnyaDariTray()
-    {
-        _closingIntentionally = true;
-        _trayIcon?.Dispose();
-        _server.StopIntentionally();
-        Application.Current.Shutdown();
-    }
-
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
         await InisialisasiAsync();
@@ -106,7 +31,6 @@ public partial class MainWindow : Window
 
     private async Task InisialisasiAsync()
     {
-        SiapkanTrayIcon();
         SetSplash("Memeriksa pembaruan...");
         // Tidak memblokir start server - kalau ADA pembaruan, UpdateChecker
         // sendiri yang akan mematikan _server & menutup aplikasi lewat
@@ -206,24 +130,19 @@ public partial class MainWindow : Window
 
     private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
-        // Mode Mandiri/Server: tombol X TIDAK mematikan server - lihat catatan
-        // panjang di SiapkanTrayIcon() kenapa ini penting (bug nyata dilaporkan
-        // user, PC klien lain macet begitu jendela ini ditutup). Minimize ke
-        // tray SELAMA belum benar2 diminta keluar lewat menu tray
-        // (_closingIntentionally baru true dari KeluarSepenuhnyaDariTray()).
-        if (_trayIcon is not null && !_closingIntentionally)
-        {
-            e.Cancel = true;
-            Hide();
-            _trayIcon.Visible = true;
-            _trayIcon.ShowBalloonTip(3000, "Data Master masih berjalan",
-                "Server tetap aktif di latar belakang supaya PC lain tetap bisa menyambung. Klik kanan ikon ini utk membuka lagi atau keluar sepenuhnya.",
-                WinForms.ToolTipIcon.Info);
-            return;
-        }
-
+        // Tombol X = keluar SEPENUHNYA, di SEMUA mode (dikembalikan 2026-09-14 -
+        // lihat catatan panjang di WindowsServiceHelper.cs/ServerProcessManager.cs:
+        // kebutuhan "server tetap nyala walau app ditutup" SEKARANG ditangani
+        // Windows Service beneran di level OS, BUKAN lagi minimize-ke-tray WPF.
+        // Tray icon SEBELUMNYA aktif juga di mode Mandiri (bukan cuma Server) -
+        // BUG NYATA ditemukan 2026-09-14: user "tutup" app (kira2 benar2 keluar),
+        // proses SEBENARNYA masih hidup tersembunyi di tray, lalu user buka lagi
+        // -> instance KEDUA tabrakan rebutan file log HARI YANG SAMA
+        // (IOException tak tertangani, "Kesalahan tak terduga") DAN rebutan
+        // kunci SQLite (bikin loading lambat). Server mode via Windows Service
+        // tidak butuh trik tray sama sekali lagi; Mandiri/Klien malah tidak
+        // pernah butuh dari awal.
         _closingIntentionally = true;
-        _trayIcon?.Dispose();
         _server.StopIntentionally();
         // WAJIB eksplisit sejak App.xaml pakai ShutdownMode="OnExplicitShutdown"
         // (lihat komentar di sana) - tanpa ini, menutup MainWindow normal (tombol

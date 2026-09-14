@@ -25,10 +25,6 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
-    <!-- Dibutuhkan System.Windows.Forms.NotifyIcon (ikon system tray) - lihat
-         MainWindow.xaml.cs, mencegah tombol X mode Server/Mandiri sengaja/tidak
-         sengaja mematikan server yang sedang dipakai PC klien lain. -->
-    <UseWindowsForms>true</UseWindowsForms>
     <!-- Dibandingkan UpdateChecker terhadap tag rilis GitHub (vX.Y.Z) - naikkan
          tiap kali CI/CD menerbitkan rilis baru. -->
     <Version>1.0.0</Version>

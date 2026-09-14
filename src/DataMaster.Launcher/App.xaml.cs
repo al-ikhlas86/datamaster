@@ -1,21 +1,13 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Threading;
-// Alias eksplisit (2026-09-12) - sejak UseWindowsForms=true (utk NotifyIcon
-// system tray di MainWindow.xaml.cs), "MessageBox"/"Application" polos
-// ambigu dgn versi System.Windows.Forms.
-using MessageBox = System.Windows.MessageBox;
 
 namespace DataMaster.Launcher;
 
 /// <summary>
 /// Interaction logic for App.xaml
 /// </summary>
-// System.Windows.Application dieksplisit qualified (2026-09-12) - sejak
-// UseWindowsForms=true ditambahkan (utk NotifyIcon system tray di
-// MainWindow.xaml.cs), "Application" polos jadi ambigu dgn
-// System.Windows.Forms.Application yang ikut masuk implicit usings.
-public partial class App : System.Windows.Application
+public partial class App : Application
 {
     // Exception tak tertangani di WPF (termasuk dari async void event handler,
     // mis. MainWindow.Server_ExitedUnexpectedly) TIDAK OTOMATIS terlihat di mana
