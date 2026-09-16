@@ -130,6 +130,7 @@ public sealed class ServerProcessManager : IDisposable
         // membuat "../backup" salah naik ke luar folder DataMaster sama sekali.
         var appDataDir = Path.Combine(DataDirectory, "App_Data");
         Directory.CreateDirectory(appDataDir);
+        MigrasikanDbLamaJikaAda(workDir, appDataDir);
         psi.EnvironmentVariables["ASPNETCORE_URLS"] = listenUrl;
         psi.EnvironmentVariables["ASPNETCORE_ENVIRONMENT"] = "Production";
         psi.EnvironmentVariables["ConnectionStrings__DataMaster"] = $"Data Source={Path.Combine(appDataDir, "datamaster.db")}";
@@ -239,6 +240,38 @@ public sealed class ServerProcessManager : IDisposable
         // "server nyala sendiri" sampai instalasi service diulang lain kali.
         return WindowsServiceHelper.TryInstallAndStart(webExePath, DataDirectory, _config.ServerPort)
             && SetelahServiceSiap();
+    }
+
+    // Migrasi SEKALI SAJA dari lokasi LAMA (2026-09-11, sebelum database
+    // dieksternalisasi ke LocalAppData demi aman dari auto-update - lihat
+    // komentar "ConnectionStrings__DataMaster" di atas). Versi SEBELUM
+    // eksternalisasi itu menyimpan datamaster.db LANGSUNG di dalam folder
+    // instalasi (web/App_Data/), memakai connection string bawaan
+    // appsettings.json apa adanya. Upgrade dari versi lama itu TANPA
+    // migrasi ini membuat Launcher diam2 memakai database BARU KOSONG di
+    // lokasi eksternal - dari sisi pengguna terlihat PERSIS seperti semua
+    // data hilang (Setup Awal muncul lagi) padahal cuma salah baca lokasi.
+    // INSIDEN NYATA ditemukan 2026-09-15 di PC TU TK: data asli masih
+    // 100% utuh di lokasi lama, murni Launcher versi baru belum tahu cara
+    // menemukannya. Aman-by-construction: HANYA jalan kalau lokasi BARU
+    // belum py db sama sekali (instalasi baru murni ATAU sudah pernah
+    // dimigrasi sebelumnya - tidak pernah menimpa data yang sudah ada).
+    private static void MigrasikanDbLamaJikaAda(string webWorkDir, string appDataDirBaru)
+    {
+        if (File.Exists(Path.Combine(appDataDirBaru, "datamaster.db"))) return;
+
+        var appDataDirLama = Path.Combine(webWorkDir, "App_Data");
+        if (!File.Exists(Path.Combine(appDataDirLama, "datamaster.db"))) return; // instalasi baru murni - normal, tidak ada yang perlu dimigrasi
+
+        // Pindahkan (bukan salin) db + WAL/SHM (kalau ada, WAL bisa memuat
+        // transaksi yang belum di-checkpoint ke .db utama - HARUS ikut,
+        // bukan cuma file .db saja) - move (bukan copy) supaya lokasi lama
+        // tidak menyesatkan kalau dibuka manual lagi belakangan.
+        foreach (var nama in new[] { "datamaster.db", "datamaster.db-shm", "datamaster.db-wal" })
+        {
+            var src = Path.Combine(appDataDirLama, nama);
+            if (File.Exists(src)) File.Move(src, Path.Combine(appDataDirBaru, nama));
+        }
     }
 
     private bool SetelahServiceSiap()
