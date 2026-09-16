@@ -68,6 +68,40 @@ public sealed class ServerProcessManager : IDisposable
         var isServerMode = _config.Mode == "server";
         Directory.CreateDirectory(DataDirectory);
 
+        // Dihitung DI SINI (sebelum cabang Windows Service) - dipakai KEDUA
+        // jalur (service maupun fallback anak proses di bawah), BUKAN cuma
+        // fallback spt sebelumnya. BUG NYATA ditemukan 2026-09-16 (PC TU TK):
+        // Windows Service jalan sbg akun SYSTEM, yang py %LocalAppData%
+        // SENDIRI (C:\Windows\System32\config\systemprofile\...) TOTAL BEDA
+        // dari akun interaktif ini - "SELF-KONFIGURASI" di Program.cs (baca
+        // %LocalAppData%\DataMaster miliknya SENDIRI) jadi PERCUMA utk
+        // service, baca lokasi yang SALAH SAMA SEKALI (bukan soal drive/
+        // partisi apa pun, MURNI beda akun Windows). service-config.json/
+        // hubapi.json yang ditulis di lokasi INTERAKTIF ini tidak pernah
+        // kebaca proses service - service diam2 pakai port default ASP.NET
+        // Core (bukan ServerPort), makanya /healthz di port yang benar
+        // TIDAK PERNAH menjawab ("Gagal Start" 30 detik). Fix: suntikkan
+        // nilai yang SAMA lewat registry Environment service (satu2nya cara
+        // resmi Windows kirim env var ke Windows Service, lihat
+        // WindowsServiceHelper.TerapkanEnvironment).
+        var appDataDir = Path.Combine(DataDirectory, "App_Data");
+        Directory.CreateDirectory(appDataDir);
+        var connectionString = $"Data Source={Path.Combine(appDataDir, "datamaster.db")}";
+        string? hubApiUrl = null, hubApiToken = null;
+        var hubApiConfigPath = Path.Combine(DataDirectory, "hubapi.json");
+        if (File.Exists(hubApiConfigPath))
+        {
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(hubApiConfigPath));
+                if (doc.RootElement.TryGetProperty("HubApiUrl", out var u) && u.ValueKind == System.Text.Json.JsonValueKind.String)
+                    hubApiUrl = u.GetString();
+                if (doc.RootElement.TryGetProperty("HubApiToken", out var tok) && tok.ValueKind == System.Text.Json.JsonValueKind.String)
+                    hubApiToken = tok.GetString();
+            }
+            catch { /* file rusak/tidak valid - biarkan kosong, non-fatal */ }
+        }
+
         // Windows Service (2026-09-12, poin "server harus nyala sendiri tanpa
         // buka aplikasi") - HANYA utk mode "server" (PC yang benar2 dipakai PC
         // klien LAIN di jaringan). Mode "mandiri" (individu, 1 PC, TIDAK ada
@@ -98,7 +132,7 @@ public sealed class ServerProcessManager : IDisposable
         // menyerah - matikan service yang gagal itu (bebaskan port) lalu
         // TERUSKAN ke fallback anak proses di bawah, jalur yang SAMA PERSIS
         // terbukti jalan di versi sebelum fitur Windows Service ada.
-        if (isServerMode && TryPakaiWindowsService())
+        if (isServerMode && TryPakaiWindowsService(connectionString, hubApiUrl, hubApiToken))
         {
             if (await WaitUntilHealthyAsync(ct, checkLocalProcessAlive: false, timeoutSeconds: 30))
                 return true;
@@ -145,12 +179,10 @@ public sealed class ServerProcessManager : IDisposable
         // menjalankannya (dotnet run langsung vs Launcher) - lihat bug nyata yang
         // ditemukan saat uji Launcher: taruh db LANGSUNG di root DataDirectory
         // membuat "../backup" salah naik ke luar folder DataMaster sama sekali.
-        var appDataDir = Path.Combine(DataDirectory, "App_Data");
-        Directory.CreateDirectory(appDataDir);
         MigrasikanDbLamaJikaAda(workDir, appDataDir);
         psi.EnvironmentVariables["ASPNETCORE_URLS"] = listenUrl;
         psi.EnvironmentVariables["ASPNETCORE_ENVIRONMENT"] = "Production";
-        psi.EnvironmentVariables["ConnectionStrings__DataMaster"] = $"Data Source={Path.Combine(appDataDir, "datamaster.db")}";
+        psi.EnvironmentVariables["ConnectionStrings__DataMaster"] = connectionString;
         // Diteruskan ke halaman Setting (User/Index.cshtml) - supaya alamat PC
         // klien tetap bisa dilihat/disalin ulang kapan saja SETELAH login, tidak
         // cuma sekali muncul di wizard setup awal (keluhan nyata: staf TU lupa
@@ -171,20 +203,10 @@ public sealed class ServerProcessManager : IDisposable
         // ditimpa update - pola SAMA PERSIS ConnectionStrings di atas) sbg
         // override lewat environment variable - MENANG di atas nilai appsettings.json
         // bawaan apa pun yang datang dari rilis baru. AppSettingsWriterService.cs
-        // (DataMaster.Web) sudah diubah menulis ke file yang SAMA ini.
-        var hubApiConfigPath = Path.Combine(DataDirectory, "hubapi.json");
-        if (File.Exists(hubApiConfigPath))
-        {
-            try
-            {
-                using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(hubApiConfigPath));
-                if (doc.RootElement.TryGetProperty("HubApiUrl", out var u) && u.ValueKind == System.Text.Json.JsonValueKind.String)
-                    psi.EnvironmentVariables["AppSettings__HubApiUrl"] = u.GetString();
-                if (doc.RootElement.TryGetProperty("HubApiToken", out var tok) && tok.ValueKind == System.Text.Json.JsonValueKind.String)
-                    psi.EnvironmentVariables["AppSettings__HubApiToken"] = tok.GetString();
-            }
-            catch { /* file rusak/tidak valid - biarkan appsettings.json bawaan yang berlaku, non-fatal */ }
-        }
+        // (DataMaster.Web) sudah diubah menulis ke file yang SAMA ini. (Sudah
+        // dibaca di atas, sebelum cabang Windows Service - dipakai ulang di sini.)
+        if (hubApiUrl is not null) psi.EnvironmentVariables["AppSettings__HubApiUrl"] = hubApiUrl;
+        if (hubApiToken is not null) psi.EnvironmentVariables["AppSettings__HubApiToken"] = hubApiToken;
 
         _logWriter = new StreamWriter(File.Open(Path.Combine(logDir, $"web_{DateTime.Now:yyyy-MM-dd}.log"), FileMode.Append, FileAccess.Write, FileShare.Read)) { AutoFlush = true };
 
@@ -209,7 +231,7 @@ public sealed class ServerProcessManager : IDisposable
     // ini TIDAK berhasil disiapkan sama sekali (service belum ada & gagal
     // dipasang, atau proses instalasi service.exe tidak ditemukan) - pemanggil
     // WAJIB lanjut ke fallback anak proses, BUKAN anggap sukses.
-    private bool TryPakaiWindowsService()
+    private bool TryPakaiWindowsService(string connectionString, string? hubApiUrl, string? hubApiToken)
     {
         // Path exe DataMaster.Web YANG SEHARUSNYA dipakai instalasi PC ini
         // SEKARANG - dihitung DULU (bukan belakangan) supaya bisa dibandingkan
@@ -240,10 +262,16 @@ public sealed class ServerProcessManager : IDisposable
             // status Running/Installed apa pun.
             if (!WindowsServiceHelper.BinPathCocok(webExePath))
             {
-                return WindowsServiceHelper.PerbaikiBinPathDanMulai(webExePath, _config.ServerPort)
+                return WindowsServiceHelper.PerbaikiBinPathDanMulai(webExePath, _config.ServerPort, connectionString, hubApiUrl, hubApiToken)
                     && SetelahServiceSiap();
             }
 
+            // Refresh registry Environment tiap kali (bukan cuma sekali pasang) -
+            // supaya kalau token/URL Hub API diubah lewat menu Pengaturan
+            // (ditulis ulang ke hubapi.json), service yang SUDAH terpasang
+            // ikut dapat nilai baru begitu di-restart, bukan nyangkut nilai
+            // basi dari instalasi pertama SELAMANYA.
+            WindowsServiceHelper.TerapkanEnvironment(_config.ServerPort, connectionString, hubApiUrl, hubApiToken);
             WindowsServiceHelper.EnsureStarted();
             if (WindowsServiceHelper.IsRunning()) return SetelahServiceSiap();
             return false; // terpasang tapi gagal nyala - fallback, jangan paksa
@@ -255,7 +283,7 @@ public sealed class ServerProcessManager : IDisposable
         // gagal, TryInstallAndStart return false & StartAsync lanjut fallback
         // - PC tetap bisa dipakai seperti sebelumnya, cuma belum dapat manfaat
         // "server nyala sendiri" sampai instalasi service diulang lain kali.
-        return WindowsServiceHelper.TryInstallAndStart(webExePath, DataDirectory, _config.ServerPort)
+        return WindowsServiceHelper.TryInstallAndStart(webExePath, DataDirectory, _config.ServerPort, connectionString, hubApiUrl, hubApiToken)
             && SetelahServiceSiap();
     }
 

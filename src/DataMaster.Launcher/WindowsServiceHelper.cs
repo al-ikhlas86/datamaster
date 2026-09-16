@@ -95,15 +95,12 @@ public static class WindowsServiceHelper
     // (bukan delete+create, `sc config` cukup & tidak mengganggu recovery
     // options yang sudah dipasang TryInstallAndStart sebelumnya) LALU restart
     // supaya proses lama (exe basi) benar2 diganti proses baru (exe benar).
-    public static bool PerbaikiBinPathDanMulai(string webExePathBenar, int port)
+    public static bool PerbaikiBinPathDanMulai(string webExePathBenar, int port, string connectionString, string? hubApiUrl, string? hubApiToken)
     {
         try
         {
-            // service-config.json (port) TIDAK ditulis ulang di sini - jalur
-            // mismatch ini murni "path exe salah", port dari instalasi
-            // pertama (kalau service memang sudah pernah benar sebelumnya)
-            // tetap berlaku, cukup config path + restart.
             if (!RunElevated("sc.exe", $"config {ServiceName} binPath= \"{webExePathBenar}\"")) return false;
+            TerapkanEnvironment(port, connectionString, hubApiUrl, hubApiToken);
             RunElevated("sc.exe", $"stop {ServiceName}");
             using (var scWait = new ServiceController(ServiceName))
             {
@@ -120,16 +117,40 @@ public static class WindowsServiceHelper
         }
     }
 
+    // Env var yang SAMA PERSIS dipakai jalur anak proses (ServerProcessManager.
+    // StartAsync) - satu2nya cara RESMI Windows mengirim env var ke sebuah
+    // Windows Service adalah registry "Environment" (REG_MULTI_SZ) di key
+    // service ybs, dibaca otomatis oleh SCM saat menyalakan prosesnya
+    // (didokumentasikan Microsoft, bukan hack). WAJIB ADA - lihat BUG NYATA
+    // 2026-09-16 (PC TU TK) di komentar panjang ServerProcessManager.StartAsync:
+    // TANPA ini, service jalan sbg akun SYSTEM yang py %LocalAppData% SENDIRI
+    // (C:\Windows\System32\config\systemprofile\...) TOTAL BEDA dari akun
+    // interaktif - "SELF-KONFIGURASI" fallback di Program.cs (baca
+    // %LocalAppData%\DataMaster miliknya SENDIRI) jadi PERCUMA, service diam2
+    // pakai port default ASP.NET Core (bukan ServerPort) & database kosong di
+    // lokasi yang salah - BUKAN soal drive/partisi apa pun, murni beda akun
+    // Windows. reg.exe REG_MULTI_SZ via /d pakai "\0" literal sbg pemisah antar
+    // string (perilaku terdokumentasi reg.exe, bukan escape sembarangan).
+    public static bool TerapkanEnvironment(int port, string connectionString, string? hubApiUrl, string? hubApiToken)
+    {
+        var vars = new System.Collections.Generic.List<string>
+        {
+            $"ASPNETCORE_URLS=http://0.0.0.0:{port}",
+            "ASPNETCORE_ENVIRONMENT=Production",
+            $"ConnectionStrings__DataMaster={connectionString}",
+        };
+        if (!string.IsNullOrEmpty(hubApiUrl)) vars.Add($"AppSettings__HubApiUrl={hubApiUrl}");
+        if (!string.IsNullOrEmpty(hubApiToken)) vars.Add($"AppSettings__HubApiToken={hubApiToken}");
+
+        var data = string.Join("\\0", vars);
+        return RunElevated("reg.exe", $"add \"HKLM\\SYSTEM\\CurrentControlSet\\Services\\{ServiceName}\" /v Environment /t REG_MULTI_SZ /d \"{data}\" /f");
+    }
+
     // Dipanggil ServerProcessManager kalau service TERPASANG & SCM bilang
-    // "Running" tapi /healthz tidak pernah menjawab (insiden nyata 2026-09-16,
-    // PC TU TK - lihat komentar panjang di StartAsync) - gejala PALING mungkin:
-    // service jalan sbg akun SYSTEM, yang TIDAK PUNYA akses ke drive
-    // network-mapped/subst punya sesi user interaktif (drive G: dkk cuma
-    // "kelihatan" utk user yang memetakannya, BUKAN utk SYSTEM/Session 0) -
-    // proses child DataMaster.Web.exe lama-lama gagal total tapi SCM sendiri
-    // sempat lapor "Running" sesaat. Stop di sini SEBELUM fallback anak proses
-    // supaya port ServerPort (tetap, sama persis dipakai kedua jalur) benar2
-    // bebas - tanpa ini fallback bisa gagal lagi krn "address already in use".
+    // "Running" tapi /healthz tidak pernah menjawab. Stop di sini SEBELUM
+    // fallback anak proses supaya port ServerPort (tetap, sama persis dipakai
+    // kedua jalur) benar2 bebas - tanpa ini fallback bisa gagal lagi krn
+    // "address already in use".
     public static void StopUntukFallback()
     {
         try { RunElevated("sc.exe", $"stop {ServiceName}"); } catch { /* non-fatal - fallback tetap dicoba walau stop gagal */ }
@@ -150,15 +171,23 @@ public static class WindowsServiceHelper
         catch { /* non-fatal - StartAsync pemanggil tetap akan polling /healthz, gagal jelas terlihat dari situ */ }
     }
 
-    // Tulis service-config.json (dibaca Program.cs DataMaster.Web - lihat catatan
-    // lengkap di sana) LALU pasang & nyalakan service via sc.exe TERELEVASI
-    // (1x UAC). Return true HANYA kalau instalasi+start benar2 berhasil -
-    // pemanggil (ServerProcessManager) WAJIB fallback ke anak proses lama
-    // kalau ini return false, JANGAN pernah anggap "sudah pasti jalan".
-    public static bool TryInstallAndStart(string webExePath, string dataDirectory, int port)
+    // Pasang & nyalakan service via sc.exe TERELEVASI (1x UAC), suntikkan
+    // port/connection string/token Hub API lewat registry Environment
+    // (lihat TerapkanEnvironment). Return true HANYA kalau instalasi+start
+    // benar2 berhasil - pemanggil (ServerProcessManager) WAJIB fallback ke
+    // anak proses lama kalau ini return false, JANGAN pernah anggap "sudah
+    // pasti jalan".
+    public static bool TryInstallAndStart(string webExePath, string dataDirectory, int port, string connectionString, string? hubApiUrl, string? hubApiToken)
     {
         try
         {
+            // service-config.json TIDAK LAGI dibaca Program.cs (2026-09-16,
+            // BUG NYATA - lokasi ini dihitung dari %LocalAppData% akun
+            // INTERAKTIF, sedangkan proses service jalan sbg SYSTEM yang py
+            // %LocalAppData% sendiri, jadi tidak akan pernah ketemu file ini).
+            // Tetap ditulis apa adanya sbg CATATAN/diagnostik manual saja -
+            // sumber kebenaran SEKARANG adalah registry Environment lewat
+            // TerapkanEnvironment di bawah.
             Directory.CreateDirectory(dataDirectory);
             var serviceConfigPath = Path.Combine(dataDirectory, "service-config.json");
             File.WriteAllText(serviceConfigPath, $$"""{"Port": {{port}}}""");
@@ -175,6 +204,8 @@ public static class WindowsServiceHelper
             // manual, beda dari App WPF yang dulu setidaknya masih kelihatan
             // "tertutup" di taskbar).
             RunElevated("sc.exe", $"failure {ServiceName} reset= 86400 actions= restart/5000/restart/30000/restart/60000");
+
+            TerapkanEnvironment(port, connectionString, hubApiUrl, hubApiToken);
 
             if (!RunElevated("sc.exe", $"start {ServiceName}")) return false;
 
