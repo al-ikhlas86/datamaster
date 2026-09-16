@@ -84,14 +84,31 @@ public sealed class ServerProcessManager : IDisposable
         // healthz tidak pernah menjawab, "Gagal Start" 30 detik. Lihat juga
         // WindowsServiceHelper.TryPakaiOrPerbaiki() utk pertahanan tambahan
         // (deteksi mismatch binPath) khusus kasus PC Server itu sendiri.
+        // BUG NYATA ditemukan 2026-09-16 (PC TU TK, upgrade 1.4.2->1.5.0):
+        // sebelum perbaikan ini, `return` di sini dijalankan begitu
+        // TryPakaiWindowsService() sukses MEMASANG service - kalau service
+        // itu SCM lapor "Running" tapi /healthz TIDAK PERNAH menjawab dalam
+        // 30 detik (gejala paling mungkin: service jalan sbg SYSTEM, yang
+        // tidak punya akses ke drive network-mapped/subst punya sesi
+        // interaktif tempat instalasi ini berada - beda dari anak proses
+        // LAMA yang mewarisi akses drive user yang login), method ini
+        // LANGSUNG return false - "Gagal Start" total, PADAHAL komentar
+        // WindowsServiceHelper.cs SUDAH menjanjikan "fallback wajib" utk
+        // persis skenario ini. Sekarang: kalau health check gagal, JANGAN
+        // menyerah - matikan service yang gagal itu (bebaskan port) lalu
+        // TERUSKAN ke fallback anak proses di bawah, jalur yang SAMA PERSIS
+        // terbukti jalan di versi sebelum fitur Windows Service ada.
         if (isServerMode && TryPakaiWindowsService())
         {
-            return await WaitUntilHealthyAsync(ct, checkLocalProcessAlive: false, timeoutSeconds: 30);
+            if (await WaitUntilHealthyAsync(ct, checkLocalProcessAlive: false, timeoutSeconds: 30))
+                return true;
+            WindowsServiceHelper.StopUntukFallback();
         }
 
         // --- Fallback: cara LAMA (anak proses) - dipertahankan APA ADANYA
         // supaya PC yang gagal dipasangi service (mis. UAC ditolak/sc.exe
-        // error) TETAP BISA DIPAKAI, bukan mati total. ---
+        // error, ATAU terpasang tapi tidak pernah benar2 sehat - lihat
+        // komentar di atas) TETAP BISA DIPAKAI, bukan mati total. ---
         Port = isServerMode ? _config.ServerPort : GetFreeTcpPort();
         // BaseUrl (dipakai WebView2 PC INI sendiri + healthz check lokal) SELALU
         // loopback - Kestrel yang didengarkan ke 0.0.0.0 tetap menjawab di

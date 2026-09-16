@@ -120,6 +120,21 @@ public static class WindowsServiceHelper
         }
     }
 
+    // Dipanggil ServerProcessManager kalau service TERPASANG & SCM bilang
+    // "Running" tapi /healthz tidak pernah menjawab (insiden nyata 2026-09-16,
+    // PC TU TK - lihat komentar panjang di StartAsync) - gejala PALING mungkin:
+    // service jalan sbg akun SYSTEM, yang TIDAK PUNYA akses ke drive
+    // network-mapped/subst punya sesi user interaktif (drive G: dkk cuma
+    // "kelihatan" utk user yang memetakannya, BUKAN utk SYSTEM/Session 0) -
+    // proses child DataMaster.Web.exe lama-lama gagal total tapi SCM sendiri
+    // sempat lapor "Running" sesaat. Stop di sini SEBELUM fallback anak proses
+    // supaya port ServerPort (tetap, sama persis dipakai kedua jalur) benar2
+    // bebas - tanpa ini fallback bisa gagal lagi krn "address already in use".
+    public static void StopUntukFallback()
+    {
+        try { RunElevated("sc.exe", $"stop {ServiceName}"); } catch { /* non-fatal - fallback tetap dicoba walau stop gagal */ }
+    }
+
     public static void EnsureStarted()
     {
         try
