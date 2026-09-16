@@ -45,4 +45,11 @@ public class AppOptions
     public string LanMode { get; set; } = "mandiri";
     public string LanHostname { get; set; } = "";
     public int LanPort { get; set; }
+
+    // Versi Launcher yang SEDANG jalan (2026-09-16, keluhan nyata user -
+    // "biar ga bingung sekarang versi berapa" setelah beberapa kali
+    // upgrade/downgrade manual PC TU TK). Diisi Launcher lewat env var,
+    // SAMA PERSIS pola LanMode dkk di atas - kosong kalau dijalankan
+    // `dotnet run` langsung (bukan lewat Launcher, lihat Program.cs).
+    public string AppVersion { get; set; } = "";
 }

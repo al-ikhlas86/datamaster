@@ -101,6 +101,11 @@ public sealed class ServerProcessManager : IDisposable
             }
             catch { /* file rusak/tidak valid - biarkan kosong, non-fatal */ }
         }
+        // Versi Launcher SAAT INI (2026-09-16, keluhan nyata user - "biar ga
+        // bingung sekarang versi berapa" setelah beberapa kali upgrade/downgrade
+        // manual PC TU TK) - diteruskan ke halaman Setting, pola SAMA PERSIS
+        // LanMode/LanHostname/LanPort di atas.
+        var appVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "";
 
         // Windows Service (2026-09-12, poin "server harus nyala sendiri tanpa
         // buka aplikasi") - HANYA utk mode "server" (PC yang benar2 dipakai PC
@@ -132,7 +137,7 @@ public sealed class ServerProcessManager : IDisposable
         // menyerah - matikan service yang gagal itu (bebaskan port) lalu
         // TERUSKAN ke fallback anak proses di bawah, jalur yang SAMA PERSIS
         // terbukti jalan di versi sebelum fitur Windows Service ada.
-        if (isServerMode && TryPakaiWindowsService(connectionString, hubApiUrl, hubApiToken))
+        if (isServerMode && TryPakaiWindowsService(connectionString, hubApiUrl, hubApiToken, appVersion))
         {
             if (await WaitUntilHealthyAsync(ct, checkLocalProcessAlive: false, timeoutSeconds: 30))
                 return true;
@@ -190,6 +195,7 @@ public sealed class ServerProcessManager : IDisposable
         psi.EnvironmentVariables["AppSettings__LanMode"] = _config.Mode;
         psi.EnvironmentVariables["AppSettings__LanHostname"] = Environment.MachineName;
         psi.EnvironmentVariables["AppSettings__LanPort"] = Port.ToString();
+        psi.EnvironmentVariables["AppSettings__AppVersion"] = appVersion;
 
         // Fix BUG NYATA 2026-09-11: HubApiUrl/HubApiToken SEBELUMNYA ditulis
         // AppSettingsWriterService langsung ke web\appsettings.json (DI DALAM
@@ -231,7 +237,7 @@ public sealed class ServerProcessManager : IDisposable
     // ini TIDAK berhasil disiapkan sama sekali (service belum ada & gagal
     // dipasang, atau proses instalasi service.exe tidak ditemukan) - pemanggil
     // WAJIB lanjut ke fallback anak proses, BUKAN anggap sukses.
-    private bool TryPakaiWindowsService(string connectionString, string? hubApiUrl, string? hubApiToken)
+    private bool TryPakaiWindowsService(string connectionString, string? hubApiUrl, string? hubApiToken, string appVersion)
     {
         // Path exe DataMaster.Web YANG SEHARUSNYA dipakai instalasi PC ini
         // SEKARANG - dihitung DULU (bukan belakangan) supaya bisa dibandingkan
@@ -262,7 +268,7 @@ public sealed class ServerProcessManager : IDisposable
             // status Running/Installed apa pun.
             if (!WindowsServiceHelper.BinPathCocok(webExePath))
             {
-                return WindowsServiceHelper.PerbaikiBinPathDanMulai(webExePath, _config.ServerPort, connectionString, hubApiUrl, hubApiToken)
+                return WindowsServiceHelper.PerbaikiBinPathDanMulai(webExePath, _config.ServerPort, connectionString, hubApiUrl, hubApiToken, appVersion)
                     && SetelahServiceSiap();
             }
 
@@ -271,7 +277,7 @@ public sealed class ServerProcessManager : IDisposable
             // (ditulis ulang ke hubapi.json), service yang SUDAH terpasang
             // ikut dapat nilai baru begitu di-restart, bukan nyangkut nilai
             // basi dari instalasi pertama SELAMANYA.
-            WindowsServiceHelper.TerapkanEnvironment(_config.ServerPort, connectionString, hubApiUrl, hubApiToken);
+            WindowsServiceHelper.TerapkanEnvironment(_config.ServerPort, connectionString, hubApiUrl, hubApiToken, appVersion);
             WindowsServiceHelper.EnsureStarted();
             if (WindowsServiceHelper.IsRunning()) return SetelahServiceSiap();
             return false; // terpasang tapi gagal nyala - fallback, jangan paksa
@@ -283,7 +289,7 @@ public sealed class ServerProcessManager : IDisposable
         // gagal, TryInstallAndStart return false & StartAsync lanjut fallback
         // - PC tetap bisa dipakai seperti sebelumnya, cuma belum dapat manfaat
         // "server nyala sendiri" sampai instalasi service diulang lain kali.
-        return WindowsServiceHelper.TryInstallAndStart(webExePath, DataDirectory, _config.ServerPort, connectionString, hubApiUrl, hubApiToken)
+        return WindowsServiceHelper.TryInstallAndStart(webExePath, DataDirectory, _config.ServerPort, connectionString, hubApiUrl, hubApiToken, appVersion)
             && SetelahServiceSiap();
     }
 

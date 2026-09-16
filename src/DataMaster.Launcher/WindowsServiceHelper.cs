@@ -95,12 +95,12 @@ public static class WindowsServiceHelper
     // (bukan delete+create, `sc config` cukup & tidak mengganggu recovery
     // options yang sudah dipasang TryInstallAndStart sebelumnya) LALU restart
     // supaya proses lama (exe basi) benar2 diganti proses baru (exe benar).
-    public static bool PerbaikiBinPathDanMulai(string webExePathBenar, int port, string connectionString, string? hubApiUrl, string? hubApiToken)
+    public static bool PerbaikiBinPathDanMulai(string webExePathBenar, int port, string connectionString, string? hubApiUrl, string? hubApiToken, string appVersion)
     {
         try
         {
             if (!RunElevated("sc.exe", $"config {ServiceName} binPath= \"{webExePathBenar}\"")) return false;
-            TerapkanEnvironment(port, connectionString, hubApiUrl, hubApiToken);
+            TerapkanEnvironment(port, connectionString, hubApiUrl, hubApiToken, appVersion);
             RunElevated("sc.exe", $"stop {ServiceName}");
             using (var scWait = new ServiceController(ServiceName))
             {
@@ -131,7 +131,7 @@ public static class WindowsServiceHelper
     // lokasi yang salah - BUKAN soal drive/partisi apa pun, murni beda akun
     // Windows. reg.exe REG_MULTI_SZ via /d pakai "\0" literal sbg pemisah antar
     // string (perilaku terdokumentasi reg.exe, bukan escape sembarangan).
-    public static bool TerapkanEnvironment(int port, string connectionString, string? hubApiUrl, string? hubApiToken)
+    public static bool TerapkanEnvironment(int port, string connectionString, string? hubApiUrl, string? hubApiToken, string appVersion)
     {
         var vars = new System.Collections.Generic.List<string>
         {
@@ -141,6 +141,7 @@ public static class WindowsServiceHelper
         };
         if (!string.IsNullOrEmpty(hubApiUrl)) vars.Add($"AppSettings__HubApiUrl={hubApiUrl}");
         if (!string.IsNullOrEmpty(hubApiToken)) vars.Add($"AppSettings__HubApiToken={hubApiToken}");
+        if (!string.IsNullOrEmpty(appVersion)) vars.Add($"AppSettings__AppVersion={appVersion}");
 
         var data = string.Join("\\0", vars);
         return RunElevated("reg.exe", $"add \"HKLM\\SYSTEM\\CurrentControlSet\\Services\\{ServiceName}\" /v Environment /t REG_MULTI_SZ /d \"{data}\" /f");
@@ -156,6 +157,17 @@ public static class WindowsServiceHelper
         try { RunElevated("sc.exe", $"stop {ServiceName}"); } catch { /* non-fatal - fallback tetap dicoba walau stop gagal */ }
     }
 
+    // BUG NYATA ditemukan 2026-09-16 (PC TU TK): sebelumnya pakai
+    // `ServiceController.Start()` LANGSUNG (bukan lewat RunElevated spt semua
+    // titik lain di file ini) - method .NET ini butuh PROSES PEMANGGIL sendiri
+    // yang sudah admin, BUKAN cukup UAC yang pernah di-approve sebelumnya di
+    // proses ANAK terpisah (RunElevated spawn cmd.exe/sc.exe elevated
+    // TERSENDIRI, tidak menaikkan hak proses Launcher itu sendiri). Akibatnya:
+    // dibuka biasa (dobel klik, BUKAN "Run as Administrator") -> gagal diam2
+    // ("Gagal Start" 30 detik krn service tidak pernah benar2 nyala), tapi
+    // dibuka "Run as Administrator" -> berhasil (karena SEKARANG proses
+    // pemanggilnya sendiri sudah admin). Fix: pakai RunElevated spt titik
+    // lain, supaya berhasil TERLEPAS dari cara app ini dibuka.
     public static void EnsureStarted()
     {
         try
@@ -164,7 +176,7 @@ public static class WindowsServiceHelper
             sc.Refresh();
             if (sc.Status is ServiceControllerStatus.Stopped or ServiceControllerStatus.StopPending)
             {
-                sc.Start();
+                RunElevated("sc.exe", $"start {ServiceName}");
                 sc.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(20));
             }
         }
@@ -177,7 +189,7 @@ public static class WindowsServiceHelper
     // benar2 berhasil - pemanggil (ServerProcessManager) WAJIB fallback ke
     // anak proses lama kalau ini return false, JANGAN pernah anggap "sudah
     // pasti jalan".
-    public static bool TryInstallAndStart(string webExePath, string dataDirectory, int port, string connectionString, string? hubApiUrl, string? hubApiToken)
+    public static bool TryInstallAndStart(string webExePath, string dataDirectory, int port, string connectionString, string? hubApiUrl, string? hubApiToken, string appVersion)
     {
         try
         {
@@ -205,7 +217,7 @@ public static class WindowsServiceHelper
             // "tertutup" di taskbar).
             RunElevated("sc.exe", $"failure {ServiceName} reset= 86400 actions= restart/5000/restart/30000/restart/60000");
 
-            TerapkanEnvironment(port, connectionString, hubApiUrl, hubApiToken);
+            TerapkanEnvironment(port, connectionString, hubApiUrl, hubApiToken, appVersion);
 
             if (!RunElevated("sc.exe", $"start {ServiceName}")) return false;
 

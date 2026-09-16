@@ -134,6 +134,11 @@
             </div>
         }
 
+        @if (!string.IsNullOrEmpty(Model.AppVersion))
+        {
+            <p class="text-muted small mt-2 mb-0">Versi aplikasi: v@(Model.AppVersion)</p>
+        }
+
         <div class="card mt-3">
             <div class="card-header">Backup &amp; Pemulihan</div>
             <div class="card-body">

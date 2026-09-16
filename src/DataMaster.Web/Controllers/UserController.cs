@@ -57,6 +57,7 @@ public class UserController(DataMasterDbContext db, DatabaseBackupService backup
             LanMode = appOptions.Value.LanMode,
             LanHostname = appOptions.Value.LanHostname,
             LanPort = appOptions.Value.LanPort,
+            AppVersion = appOptions.Value.AppVersion,
             HubApiStatus = hubApiStatus,
             BackupPassphraseAktif = !string.IsNullOrWhiteSpace(appOptions.Value.BackupPassphrase),
         };

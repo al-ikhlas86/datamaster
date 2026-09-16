@@ -13,6 +13,7 @@ public class UserSettingsViewModel
     public string LanMode { get; set; } = "mandiri";
     public string LanHostname { get; set; } = "";
     public int LanPort { get; set; }
+    public string AppVersion { get; set; } = "";
 
     // Status Hub API (2026-09-11, diperluas 2026-09-14 jadi 3 nilai sejak
     // fitur persetujuan admin) - "belum" (belum diisi sama sekali),
