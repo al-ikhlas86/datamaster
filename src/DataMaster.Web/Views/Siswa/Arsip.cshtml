@@ -1,3 +1,4 @@
+@using System.Text.Json
 @model List<DataMaster.Web.Models.Siswa.SiswaRow>
 @{
     ViewData["Title"] = "Arsip Siswa";
@@ -5,6 +6,7 @@
 
 <ul class="nav nav-tabs mb-3">
     <li class="nav-item"><span class="nav-link active">Arsip Siswa</span></li>
+    <li class="nav-item"><a class="nav-link" asp-action="TempatSampah">Tempat Sampah</a></li>
 </ul>
 
 <div class="card">
@@ -28,6 +30,7 @@
                     var no = 1;
                     foreach (var s in Model)
                     {
+                        var formId = $"form-hapus-permanen-{s.SiswaId}";
                         <tr>
                             <td>@(no++)</td>
                             <td>@s.Nis</td>
@@ -37,9 +40,16 @@
                             <td><span class="badge bg-secondary">@(s.Status == "lulus" ? "Lulus" : "Keluar")</span></td>
                             <td>
                                 <a asp-action="Detail" asp-route-id="@s.SiswaId" class="btn btn-sm btn-outline-info">Detail</a>
-                                <form asp-action="HapusPermanen" asp-route-id="@s.SiswaId" method="post" class="d-inline form-hapus-permanen" data-nama="@s.Nama">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">Hapus Permanen</button>
-                                </form>
+                                @* Form ini kosong - MURNI pembawa antiforgery token + action per-siswa
+                                   (tag helper asp-action otomatis suntik token, lihat komentar Program.cs
+                                   soal auto-validate global). Tombol yang terlihat TIDAK ada di dalamnya
+                                   (type=button, di luar), submit-nya dipicu manual dari modal konfirmasi
+                                   setelah nama diketik persis - lihat script di bawah. *@
+                                <form asp-action="HapusPermanen" asp-route-id="@s.SiswaId" method="post" id="@formId" class="d-none"></form>
+                                <button type="button" class="btn btn-sm btn-outline-danger"
+                                        onclick="bukaModalHapusPermanen('@formId', @Html.Raw(JsonSerializer.Serialize(s.Nama)))">
+                                    Hapus Permanen
+                                </button>
                             </td>
                         </tr>
                     }
@@ -50,14 +60,57 @@
     </div>
 </div>
 
+@* Modal tunggal dipakai ulang utk semua baris (2026-09-23, permintaan eksplisit
+   user - pola sama seperti GitHub "type repo name to confirm delete"): sekedar
+   confirm() browser dianggap terlalu gampang ke-klik tanpa mikir. Tombol
+   "Hapus Permanen" tetap nonaktif sampai nama yang diketik PERSIS sama
+   (case-sensitive, termasuk spasi) dgn nama siswa target. *@
+<div class="modal fade" id="modalHapusPermanen" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title text-danger">Hapus Permanen</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="alert alert-danger">
+                    Siswa <strong id="hapusPermanenNamaTampil"></strong> akan pindah ke <strong>Tempat Sampah</strong> dan
+                    dihapus BENERAN (identitas, riwayat akademik/ekskul, dokumen) otomatis <strong>setelah 30 hari</strong> -
+                    selama 30 hari itu masih bisa dipulihkan kapan saja lewat menu Tempat Sampah kalau ternyata salah pencet.
+                </div>
+                <div class="mb-2">
+                    <label class="form-label">Ketik <strong id="hapusPermanenNamaLabel"></strong> untuk konfirmasi *</label>
+                    <input type="text" id="hapusPermanenInput" class="form-control" autocomplete="off" oninput="cekKonfirmasiHapusPermanen()" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                <button type="button" class="btn btn-danger" id="hapusPermanenBtnSubmit" disabled onclick="submitHapusPermanen()">Hapus Permanen</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <script>
-        document.querySelectorAll('.form-hapus-permanen').forEach(function (f) {
-            f.addEventListener('submit', function (e) {
-                if (!confirm(this.dataset.nama + ' akan DIHAPUS PERMANEN dari database (identitas, riwayat akademik/ekskul, dokumen) - TIDAK BISA DIBATALKAN. Cuma bisa dilakukan kalau tidak ada riwayat akademik/ekskul tersimpan. Lanjutkan?')) {
-                    e.preventDefault();
-                }
-            });
-        });
+        let hapusPermanenNamaTarget = '';
+        let hapusPermanenFormId = '';
+
+        function bukaModalHapusPermanen(formId, nama) {
+            hapusPermanenFormId = formId;
+            hapusPermanenNamaTarget = nama;
+            document.getElementById('hapusPermanenNamaTampil').textContent = nama;
+            document.getElementById('hapusPermanenNamaLabel').textContent = nama;
+            document.getElementById('hapusPermanenInput').value = '';
+            document.getElementById('hapusPermanenBtnSubmit').disabled = true;
+            new bootstrap.Modal(document.getElementById('modalHapusPermanen')).show();
+        }
+
+        function cekKonfirmasiHapusPermanen() {
+            const typed = document.getElementById('hapusPermanenInput').value;
+            document.getElementById('hapusPermanenBtnSubmit').disabled = (typed !== hapusPermanenNamaTarget);
+        }
+
+        function submitHapusPermanen() {
+            if (document.getElementById('hapusPermanenInput').value !== hapusPermanenNamaTarget) return;
+            document.getElementById(hapusPermanenFormId).submit();
+        }
     </script>
 }

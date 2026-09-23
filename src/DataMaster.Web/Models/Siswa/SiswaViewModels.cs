@@ -37,6 +37,21 @@ public class SiswaRow
     public string Status { get; set; } = "aktif";
 }
 
+// Tempat Sampah 30 hari (2026-09-23) - lihat catatan lengkap di Entities/Siswa.cs::DeletedAt.
+public class SampahSiswaRow
+{
+    public int SiswaId { get; set; }
+    public required string Nama { get; set; }
+    public required string Nis { get; set; }
+    public required string JenisKelamin { get; set; }
+    public string? NamaKelas { get; set; }
+    public DateTime DeletedAt { get; set; }
+    public int HariTersisa { get; set; }
+    // true kalau sudah lewat 30 hari TAPI tidak bisa otomatis dimusnahkan
+    // (masih py riwayat akademik/ekskul) - "macet" di sampah sampai ditangani manual.
+    public bool MacetPunyaRiwayat { get; set; }
+}
+
 public class KelasOption
 {
     public int KelasId { get; set; }

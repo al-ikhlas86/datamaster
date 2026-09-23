@@ -332,27 +332,23 @@ public class SiswaController(DataMasterDbContext db, DocumentStorageService docs
 
     // --------------------------------------------------- HapusPermanen (HARD)
 
-    // BARU (2026-09-23) - dibangun sbg pasangan fitur tombstone Hub API
-    // (lihat HubApiSyncService.PushSiswaAsync full:true & migrasi hub-api
-    // AddDeletedAtToStudentsTeachers) - motivasi nyata: insiden 5 siswa
-    // Kelas 1 Al Jabbar yang ke-duplikat permanen (2x baris lokal utk siswa
-    // yg sama, source_id beda) TIDAK ADA cara membersihkannya sebelum ini -
-    // Delete() biasa cuma arsip (Status=keluar), tetap ke-push ke Hub API
-    // selamanya sbg 2 baris terpisah.
+    // REVISI 2026-09-23 (diskusi langsung dgn user soal risiko presensi VPS
+    // ikut kehapus): "Hapus Permanen" TIDAK LAGI db.Siswa.Remove() detik itu
+    // juga - cuma menyimpan waktu masuk sampah (DeletedAt). Baris TETAP
+    // terkirim ke Hub API sbg "hidup" selama 30 hari (lihat catatan lengkap
+    // di Entities/Siswa.cs::DeletedAt) - VPS TIDAK menyentuh apa pun sampai
+    // TrashPurgeHostedService benar2 menghapus baris ini stlh 30 hari tanpa
+    // dipulihkan. Ini jaring pengaman utk kasus siswa yg TERNYATA py
+    // presensi asli di VPS (DataMaster tidak py visibilitas ke sana sama
+    // sekali) - staf py 30 hari utk sadar & Pulihkan kalau salah pencet.
     //
     // Sengaja HANYA bisa dipanggil utk siswa yg SUDAH diarsipkan (Status !=
-    // aktif) - dua langkah wajib (arsip dulu, baru hapus permanen) sbg jaring
-    // pengaman drpd 1 klik langsung hilang dari siswa aktif. Diblokir kalau
-    // masih py riwayat akademik/ekskul (FK cascade EF Core ke 2 tabel itu
-    // TIDAK PERNAH didesain sengaja - lihat komentar DataMasterDbContext -
-    // hapus tanpa guard ini bisa diam2 menghapus riwayat akademik sungguhan).
+    // aktif) - dua langkah wajib (arsip dulu, baru masuk sampah) sbg jaring
+    // pengaman drpd 1 klik langsung hilang dari siswa aktif.
     [HttpPost("{id:int}/hapus-permanen")]
     public async Task<IActionResult> HapusPermanen(int id)
     {
-        var siswa = await db.Siswa
-            .Include(s => s.RiwayatAkademikList)
-            .Include(s => s.EkskulSiswaList)
-            .FirstOrDefaultAsync(s => s.SiswaId == id);
+        var siswa = await db.Siswa.FindAsync(id);
         if (siswa is null) return NotFound($"Siswa dengan ID {id} tidak ditemukan.");
 
         if (siswa.Status == StatusSiswa.aktif)
@@ -360,23 +356,56 @@ public class SiswaController(DataMasterDbContext db, DocumentStorageService docs
             TempData["error"] = "Siswa aktif tidak bisa dihapus permanen - arsipkan dulu (tombol Hapus di Data Siswa), baru bisa dihapus permanen dari sini.";
             return RedirectToAction(nameof(Arsip));
         }
-        if (siswa.RiwayatAkademikList.Count > 0 || siswa.EkskulSiswaList.Count > 0)
-        {
-            TempData["error"] = $"'{siswa.Nama}' masih punya riwayat akademik/ekskul tersimpan - tidak bisa dihapus permanen (data itu akan ikut hilang). Hubungi developer kalau memang harus dibersihkan.";
-            return RedirectToAction(nameof(Arsip));
-        }
 
-        docs.Delete(siswa.DokumenKk);
-        docs.Delete(siswa.DokumenAkta);
-        docs.Delete(siswa.DokumenKia);
-        docs.Delete(siswa.DokumenIjazah);
-
-        var nama = siswa.Nama;
-        db.Siswa.Remove(siswa); // HARD DELETE beneran - baris hilang dari kiriman full:true berikutnya, Hub API men-tombstone otomatis (lihat BaseSyncModel::tombstoneMissing di hub-api).
+        siswa.DeletedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
 
-        TempData["message"] = $"Data siswa '{nama}' dihapus permanen. Perubahan ini akan ikut tersinkron ke Hub API pada sinkronisasi berikutnya.";
+        TempData["message"] = $"'{siswa.Nama}' dipindahkan ke Tempat Sampah - akan dihapus permanen otomatis setelah 30 hari. Bisa dipulihkan kapan saja sebelum itu dari menu Tempat Sampah.";
         return RedirectToAction(nameof(Arsip));
+    }
+
+    // ----------------------------------------------------------- Sampah
+
+    private const int MasaSampahHari = 30;
+
+    [HttpGet("sampah")]
+    public async Task<IActionResult> TempatSampah()
+    {
+        var siswaList = await db.Siswa
+            .Include(s => s.Kelas)
+            .Include(s => s.RiwayatAkademikList)
+            .Include(s => s.EkskulSiswaList)
+            .Where(s => s.DeletedAt != null)
+            .OrderBy(s => s.DeletedAt)
+            .ToListAsync();
+
+        var now = DateTime.UtcNow;
+        var rows = siswaList.Select(s => new SampahSiswaRow
+        {
+            SiswaId = s.SiswaId,
+            Nama = s.Nama,
+            Nis = s.Nis,
+            JenisKelamin = s.JenisKelamin.ToString(),
+            NamaKelas = s.Kelas?.NamaKelas,
+            DeletedAt = s.DeletedAt!.Value,
+            HariTersisa = Math.Max(0, MasaSampahHari - (int)(now - s.DeletedAt!.Value).TotalDays),
+            MacetPunyaRiwayat = s.RiwayatAkademikList.Count > 0 || s.EkskulSiswaList.Count > 0,
+        }).ToList();
+
+        return View(rows);
+    }
+
+    [HttpPost("{id:int}/pulihkan-dari-sampah")]
+    public async Task<IActionResult> PulihkanDariSampah(int id)
+    {
+        var siswa = await db.Siswa.FindAsync(id);
+        if (siswa is null) return NotFound($"Siswa dengan ID {id} tidak ditemukan.");
+
+        siswa.DeletedAt = null;
+        await db.SaveChangesAsync();
+
+        TempData["message"] = $"'{siswa.Nama}' berhasil dipulihkan dari Tempat Sampah - kembali ke Arsip Siswa.";
+        return RedirectToAction(nameof(TempatSampah));
     }
 
     // Tandai Lulus (2026-09-11, poin #12 - kontinuitas TK->SD): TERPISAH dari
@@ -450,8 +479,10 @@ public class SiswaController(DataMasterDbContext db, DocumentStorageService docs
     [HttpGet("arsip")]
     public async Task<IActionResult> Arsip()
     {
+        // DeletedAt != null (masuk Tempat Sampah) disembunyikan dari sini -
+        // lihat TempatSampah() & catatan lengkap di Entities/Siswa.cs::DeletedAt.
         var siswaList = await db.Siswa.Include(s => s.Kelas)
-            .Where(s => s.Status != StatusSiswa.aktif)
+            .Where(s => s.Status != StatusSiswa.aktif && s.DeletedAt == null)
             .OrderBy(s => s.Nama)
             .ToListAsync();
         return View(siswaList.Select(ToRow).ToList());
@@ -732,6 +763,19 @@ public class SiswaController(DataMasterDbContext db, DocumentStorageService docs
                     ? await db.Siswa.FirstOrDefaultAsync(s => s.Nis == nisBaris)
                     : null;
 
+                // Pertahanan kedua (2026-09-23) - sama alasan dgn cek NIS di
+                // atas, TAPI utk kasus NIS beda format (kehilangan 0 di depan
+                // dkk) yg lolos cek NIS: nama+No HP SEKALIGUS sama persis dgn
+                // siswa lain = sinyal kuat duplikat (kakak-adik PASTI beda
+                // nama walau No HP sama), bukan cuma di ValidateFormAsync
+                // (manual Create/Update) tapi juga di jalur Import ini.
+                var namaBaris = row.Type == "insert" ? row.Data.GetValueOrDefault("nama") : null;
+                var noHpBaris = row.Type == "insert" ? row.Data.GetValueOrDefault("no_handphone") : null;
+                if (existingByNis is null && namaBaris is not null && !string.IsNullOrWhiteSpace(noHpBaris))
+                {
+                    existingByNis = await db.Siswa.FirstOrDefaultAsync(s => s.NoHandphone == noHpBaris && s.Nama.ToLower() == namaBaris.ToLower());
+                }
+
                 if (row.Type == "insert" && existingByNis is null)
                 {
                     db.Siswa.Add(new Siswa
@@ -870,6 +914,21 @@ public class SiswaController(DataMasterDbContext db, DocumentStorageService docs
         else if (nis.Length > 20) e["Nis"] = "NIS maksimal 20 karakter.";
         else if (!IsNumericLike(nis)) e["Nis"] = "NIS hanya boleh berisi angka.";
         else if (await db.Siswa.AnyAsync(s => s.Nis == nis && s.SiswaId != (excludeId ?? 0))) e["Nis"] = "NIS ini sudah dipakai siswa lain.";
+
+        // Cegah duplikat siswa ke depan (2026-09-23, permintaan eksplisit user
+        // stlh insiden 5 siswa Al Jabbar dobel) - NAMA+No HP SEKALIGUS sama
+        // persis dgn siswa lain adalah sinyal kuat "ini orang yang sama
+        // diinput 2x", BUKAN kakak-adik (kakak-adik WAJAR berbagi No HP
+        // orang tua yang sama, tapi namanya PASTI beda) - jadi cek gabungan
+        // ini tidak akan salah tandai kakak-adik sbg duplikat. Diblokir keras
+        // (bukan cuma peringatan) krn kombinasi ini nyaris mustahil legitimate.
+        var noHpBaru = OnlyDigits(input.NoHandphone);
+        if (nama != "" && !string.IsNullOrWhiteSpace(noHpBaru))
+        {
+            var kembar = await db.Siswa.FirstOrDefaultAsync(s =>
+                s.SiswaId != (excludeId ?? 0) && s.NoHandphone == noHpBaru && s.Nama.ToLower() == nama.ToLower());
+            if (kembar is not null) e["Nama"] = $"Sudah ada siswa lain dengan nama & No HP yang sama persis (NIS {kembar.Nis}) - kemungkinan besar ini siswa duplikat, bukan siswa baru. Cek dulu di Data Siswa/Arsip sebelum menyimpan.";
+        }
 
         if (!string.IsNullOrWhiteSpace(input.Nisn))
         {

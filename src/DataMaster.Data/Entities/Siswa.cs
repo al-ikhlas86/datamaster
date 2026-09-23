@@ -43,6 +43,20 @@ public class Siswa
     public DateTime? CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
 
+    // Tempat Sampah 30 hari (2026-09-23, permintaan eksplisit user) - "Hapus
+    // Permanen" TIDAK LAGI langsung db.Siswa.Remove() detik itu juga, cuma
+    // menyimpan waktu masuk sampah di sini. Selama kolom ini terisi TAPI
+    // belum lewat 30 hari, baris ini: (1) MASIH ikut terkirim ke Hub API
+    // sbg "hidup" (lihat HubApiSyncService.PushSiswaAsync - TIDAK ada
+    // filter DeletedAt di sana, sengaja) supaya VPS TIDAK tahu-menahu &
+    // TIDAK menghapus apa pun selama jendela pemulihan ini, (2) disembunyikan
+    // dari Data Siswa & Arsip Siswa, cuma tampil di halaman baru Tempat
+    // Sampah dgn tombol Pulihkan. TrashPurgeHostedService yang benar2
+    // menghapus baris ini (db.Siswa.Remove) SETELAH 30 hari - baru DI SITU
+    // baris hilang dari kiriman full:true berikutnya & Hub API men-tombstone
+    // beneran (VPS ikut coba hapus fisik, lihat komentar hubApiSync.js).
+    public DateTime? DeletedAt { get; set; }
+
     public Kelas? Kelas { get; set; }
     public CalonSiswa? CalonSiswaAsal { get; set; }
     public ICollection<EkskulSiswa> EkskulSiswaList { get; set; } = new List<EkskulSiswa>();

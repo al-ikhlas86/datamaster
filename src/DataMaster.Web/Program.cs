@@ -177,6 +177,8 @@ builder.Services.AddHttpClient<LulusanTkService>();
 builder.Services.AddHttpClient();
 builder.Services.AddHostedService<HubApiSyncHostedService>();
 builder.Services.AddHostedService<BackupCloudHostedService>();
+builder.Services.AddScoped<TrashPurgeService>();
+builder.Services.AddHostedService<TrashPurgeHostedService>();
 
 var app = builder.Build();
 

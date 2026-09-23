@@ -1,0 +1,65 @@
+@model List<DataMaster.Web.Models.Siswa.SampahSiswaRow>
+@{
+    ViewData["Title"] = "Tempat Sampah Siswa";
+}
+
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item"><a class="nav-link" asp-action="Arsip">Arsip Siswa</a></li>
+    <li class="nav-item"><span class="nav-link active">Tempat Sampah</span></li>
+</ul>
+
+<div class="card">
+    <div class="card-header">
+        <strong>Tempat Sampah</strong>
+        <div class="text-muted small">Siswa yang diklik "Hapus Permanen" - dihapus BENERAN (identitas, riwayat, dokumen) otomatis setelah 30 hari kalau tidak dipulihkan. Selama masih di sini, data belum hilang sama sekali.</div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr><th>No</th><th>NIS</th><th>Nama</th><th>JK</th><th>Kelas Terakhir</th><th>Dihapus Pada</th><th>Sisa Waktu</th><th>Aksi</th></tr>
+                </thead>
+                <tbody>
+                @if (Model.Count == 0)
+                {
+                    <tr><td colspan="8" class="text-center text-muted py-4">Tempat sampah kosong.</td></tr>
+                }
+                else
+                {
+                    var no = 1;
+                    foreach (var s in Model)
+                    {
+                        <tr>
+                            <td>@(no++)</td>
+                            <td>@s.Nis</td>
+                            <td>@s.Nama</td>
+                            <td><span class="badge @(s.JenisKelamin == "L" ? "bg-primary" : "bg-danger")">@s.JenisKelamin</span></td>
+                            <td>@(s.NamaKelas ?? "-")</td>
+                            <td>@s.DeletedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</td>
+                            <td>
+                                @if (s.MacetPunyaRiwayat && s.HariTersisa == 0)
+                                {
+                                    <span class="badge bg-warning text-dark" title="Sudah lewat 30 hari tapi tidak bisa dimusnahkan otomatis - masih punya riwayat akademik/ekskul tersimpan.">Macet - masih py riwayat</span>
+                                }
+                                else if (s.HariTersisa == 0)
+                                {
+                                    <span class="badge bg-secondary">Menunggu pemusnahan...</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-danger">@s.HariTersisa hari lagi</span>
+                                }
+                            </td>
+                            <td>
+                                <form asp-action="PulihkanDariSampah" asp-route-id="@s.SiswaId" method="post" class="d-inline" onsubmit="return confirm('Pulihkan ' + @Html.Raw(System.Text.Json.JsonSerializer.Serialize(s.Nama)) + ' dari Tempat Sampah? Data akan kembali ke Arsip Siswa.');">
+                                    <button type="submit" class="btn btn-sm btn-outline-success">Pulihkan</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
