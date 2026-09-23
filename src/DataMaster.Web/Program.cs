@@ -4,6 +4,7 @@ using DataMaster.Data;
 using DataMaster.Web.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -106,6 +107,25 @@ var builder = WebApplication.CreateBuilder(args);
 // manual spt sepanjang sesi pengembangan ini, tidak mengubah perilaku
 // apa pun di kedua skenario itu.
 builder.Host.UseWindowsService();
+
+// Simpan Data Protection Keys di folder stabil (2026-09-23, BUG NYATA - hapus
+// tingkat & form POST lain mendadak "HTTP ERROR 400", halaman nyangkut sampai
+// harus ditutup total & dibuka ulang) - tanpa ini, .NET bisa generate kunci
+// BARU tiap proses restart (auto-update ApplyAndRestart, restart manual, dll).
+// Begitu kunci berganti, SEMUA token antiforgery yang sudah terbit (termasuk
+// yang sedang terbuka di WebView2 pengguna) langsung dianggap tidak valid ->
+// validasi CSRF global (AutoValidateAntiforgeryTokenAttribute di bawah)
+// menolaknya dgn HTTP 400 - utk SEMUA form POST tanpa kecuali, bukan cuma satu
+// fitur. Kunci disimpan di folder yang SAMA dgn database (%LocalAppData%\DataMaster)
+// supaya kunci, dan karenanya token yang sudah terbit, tetap valid lintas
+// restart proses apa pun.
+try
+{
+    var dpDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DataMaster", "DataProtection-Keys");
+    Directory.CreateDirectory(dpDir);
+    builder.Services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo(dpDir));
+}
+catch { /* non-fatal - fallback ke kunci sementara bawaan kalau folder tidak bisa ditulis */ }
 
 // Add services to the container.
 // Session dipakai utk alur preview-import 2 langkah (persis pola PHP
