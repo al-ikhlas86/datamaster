@@ -21,7 +21,19 @@ public class HubApiSyncService(DataMasterDbContext db, HttpClient http, IOptions
     // PERSIS dgn versi payload PHP asli (guru sudah termasuk is_kepala_sekolah +
     // status_keluar) - supaya PC yang datanya kebetulan identik dgn kiriman PHP
     // lama tidak perlu mengirim ulang semua begitu berpindah ke implementasi ini.
-    private const string ProtocolVersion = "v4-full";
+    // BUMP 2026-09-23 (v4-full -> v5-siswa-guru-full): WAJIB tiap kali ada
+    // perubahan yang TIDAK mengubah ISI payload (rows) tapi mengubah CARA
+    // server memperlakukannya - contoh nyata BARU SAJA ketahuan: flip
+    // full:false->full:true utk Siswa/Guru (PushSiswaAsync/PushGuruAsync)
+    // TIDAK ikut membump versi ini, akibatnya fingerprint cache (dihitung
+    // dari ProtocolVersion+json rows SAJA, `full` sendiri TIDAK ikut
+    // dihash) tetap menganggap "tidak berubah sejak sync terakhir" kalau
+    // data siswa/guru kebetulan sama persis dgn push terakhir - PUSH
+    // full:true YANG BARU TIDAK PERNAH BENAR2 TERKIRIM sampai ada
+    // perubahan data asli, bug nyata yang bikin 5 siswa Al Jabbar duplikat
+    // TIDAK PERNAH ter-reconcile walau kode server sudah benar. Bump versi
+    // ini memaksa SATU KALI re-kirim penuh semua entitas sbg "berubah".
+    private const string ProtocolVersion = "v5-siswa-guru-full";
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
 
     // Deteksi 401 (2026-09-14, fitur persetujuan admin di Hub API) - dipakai
