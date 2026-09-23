@@ -242,7 +242,7 @@ public class HubApiSyncService(DataMasterDbContext db, HttpClient http, IOptions
             HpOrtuKedua = s.NoHandphoneKedua,
             Status = s.Status.ToString(),
         }).ToList();
-        await PostAsync(url, token, "/api/v1/sync/siswa", rows, full: false, "Siswa", ct);
+        await PostAsync(url, token, "/api/v1/sync/siswa", rows, full: true, "Siswa", ct);
     }
 
     private async Task PushMataPelajaranAsync(string url, string token, CancellationToken ct)
@@ -308,7 +308,7 @@ public class HubApiSyncService(DataMasterDbContext db, HttpClient http, IOptions
             IsKepalaSekolah = kepalaSet.Contains(g.GuruId),
             StatusKeluar = g.StatusKeluar?.ToString(),
         }).ToList();
-        await PostAsync(url, token, "/api/v1/sync/guru", rows, full: false, "Guru", ct);
+        await PostAsync(url, token, "/api/v1/sync/guru", rows, full: true, "Guru", ct);
     }
 
     private async Task PushWaliKelasAsync(string url, string token, CancellationToken ct)

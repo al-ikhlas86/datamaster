@@ -35,7 +35,12 @@
                             <td><span class="badge @(s.JenisKelamin == "L" ? "bg-primary" : "bg-danger")">@s.JenisKelamin</span></td>
                             <td>@(s.NamaKelas ?? "-")</td>
                             <td><span class="badge bg-secondary">@(s.Status == "lulus" ? "Lulus" : "Keluar")</span></td>
-                            <td><a asp-action="Detail" asp-route-id="@s.SiswaId" class="btn btn-sm btn-outline-info">Detail</a></td>
+                            <td>
+                                <a asp-action="Detail" asp-route-id="@s.SiswaId" class="btn btn-sm btn-outline-info">Detail</a>
+                                <form asp-action="HapusPermanen" asp-route-id="@s.SiswaId" method="post" class="d-inline form-hapus-permanen" data-nama="@s.Nama">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Hapus Permanen</button>
+                                </form>
+                            </td>
                         </tr>
                     }
                 }
@@ -44,3 +49,15 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        document.querySelectorAll('.form-hapus-permanen').forEach(function (f) {
+            f.addEventListener('submit', function (e) {
+                if (!confirm(this.dataset.nama + ' akan DIHAPUS PERMANEN dari database (identitas, riwayat akademik/ekskul, dokumen) - TIDAK BISA DIBATALKAN. Cuma bisa dilakukan kalau tidak ada riwayat akademik/ekskul tersimpan. Lanjutkan?')) {
+                    e.preventDefault();
+                }
+            });
+        });
+    </script>
+}

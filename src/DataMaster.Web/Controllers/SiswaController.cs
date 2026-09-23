@@ -330,6 +330,55 @@ public class SiswaController(DataMasterDbContext db, DocumentStorageService docs
         return RedirectToAction(nameof(Index));
     }
 
+    // --------------------------------------------------- HapusPermanen (HARD)
+
+    // BARU (2026-09-23) - dibangun sbg pasangan fitur tombstone Hub API
+    // (lihat HubApiSyncService.PushSiswaAsync full:true & migrasi hub-api
+    // AddDeletedAtToStudentsTeachers) - motivasi nyata: insiden 5 siswa
+    // Kelas 1 Al Jabbar yang ke-duplikat permanen (2x baris lokal utk siswa
+    // yg sama, source_id beda) TIDAK ADA cara membersihkannya sebelum ini -
+    // Delete() biasa cuma arsip (Status=keluar), tetap ke-push ke Hub API
+    // selamanya sbg 2 baris terpisah.
+    //
+    // Sengaja HANYA bisa dipanggil utk siswa yg SUDAH diarsipkan (Status !=
+    // aktif) - dua langkah wajib (arsip dulu, baru hapus permanen) sbg jaring
+    // pengaman drpd 1 klik langsung hilang dari siswa aktif. Diblokir kalau
+    // masih py riwayat akademik/ekskul (FK cascade EF Core ke 2 tabel itu
+    // TIDAK PERNAH didesain sengaja - lihat komentar DataMasterDbContext -
+    // hapus tanpa guard ini bisa diam2 menghapus riwayat akademik sungguhan).
+    [HttpPost("{id:int}/hapus-permanen")]
+    public async Task<IActionResult> HapusPermanen(int id)
+    {
+        var siswa = await db.Siswa
+            .Include(s => s.RiwayatAkademikList)
+            .Include(s => s.EkskulSiswaList)
+            .FirstOrDefaultAsync(s => s.SiswaId == id);
+        if (siswa is null) return NotFound($"Siswa dengan ID {id} tidak ditemukan.");
+
+        if (siswa.Status == StatusSiswa.aktif)
+        {
+            TempData["error"] = "Siswa aktif tidak bisa dihapus permanen - arsipkan dulu (tombol Hapus di Data Siswa), baru bisa dihapus permanen dari sini.";
+            return RedirectToAction(nameof(Arsip));
+        }
+        if (siswa.RiwayatAkademikList.Count > 0 || siswa.EkskulSiswaList.Count > 0)
+        {
+            TempData["error"] = $"'{siswa.Nama}' masih punya riwayat akademik/ekskul tersimpan - tidak bisa dihapus permanen (data itu akan ikut hilang). Hubungi developer kalau memang harus dibersihkan.";
+            return RedirectToAction(nameof(Arsip));
+        }
+
+        docs.Delete(siswa.DokumenKk);
+        docs.Delete(siswa.DokumenAkta);
+        docs.Delete(siswa.DokumenKia);
+        docs.Delete(siswa.DokumenIjazah);
+
+        var nama = siswa.Nama;
+        db.Siswa.Remove(siswa); // HARD DELETE beneran - baris hilang dari kiriman full:true berikutnya, Hub API men-tombstone otomatis (lihat BaseSyncModel::tombstoneMissing di hub-api).
+        await db.SaveChangesAsync();
+
+        TempData["message"] = $"Data siswa '{nama}' dihapus permanen. Perubahan ini akan ikut tersinkron ke Hub API pada sinkronisasi berikutnya.";
+        return RedirectToAction(nameof(Arsip));
+    }
+
     // Tandai Lulus (2026-09-11, poin #12 - kontinuitas TK->SD): TERPISAH dari
     // Delete (arsip/keluar) - status 'lulus' SUDAH ADA di enum StatusSiswa
     // sejak awal (lihat Enums.cs), tapi sebelum ini TIDAK ADA jalur UI utk
@@ -659,12 +708,31 @@ public class SiswaController(DataMasterDbContext db, DocumentStorageService docs
         var preview = JsonSerializer.Deserialize<ImportPreviewSession>(json)!;
 
         await using var tx = await db.Database.BeginTransactionAsync();
-        int inserted = 0, updated = 0;
+        int inserted = 0, updated = 0, convertedToUpdate = 0;
         try
         {
             foreach (var row in preview.Rows)
             {
-                if (row.Type == "insert")
+                // BUG NYATA (2026-09-23, insiden 5 siswa Al Jabbar duplikat):
+                // Preview cuma cek NIS SEKALI saat upload, keputusan "insert"
+                // dibekukan di session lalu diputar ulang apa adanya di sini -
+                // kalau siswa dgn NIS itu SUDAH dibuat lewat jalur lain (Store()
+                // manual, PSB, atau import lain) di antara Preview dan Apply,
+                // baris ini tetap dieksekusi sbg INSERT baru -> 2 baris lokal
+                // utk siswa yg sama, masing2 dapat SiswaId sendiri yg lalu
+                // ke-push ke Hub API sbg 2 record terpisah selamanya. Fix:
+                // cek ulang NIS PERSIS SEBELUM insert (bukan cuma percaya
+                // keputusan Preview yang sudah basi), alihkan ke update kalau
+                // ternyata sudah ada - JANGAN PERNAH insert baru tanpa cek
+                // ulang, unique index di DB cuma menyelamatkan kasus NIS
+                // identik byte-per-byte (lihat DownloadTemplate() soal NIS
+                // kehilangan angka 0 di depan - variasi format tetap bisa lolos).
+                var nisBaris = row.Type == "insert" ? row.Data.GetValueOrDefault("nis") : null;
+                var existingByNis = nisBaris is not null
+                    ? await db.Siswa.FirstOrDefaultAsync(s => s.Nis == nisBaris)
+                    : null;
+
+                if (row.Type == "insert" && existingByNis is null)
                 {
                     db.Siswa.Add(new Siswa
                     {
@@ -693,8 +761,13 @@ public class SiswaController(DataMasterDbContext db, DocumentStorageService docs
                 }
                 else
                 {
-                    var siswa = await db.Siswa.FindAsync(row.ExistingSiswaId);
+                    // existingByNis terisi HANYA utk baris yg tadinya ditandai
+                    // "insert" tapi ternyata NIS-nya sudah ada sekarang (lihat
+                    // komentar di atas) - row.ExistingSiswaId dipakai utk baris
+                    // "update" biasa spt semula.
+                    var siswa = existingByNis ?? await db.Siswa.FindAsync(row.ExistingSiswaId);
                     if (siswa is null) continue;
+                    if (row.Type == "insert") convertedToUpdate++;
                     ApplyIfPresent(row.Data, "nama", v => siswa.Nama = v!);
                     ApplyIfPresent(row.Data, "jenis_kelamin", v => siswa.JenisKelamin = Enum.Parse<JenisKelamin>(v!));
                     if (row.Data.ContainsKey("nisn")) siswa.Nisn = row.Data["nisn"];
@@ -730,6 +803,7 @@ public class SiswaController(DataMasterDbContext db, DocumentStorageService docs
 
         var message = $"Berhasil import {inserted} siswa baru.";
         if (updated > 0) message += $" {updated} siswa lama diperbarui.";
+        if (convertedToUpdate > 0) message += $" {convertedToUpdate} baris yang tadinya ditandai \"baru\" ternyata NIS-nya sudah ada saat diterapkan - otomatis diperbarui, bukan dibuat dobel.";
         TempData["message"] = message;
         if (preview.Errors.Count > 0) TempData["import_errors"] = JsonSerializer.Serialize(preview.Errors);
         return RedirectToAction(nameof(Index));
