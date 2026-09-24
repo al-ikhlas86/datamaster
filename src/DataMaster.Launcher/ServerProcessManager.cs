@@ -196,6 +196,12 @@ public sealed class ServerProcessManager : IDisposable
         psi.EnvironmentVariables["AppSettings__LanHostname"] = Environment.MachineName;
         psi.EnvironmentVariables["AppSettings__LanPort"] = Port.ToString();
         psi.EnvironmentVariables["AppSettings__AppVersion"] = appVersion;
+        // Mode "development" (2026-09-24) - InstallType otomatis "pengembang",
+        // TIDAK PERNAH ditulis ke file eksternal (hubapi.json dkk, lihat
+        // AppSettingsWriterService) - cukup env var spt LanMode dkk di atas,
+        // supaya berubah balik otomatis kalau suatu saat PC ini diatur ulang
+        // jadi "server"/"klien" biasa (tidak ada sisa "pengembang" nyangkut).
+        if (_config.Mode == "development") psi.EnvironmentVariables["AppSettings__InstallType"] = "pengembang";
 
         // Fix BUG NYATA 2026-09-11: HubApiUrl/HubApiToken SEBELUMNYA ditulis
         // AppSettingsWriterService langsung ke web\appsettings.json (DI DALAM

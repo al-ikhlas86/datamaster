@@ -1,7 +1,14 @@
+@using Microsoft.Extensions.Options
+@using DataMaster.Web.Services
+@inject IOptions<AppOptions> AppOpts
 @model DataMaster.Web.Models.Auth.SetupInput
 @{
     Layout = null;
     ViewData["Title"] = "Setup Awal";
+    // Mode Development (2026-09-24, LauncherConfig.Mode via env var LanMode) -
+    // skip Nama Unit & Tipe Instalasi sepenuhnya, langsung ID+PW+Daftar - lihat
+    // AuthController.Setup() utk penanganan sisi server yang sama.
+    var isDevelopment = AppOpts.Value.LanMode == "development";
 }
 <!DOCTYPE html>
 <html lang="id">
@@ -59,13 +66,29 @@
                             <input type="password" name="PasswordKonfirmasi" class="form-control" minlength="8" required>
                         </div>
 
-                        <hr class="my-4">
-                        <p class="fs-12 fw-medium text-muted mb-2">Sinkronisasi Hub API (opsional - boleh dilewati &amp; diaktifkan belakangan).</p>
-                        <div class="mb-4">
-                            <label class="form-label">Nama Unit</label>
-                            <input type="text" id="namaUnit" name="NamaUnit" class="form-control" placeholder="Contoh: TK Al Ikhlas 86" value="@Model.NamaUnit">
-                            <div class="form-text">Isi supaya data unit ini otomatis tersambung ke Mobile-app/Webview - tidak perlu alamat server atau token apapun, cukup nama unitnya saja.</div>
-                        </div>
+                        @if (!isDevelopment)
+                        {
+                            <hr class="my-4">
+                            <div class="mb-4">
+                                <label class="form-label">Tipe Instalasi *</label>
+                                <div class="form-check">
+                                    <input type="radio" id="tipePendidikan" name="TipeInstalasi" value="pendidikan" class="form-check-input" checked>
+                                    <label class="form-check-label" for="tipePendidikan">Pendidikan (sekolah)</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="radio" id="tipePerusahaan" name="TipeInstalasi" value="perusahaan" class="form-check-input">
+                                    <label class="form-check-label" for="tipePerusahaan">Perusahaan</label>
+                                </div>
+                                <div class="form-text">Menentukan tampilan menu/dashboard yang dipakai - bisa dicek lagi nanti, tapi ganti balik harus hubungi developer.</div>
+                            </div>
+
+                            <p class="fs-12 fw-medium text-muted mb-2">Sinkronisasi Hub API (opsional - boleh dilewati &amp; diaktifkan belakangan).</p>
+                            <div class="mb-4">
+                                <label class="form-label">Nama Unit</label>
+                                <input type="text" id="namaUnit" name="NamaUnit" class="form-control" placeholder="Contoh: TK Al Ikhlas 86" value="@Model.NamaUnit">
+                                <div class="form-text">Isi supaya data unit ini otomatis tersambung ke Mobile-app/Webview - tidak perlu alamat server atau token apapun, cukup nama unitnya saja. Boleh dikosongkan &amp; diisi belakangan lewat menu Pengaturan - Data Master tetap bisa dipakai normal baik sedang menunggu persetujuan admin maupun sebelum didaftarkan sama sekali.</div>
+                            </div>
+                        }
 
                         <button type="submit" class="btn btn-lg btn-primary w-100">Buat Akun Admin</button>
                     </form>

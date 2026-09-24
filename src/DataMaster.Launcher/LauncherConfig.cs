@@ -23,15 +23,28 @@ public sealed class LauncherConfig
     // database utama dipakai bareng" supaya data 100% sama di semua PC (bukan
     // sinkron berkala, tapi LITERAL 1 server/1 database yang sama, PC lain
     // cuma jendela yang menampilkannya) - lihat PANDUAN-INSTALASI.md §5.
-    //   "mandiri" (default)  - PC ini berdiri sendiri, server+database sendiri
-    //                          di PC ini saja (perilaku SEBELUM fitur ini ada).
+    //   "mandiri"            - NILAI LAMA (2026-09-24, tidak lagi ditawarkan di
+    //                          SetupWizardWindow, TAPI TETAP didukung penuh di
+    //                          sini & ServerProcessManager - instalasi LAMA yang
+    //                          sudah pernah setup tidak pernah lihat wizard lagi,
+    //                          jadi tidak boleh berubah perilaku sama sekali).
+    //                          Perilakunya identik "development" (server lokal
+    //                          127.0.0.1 saja, port acak) - lihat ServerProcessManager.
     //   "server"             - PC ini yang menyimpan database SUNGGUHAN, server
     //                          dengarkan SEMUA alamat jaringan (bukan cuma
     //                          127.0.0.1) di port TETAP (ServerPort) supaya PC
     //                          "klien" bisa menemukannya balik setelah restart.
+    //                          DIPAKAI juga utk pemakaian solo 1-PC sekarang
+    //                          (2026-09-24, ganti peran "mandiri" lama).
     //   "klien"              - PC ini TIDAK punya database/server sendiri sama
     //                          sekali - jendela aplikasi langsung menampilkan
     //                          PC "server" lewat KlienServerUrl.
+    //   "development"        - (2026-09-24) KHUSUS developer - perilaku jaringan
+    //                          identik "mandiri"/tidak-server (lihat
+    //                          ServerProcessManager), TAPI Setup Awal (Web) skip
+    //                          Nama Unit & Tipe Instalasi, dan AppOptions.InstallType
+    //                          otomatis "pengembang" (bisa ganti preview
+    //                          Pendidikan/Perusahaan cepat lewat DevPreviewController).
     public string Mode { get; set; } = "mandiri";
 
     // Wajib diisi kalau Mode="klien" - alamat PC "server" di jaringan lokal,

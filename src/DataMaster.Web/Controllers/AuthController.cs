@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace DataMaster.Web.Controllers;
 
@@ -22,7 +23,7 @@ namespace DataMaster.Web.Controllers;
 // bisa daftar dapat akses penuh tanpa RBAC).
 [AllowAnonymous]
 [Route("")]
-public class AuthController(DataMasterDbContext db, LoginThrottleService throttle, AppSettingsWriterService appSettingsWriter, IHostApplicationLifetime lifetime, HubApiRegistrationService hubApiRegistration) : Controller
+public class AuthController(DataMasterDbContext db, LoginThrottleService throttle, AppSettingsWriterService appSettingsWriter, IHostApplicationLifetime lifetime, HubApiRegistrationService hubApiRegistration, IOptions<AppOptions> appOptions) : Controller
 {
     [HttpGet("login")]
     public async Task<IActionResult> Login()
@@ -120,33 +121,58 @@ public class AuthController(DataMasterDbContext db, LoginThrottleService throttl
 
         await SignInAsync(user, ingatLogin: false);
 
-        // Opsional - kalau Nama Unit diisi, DAFTARKAN OTOMATIS ke Hub API (POST
-        // /api/v1/register) - staf TU tidak pernah lihat/ketik "token"/"alamat
-        // server" sama sekali (lihat diskusi 2026-09-10, komentar SetupInput).
-        // Token hasil registrasi ditulis sendiri ke appsettings.json, lalu proses
-        // di-restart supaya AppOptions (IOptions<AppOptions>, TIDAK hot-reload)
-        // kebaca ulang dari nilai baru - Launcher yang menjalankan ulang otomatis,
-        // pola SAMA PERSIS restart-setelah-restore-database.
-        var namaUnit = (input.NamaUnit ?? "").Trim();
+        // Mode Development (2026-09-24, LauncherConfig.Mode) - SKIP Tipe Instalasi
+        // & Nama Unit sepenuhnya, langsung jadi (InstallType="pengembang" sudah
+        // diisi Launcher lewat env var, lihat ServerProcessManager.cs) - khusus
+        // developer, BUKAN pemakaian sungguhan, jadi tidak perlu restart tambahan
+        // apa pun di sini.
+        var isDevelopment = appOptions.Value.LanMode == "development";
         var perluRestart = false;
-        if (namaUnit != "")
+
+        if (!isDevelopment)
         {
-            var token = await hubApiRegistration.DaftarAsync(namaUnit);
-            if (token is not null)
+            // Tipe Instalasi WAJIB utk mode Server/Mandiri (radio di Setup.cshtml
+            // SELALU ada nilai terpilih - "pendidikan" checked bawaan - defensif
+            // di sini kalau somehow kosong/nilai aneh). Ditulis SELALU (bukan
+            // opsional spt Nama Unit) - lihat AppSettingsWriterService kenapa
+            // harus file eksternal, bukan appsettings.json bawaan.
+            var tipeInstalasi = input.TipeInstalasi == "perusahaan" ? "perusahaan" : "pendidikan";
+            await appSettingsWriter.SetInstallTypeAsync(tipeInstalasi);
+            perluRestart = true;
+
+            // Opsional - kalau Nama Unit diisi, DAFTARKAN OTOMATIS ke Hub API (POST
+            // /api/v1/register) - staf TU tidak pernah lihat/ketik "token"/"alamat
+            // server" sama sekali (lihat diskusi 2026-09-10, komentar SetupInput).
+            // Token hasil registrasi ditulis sendiri ke appsettings.json, lalu proses
+            // di-restart supaya AppOptions (IOptions<AppOptions>, TIDAK hot-reload)
+            // kebaca ulang dari nilai baru - Launcher yang menjalankan ulang otomatis,
+            // pola SAMA PERSIS restart-setelah-restore-database.
+            var namaUnit = (input.NamaUnit ?? "").Trim();
+            if (namaUnit != "")
             {
-                await appSettingsWriter.SetHubApiConfigAsync(AppOptions.HubApiUrlResmi, token);
-                // "mengaktifkan sinkronisasi" TIDAK BENAR sejak fitur persetujuan
-                // admin (2026-09-14) - unit baru SELALU masuk "menunggu persetujuan"
-                // dulu, lihat RegisterController.php sisi server.
-                TempData["message"] = "Akun admin berhasil dibuat & didaftarkan ke Hub API - MENUNGGU PERSETUJUAN admin dulu sebelum sinkronisasi mulai jalan. Menyalakan ulang sebentar...";
-                perluRestart = true;
+                var token = await hubApiRegistration.DaftarAsync(namaUnit);
+                if (token is not null)
+                {
+                    await appSettingsWriter.SetHubApiConfigAsync(AppOptions.HubApiUrlResmi, token);
+                    // "mengaktifkan sinkronisasi" TIDAK BENAR sejak fitur persetujuan
+                    // admin (2026-09-14) - unit baru SELALU masuk "menunggu persetujuan"
+                    // dulu, lihat RegisterController.php sisi server. TETAP bisa dipakai
+                    // normal 100% selagi menunggu/walau ditolak - lihat komentar
+                    // RegisterController.php & HubApiSyncService.cs (gagal diam2, coba
+                    // lagi nanti, tidak pernah memblokir fitur apa pun).
+                    TempData["message"] = "Akun admin berhasil dibuat & didaftarkan ke Hub API - MENUNGGU PERSETUJUAN admin dulu sebelum sinkronisasi mulai jalan (Data Master tetap bisa dipakai normal selagi menunggu). Menyalakan ulang sebentar...";
+                }
+                else
+                {
+                    // Non-fatal SENGAJA - kalau pendaftaran gagal (internet mati,
+                    // server Hub API tidak terjangkau, dsb), akun admin TETAP
+                    // berhasil dibuat. Sinkronisasi bisa diaktifkan lagi belakangan.
+                    TempData["message"] = "Akun admin berhasil dibuat. Pendaftaran sinkronisasi Hub API gagal (cek koneksi internet) - bisa dicoba lagi belakangan lewat menu Pengaturan. Menyalakan ulang sebentar...";
+                }
             }
             else
             {
-                // Non-fatal SENGAJA - kalau pendaftaran gagal (internet mati,
-                // server Hub API tidak terjangkau, dsb), akun admin TETAP
-                // berhasil dibuat. Sinkronisasi bisa diaktifkan lagi belakangan.
-                TempData["message"] = "Akun admin berhasil dibuat. Pendaftaran sinkronisasi Hub API gagal (cek koneksi internet) - bisa dicoba lagi belakangan.";
+                TempData["message"] = "Akun admin berhasil dibuat. Menyalakan ulang sebentar...";
             }
         }
         else

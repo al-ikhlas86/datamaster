@@ -41,6 +41,14 @@ public class SetupInput
     // dikosongkan kalau belum mau aktifkan sinkronisasi saat instalasi.
     [StringLength(100, ErrorMessage = "Nama unit maksimal 100 karakter.")]
     public string? NamaUnit { get; set; }
+
+    // Tipe Instalasi (2026-09-24) - HANYA ditampilkan/wajib utk mode Server
+    // (lihat Setup.cshtml, AppOptions.LanMode) - mode Development skip field
+    // ini sepenuhnya (InstallType otomatis "pengembang" dari Launcher). TIDAK
+    // diberi [Required] di sini krn POST dari mode Development memang tidak
+    // pernah menyertakan field ini sama sekali - default "pendidikan" kalau
+    // kosong ditangani di AuthController.Setup(), bukan di sini.
+    public string? TipeInstalasi { get; set; }
 }
 
 // Lupa Password (2026-09-11, poin #5) - lihat catatan lengkap di User.cs &

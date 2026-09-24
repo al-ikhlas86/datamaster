@@ -78,6 +78,12 @@ try
         // pernah jalan di instalasi manapun sejak fitur ini ada.
         if (Environment.GetEnvironmentVariable("AppSettings__BackupPassphrase") is null && doc.RootElement.TryGetProperty("BackupPassphrase", out var bp))
             Environment.SetEnvironmentVariable("AppSettings__BackupPassphrase", bp.GetString());
+        // Tipe Instalasi (2026-09-24, dipilih di Setup Awal utk mode Server) - `??=`
+        // semangatnya SAMA PERSIS field lain di atas: env var Launcher (mode
+        // "development" -> "pengembang", lihat ServerProcessManager.cs) TETAP
+        // menang kalau sudah diisi dari luar, tidak pernah ditimpa file ini.
+        if (Environment.GetEnvironmentVariable("AppSettings__InstallType") is null && doc.RootElement.TryGetProperty("InstallType", out var it))
+            Environment.SetEnvironmentVariable("AppSettings__InstallType", it.GetString());
     }
 
     // service-config.json (2026-09-12) - port/alamat dengar Kestrel, ditulis

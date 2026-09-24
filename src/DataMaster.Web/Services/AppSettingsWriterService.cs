@@ -55,6 +55,19 @@ public class AppSettingsWriterService(ILogger<AppSettingsWriterService> logger)
         await TulisAsync(root);
     }
 
+    // Tipe Instalasi (2026-09-24, dipilih di Setup Awal utk mode Server -
+    // pendidikan/perusahaan) - file EKSTERNAL yang SAMA (pola persis Hub
+    // API/BackupPassphrase di atas), supaya pilihan staf TIDAK ke-reset diam2
+    // balik ke bawaan "pendidikan" tiap auto-update (appsettings.json bawaan
+    // DI DALAM folder instalasi ditimpa ulang tiap rilis, lihat komentar
+    // panjang di atas kelas ini).
+    public async Task SetInstallTypeAsync(string tipe)
+    {
+        var root = await BacaAsync();
+        root["InstallType"] = tipe.Trim();
+        await TulisAsync(root);
+    }
+
     private async Task<JsonObject> BacaAsync()
     {
         var path = PathHubApiEksternal;

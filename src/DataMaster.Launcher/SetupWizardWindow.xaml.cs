@@ -33,12 +33,13 @@ public partial class SetupWizardWindow : Window
         // ulang semuanya dari nol cuma buat pindah ke server-B, atau parah lagi
         // kelihatan "ke-reset ke Mandiri" padahal sebenarnya masih Klien.
         TxtServerPort.Text = config.ServerPort.ToString();
-        if (config.Mode == "server") RbServer.IsChecked = true;
-        else if (config.Mode == "klien")
+        if (config.Mode == "klien")
         {
             RbKlien.IsChecked = true;
             if (!string.IsNullOrWhiteSpace(config.KlienServerUrl)) TxtKlienUrl.Text = config.KlienServerUrl;
         }
+        else if (config.Mode == "development") RbDevelopment.IsChecked = true;
+        else RbServer.IsChecked = true; // "server" ATAU "mandiri" lama (lihat komentar BtnLanjut_Click)
     }
 
     private void ModePilihan_Changed(object sender, RoutedEventArgs e)
@@ -80,7 +81,14 @@ public partial class SetupWizardWindow : Window
         }
         else
         {
-            _config.Mode = "mandiri";
+            // "development" (2026-09-24) - GANTI dari mode "mandiri" lama (dihapus
+            // dari wizard, lihat diskusi: pemakaian sungguhan solo 1-PC SEKARANG
+            // pakai "Server" saja, konsisten dgn filosofi Keuangan.exe - "kalau mau
+            // pakai sendiri ya install sbg server sendiri"). String "mandiri" TETAP
+            // didukung penuh di ServerProcessManager dkk (instalasi LAMA yang sudah
+            // pernah setup TIDAK PERNAH lihat wizard ini lagi, jadi tidak terpengaruh
+            // sama sekali) - cuma tidak lagi ditawarkan sbg pilihan BARU di sini.
+            _config.Mode = "development";
             _config.KlienServerUrl = null;
         }
 

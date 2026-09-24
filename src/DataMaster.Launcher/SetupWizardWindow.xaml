@@ -42,14 +42,14 @@
                 </StackPanel>
 
                 <StackPanel Margin="0,0,0,16">
-                    <RadioButton x:Name="RbMandiri" Content="PC ini berdiri sendiri (paling umum)" FontWeight="SemiBold" FontSize="14" IsChecked="True" Checked="ModePilihan_Changed" Margin="0,0,0,4"/>
-                    <TextBlock Text="Data &amp; server ada di PC ini saja. Pilih ini kalau cuma 1 PC di unit ini (mis. PC TU TK)." FontSize="12" Foreground="#6B7280" Margin="24,0,0,16" TextWrapping="Wrap"/>
-
-                    <RadioButton x:Name="RbServer" Content="PC ini jadi SERVER (dipakai bareng PC lain di jaringan yang sama)" FontWeight="SemiBold" FontSize="14" Checked="ModePilihan_Changed" Margin="0,0,0,4"/>
-                    <TextBlock Text="Pilih ini di 1 PC saja (yang paling jarang dimatikan) - PC lain akan menampilkan data dari PC ini." FontSize="12" Foreground="#6B7280" Margin="24,0,0,16" TextWrapping="Wrap"/>
+                    <RadioButton x:Name="RbServer" Content="PC ini jadi Server (paling umum, pemakaian sungguhan)" FontWeight="SemiBold" FontSize="14" IsChecked="True" Checked="ModePilihan_Changed" Margin="0,0,0,4"/>
+                    <TextBlock Text="Data &amp; server ada di PC ini. Pilih ini baik cuma 1 PC di unit ini, maupun mau dipakai bareng PC lain di jaringan yang sama (PC lain nanti pilih 'Ikut PC lain')." FontSize="12" Foreground="#6B7280" Margin="24,0,0,16" TextWrapping="Wrap"/>
 
                     <RadioButton x:Name="RbKlien" Content="PC ini ikut PC lain (klien)" FontWeight="SemiBold" FontSize="14" Checked="ModePilihan_Changed" Margin="0,0,0,4"/>
-                    <TextBlock Text="Pilih ini kalau ada PC lain di unit ini yang sudah diatur sebagai 'Server' - PC ini tidak punya data sendiri, cuma menampilkan data PC server." FontSize="12" Foreground="#6B7280" Margin="24,0,0,0" TextWrapping="Wrap"/>
+                    <TextBlock Text="Pilih ini kalau ada PC lain di unit ini yang sudah diatur sebagai 'Server' - PC ini tidak punya data sendiri, cuma menampilkan data PC server." FontSize="12" Foreground="#6B7280" Margin="24,0,0,16" TextWrapping="Wrap"/>
+
+                    <RadioButton x:Name="RbDevelopment" Content="Mode Pengembang (developer)" FontWeight="SemiBold" FontSize="14" Checked="ModePilihan_Changed" Margin="0,0,0,4"/>
+                    <TextBlock Text="KHUSUS developer yang sedang mengembangkan aplikasi ini - bisa ganti-ganti tampilan Pendidikan/Perusahaan dengan cepat untuk mencari bug. BUKAN untuk pemakaian sekolah/instansi sungguhan." FontSize="12" Foreground="#6B7280" Margin="24,0,0,0" TextWrapping="Wrap"/>
                 </StackPanel>
 
                 <Border x:Name="BorderDetail" Background="#F3F4F6" CornerRadius="8" Padding="16" Margin="0,0,0,16" VerticalAlignment="Top" Visibility="Collapsed">
