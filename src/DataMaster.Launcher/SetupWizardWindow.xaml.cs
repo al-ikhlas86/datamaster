@@ -33,13 +33,19 @@ public partial class SetupWizardWindow : Window
         // ulang semuanya dari nol cuma buat pindah ke server-B, atau parah lagi
         // kelihatan "ke-reset ke Mandiri" padahal sebenarnya masih Klien.
         TxtServerPort.Text = config.ServerPort.ToString();
-        if (config.Mode == "klien")
+        if (config.Mode == "server") RbServer.IsChecked = true;
+        else if (config.Mode == "klien")
         {
             RbKlien.IsChecked = true;
             if (!string.IsNullOrWhiteSpace(config.KlienServerUrl)) TxtKlienUrl.Text = config.KlienServerUrl;
         }
-        else if (config.Mode == "development") RbDevelopment.IsChecked = true;
-        else RbServer.IsChecked = true; // "server" ATAU "mandiri" lama (lihat komentar BtnLanjut_Click)
+        // "development" ATAU "mandiri" lama (dihapus dari pilihan wizard, lihat
+        // BtnLanjut_Click) - keduanya perilaku jaringannya SAMA (lokal saja,
+        // bukan dengar LAN), jadi "mandiri" lama prefill ke sini, BUKAN ke
+        // Server - mencegah PC produksi "mandiri" yang buka ulang dialog ini
+        // tanpa sengaja "naik" ke mode LAN (buka port+firewall) cuma krn klik
+        // Lanjutkan tanpa ganti pilihan apa pun.
+        else RbDevelopment.IsChecked = true;
     }
 
     private void ModePilihan_Changed(object sender, RoutedEventArgs e)
