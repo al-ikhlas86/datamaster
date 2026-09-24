@@ -57,6 +57,24 @@
                                             <button type="submit" class="btn btn-sm btn-link p-0 text-danger">&times;</button>
                                         </form>
                                     </span>
+                                    @* Kelas kongkret (2026-09-24) - diturunkan dari Jadwal Pelajaran
+                                       tahun ajaran aktif, BUKAN input manual - lihat catatan
+                                       MapelTaut.KelasMengajar. Ditaruh di baris terpisah kecil di
+                                       bawah badge-nya supaya jelas ini "kelas mana persis", bukan
+                                       cuma "tingkat berapa" - disebut eksplisit di diskusi user (2
+                                       guru IPA tingkat 5, kelasnya beda2). *@
+                                    if (m.KelasMengajar.Count > 0)
+                                    {
+                                        <div class="text-muted" style="font-size:.72rem;margin:-2px 0 4px 2px;">
+                                            Ngajar di: @string.Join(", ", m.KelasMengajar)
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="text-warning" style="font-size:.72rem;margin:-2px 0 4px 2px;">
+                                            Belum ada di Jadwal Pelajaran
+                                        </div>
+                                    }
                                 }
                             </div>
                             <div class="js-mapel-baru-area d-none"></div>

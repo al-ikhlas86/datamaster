@@ -28,6 +28,22 @@ public class PenugasanMengajarController(DataMasterDbContext db, WaliKelasServic
             .OrderBy(gm => gm.MataPelajaran.Nama)
             .ToListAsync();
 
+        // KelasMengajar (2026-09-24) - lihat catatan panjang di
+        // MapelTaut.KelasMengajar. Diambil dari SELURUH Jadwal Pelajaran
+        // tahun ajaran AKTIF (kedua semester, bukan cuma yg sedang dibuka di
+        // halaman Jadwal Pelajaran) - guru bisa ngajar kelas beda di semester
+        // ganjil vs genap, keduanya relevan ditampilkan di sini.
+        var taAktifId = await db.TahunAjaran.Where(t => t.IsActive).Select(t => t.TahunAjaranId).FirstOrDefaultAsync();
+        var kelasPerGuruMapel = taAktifId > 0
+            ? (await db.JadwalPelajaran.Include(j => j.Kelas)
+                .Where(j => j.TahunAjaranId == taAktifId && j.GuruId != null)
+                .Select(j => new { j.GuruId, j.MataPelajaranId, j.Kelas.NamaKelas })
+                .Distinct()
+                .ToListAsync())
+                .GroupBy(x => (x.GuruId!.Value, x.MataPelajaranId))
+                .ToDictionary(g => g.Key, g => g.Select(x => x.NamaKelas).OrderBy(n => n).ToList())
+            : [];
+
         var vm = new PenugasanMengajarIndexViewModel
         {
             GuruWithMapel = guruList.Select(g => new GuruDenganMapel
@@ -37,7 +53,14 @@ public class PenugasanMengajarController(DataMasterDbContext db, WaliKelasServic
                 Jabatan = g.Jabatan.ToString(),
                 NomorUrut = g.NomorUrut,
                 Mapel = mapelTaut.Where(gm => gm.GuruId == g.GuruId)
-                    .Select(gm => new MapelTaut { GuruMataPelajaranId = gm.GuruMataPelajaranId, MataPelajaranId = gm.MataPelajaranId, Nama = gm.MataPelajaran.Nama, Tingkat = gm.Tingkat })
+                    .Select(gm => new MapelTaut
+                    {
+                        GuruMataPelajaranId = gm.GuruMataPelajaranId,
+                        MataPelajaranId = gm.MataPelajaranId,
+                        Nama = gm.MataPelajaran.Nama,
+                        Tingkat = gm.Tingkat,
+                        KelasMengajar = kelasPerGuruMapel.GetValueOrDefault((gm.GuruId, gm.MataPelajaranId), []),
+                    })
                     .ToList(),
             }).ToList(),
             MapelDropdown = await db.MataPelajaran.OrderBy(m => m.Nama).Select(m => new MapelOption { MataPelajaranId = m.MataPelajaranId, Nama = m.Nama }).ToListAsync(),

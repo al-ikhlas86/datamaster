@@ -163,6 +163,33 @@ public class JadwalPelajaranController(DataMasterDbContext db) : Controller
         return (petaMapel, petaGuru);
     }
 
+    // Kelayakan Guru Pengampu (2026-09-24, BUG NYATA diperbaiki - diminta
+    // user: "TU bisa aja salah ketik kode guru dan sistem gak nolak") -
+    // SEBELUMNYA BacaKode() cuma validasi kode guru/mapel ADA, TIDAK PERNAH
+    // cross-check apakah guru itu memang terdaftar mengampu mapel itu (menu
+    // Guru Pengampu) - grid/import bisa menaruh guru mana pun di slot mana
+    // pun tanpa ditolak. null di HashSet = guru terdaftar utk mapel itu
+    // TANPA batasan tingkat (universal, lihat GuruMataPelajaran.Tingkat).
+    private async Task<Dictionary<(int GuruId, int MapelId), HashSet<string?>>> BangunPetaKelayakanAsync()
+    {
+        var rows = await db.GuruMataPelajaran.Select(gm => new { gm.GuruId, gm.MataPelajaranId, gm.Tingkat }).ToListAsync();
+        return rows.GroupBy(r => (r.GuruId, r.MataPelajaranId)).ToDictionary(g => g.Key, g => g.Select(r => r.Tingkat).ToHashSet());
+    }
+
+    // null = boleh (atau memang tidak ada guru di slot ini - kode mapel
+    // "tanpa guru tetap" spt BTAQ berkelompok, TIDAK divalidasi krn memang
+    // tidak menaut ke guru manapun).
+    private static string? ValidasiKelayakan(int? guruId, int mapelId, string tingkatKelas, string namaGuru, string namaMapel,
+        Dictionary<(int GuruId, int MapelId), HashSet<string?>> petaKelayakan)
+    {
+        if (guruId is null) return null;
+        if (!petaKelayakan.TryGetValue((guruId.Value, mapelId), out var tingkatSet) || (!tingkatSet.Contains(null) && !tingkatSet.Contains(tingkatKelas)))
+        {
+            return $"{namaGuru} belum terdaftar mengampu {namaMapel} di tingkat ini - daftarkan dulu di menu Guru Pengampu.";
+        }
+        return null;
+    }
+
     // SlotBatch: engine in-memory utk simpan/hapus BANYAK slot jadwal sekaligus
     // TANPA query+SaveChanges per sel - ditemukan via audit performa (2026-09-08):
     // pola lama (SimpanSlotAsync/HapusSlotAsync dipanggil per sel di dalam loop
@@ -272,7 +299,17 @@ public class JadwalPelajaranController(DataMasterDbContext db) : Controller
             return RedirectToAction(nameof(Index), new { tahun = tahun_ajaran_id, semester, kelas = kelas_id });
         }
 
+        var kelasAktif = await db.Kelas.FindAsync(kelas_id);
+        if (kelasAktif is null)
+        {
+            TempData["error"] = "Kelas tidak ditemukan.";
+            return RedirectToAction(nameof(Index), new { tahun = tahun_ajaran_id, semester, kelas = kelas_id });
+        }
+
         var (petaMapel, petaGuru) = await BangunPetaAsync();
+        var petaKelayakan = await BangunPetaKelayakanAsync();
+        var namaGuruMap = await db.Guru.ToDictionaryAsync(g => g.GuruId, g => g.Nama);
+        var namaMapelMap = await db.MataPelajaran.ToDictionaryAsync(m => m.MataPelajaranId, m => m.Nama);
         var jamMaster = await db.JamPelajaran.Where(j => j.TahunAjaranId == tahun_ajaran_id).ToDictionaryAsync(j => j.JamPelajaranId);
         var batch = await BangunSlotBatchAsync(tahun_ajaran_id, semester);
 
@@ -286,6 +323,11 @@ public class JadwalPelajaranController(DataMasterDbContext db) : Controller
 
             var (guruId, mapelId, err) = BacaKode(raw ?? "", petaMapel, petaGuru);
             if (err is not null) { errors.Add($"{posisi}: {err}"); continue; }
+            if (mapelId is not null)
+            {
+                var kelayakanErr = ValidasiKelayakan(guruId, mapelId.Value, kelasAktif.Tingkat, namaGuruMap.GetValueOrDefault(guruId ?? 0, "?"), namaMapelMap.GetValueOrDefault(mapelId.Value, "?"), petaKelayakan);
+                if (kelayakanErr is not null) { errors.Add($"{posisi}: {kelayakanErr}"); continue; }
+            }
 
             if (mapelId is null)
             {
@@ -678,6 +720,9 @@ Baris yang bentrok jam gurunya akan dilewati dan dilaporkan - jadwal lama tidak 
             return GagalRedirect("Tidak ada kolom kelas yang dikenali. Pastikan baris HARI dan baris nama kelas tidak diubah, dan unduh ulang template kalau data kelas berubah.");
 
         var (petaMapel, petaGuru) = await BangunPetaAsync();
+        var petaKelayakan = await BangunPetaKelayakanAsync();
+        var namaGuruMap = await db.Guru.ToDictionaryAsync(g => g.GuruId, g => g.Nama);
+        var namaMapelMap = await db.MataPelajaran.ToDictionaryAsync(m => m.MataPelajaranId, m => m.Nama);
         var batch = await BangunSlotBatchAsync(tahun_ajaran_id, semester);
         int tersimpan = 0, dilewati = 0;
         var errors = new List<string>();
@@ -702,6 +747,9 @@ Baris yang bentrok jam gurunya akan dilewati dan dilaporkan - jadwal lama tidak 
                 var (guruId, mapelId, err) = BacaKode(raw, petaMapel, petaGuru);
                 if (err is not null) { errors.Add($"{posisi}: {err}"); dilewati++; continue; }
                 if (mapelId is null) continue; // sel kosong (setelah normalisasi) -> skip diam-diam
+
+                var kelayakanErr = ValidasiKelayakan(guruId, mapelId.Value, info.Kelas.Tingkat, namaGuruMap.GetValueOrDefault(guruId ?? 0, "?"), namaMapelMap.GetValueOrDefault(mapelId.Value, "?"), petaKelayakan);
+                if (kelayakanErr is not null) { errors.Add($"{posisi}: {kelayakanErr}"); dilewati++; continue; }
 
                 var slotErr = batch.Simpan(info.Kelas.KelasId, jam.JamPelajaranId, mapelId.Value, guruId);
                 if (slotErr is not null) { errors.Add($"{posisi}: {slotErr}"); dilewati++; }

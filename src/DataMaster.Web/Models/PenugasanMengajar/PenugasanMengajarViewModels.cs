@@ -14,6 +14,17 @@ public class MapelTaut
     public int MataPelajaranId { get; set; }
     public required string Nama { get; set; }
     public string? Tingkat { get; set; }
+
+    // KelasMengajar (2026-09-24, diminta user - "misal ada 2 guru IPA tingkat
+    // kelas 5, kan kelas 5 ada berbagai kelas, jadinya kan jelas") - Guru
+    // Pengampu SENDIRI cuma nyimpen Guru+MataPelajaran+Tingkat (TIDAK py kelas
+    // spesifik sama sekali, lihat catatan Entities/GuruMataPelajaran.cs) -
+    // daftar kelas KONKRET di sini diturunkan LANGSUNG dari Jadwal Pelajaran
+    // tahun ajaran aktif (sumber kebenaran SEBENARNYA soal "siapa ngajar
+    // kelas mana", lihat JadwalPelajaranController), BUKAN kolom baru yang
+    // bisa menyimpang dari jadwal sungguhan. Kosong = guru terdaftar
+    // "berhak" ngajar mapel ini tapi BELUM ada slot jadwal nyata utk itu.
+    public List<string> KelasMengajar { get; set; } = [];
 }
 
 public class GuruDenganMapel
