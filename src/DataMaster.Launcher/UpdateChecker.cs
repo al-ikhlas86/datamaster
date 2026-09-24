@@ -30,6 +30,16 @@ public class UpdateChecker
     // bikin user mengira "tidak terjadi apa-apa" lalu menutup app, unduhan hangus.
     public event Action<string?>? StatusChanged;
 
+    // ProgressChanged (2026-09-24, diminta user - "3-4 menit kerasa 10-15
+    // menit") - SEBELUMNYA unduhan ~150MB ditelan bulat-bulat lewat
+    // ReadAsByteArrayAsync() TANPA tanda kemajuan sama sekali - splash cuma
+    // nampilin teks statis "Memperbarui..." konstan selama 2-4,5 menit penuh
+    // (diverifikasi LANGSUNG dari log timestamp: proses SEBENARNYA cuma
+    // 2m41d-4m37d total, BUKAN 10-15 menit spt dikira - murni persepsi krn
+    // tidak ada indikator kemajuan sama sekali). null = indeterminate (fase
+    // cek versi, belum tahu ukuran), 0-100 = persentase unduhan sungguhan.
+    public event Action<double?>? ProgressChanged;
+
     private const string AssetName = "DataMaster-win-x64.zip";
     private const string ApiLatestReleaseUrl = "https://api.github.com/repos/al-ikhlas86/datamaster-desktop/releases/latest";
     private const string ApiAssetUrlTemplate = "https://api.github.com/repos/al-ikhlas86/datamaster-desktop/releases/assets/{0}";
@@ -108,12 +118,42 @@ public class UpdateChecker
             using (var ctsUnduh = CancellationTokenSource.CreateLinkedTokenSource(ct))
             {
                 ctsUnduh.CancelAfter(TimeSpan.FromMinutes(20));
-                using var assetResp = await http.SendAsync(assetReq, ctsUnduh.Token);
+                // HttpCompletionOption.ResponseHeadersRead (2026-09-24) - WAJIB
+                // supaya body belum langsung ditelan bulat-bulat di sini, baru
+                // di-stream manual di bawah sedikit demi sedikit (lihat catatan
+                // ProgressChanged) - tanpa ini SendAsync sendiri sudah menunggu
+                // SELURUH body sebelum baris berikutnya jalan, progress
+                // per-chunk jadi percuma.
+                using var assetResp = await http.SendAsync(assetReq, HttpCompletionOption.ResponseHeadersRead, ctsUnduh.Token);
                 assetResp.EnsureSuccessStatusCode();
-                zipBytes = await assetResp.Content.ReadAsByteArrayAsync(ctsUnduh.Token);
+                var totalBytes = assetResp.Content.Headers.ContentLength ?? assetSize;
+                await using var respStream = await assetResp.Content.ReadAsStreamAsync(ctsUnduh.Token);
+                using var mem = new MemoryStream(totalBytes > 0 ? (int)totalBytes : 0);
+                var buffer = new byte[81920];
+                long totalRead = 0;
+                var lastReport = DateTime.MinValue;
+                int read;
+                while ((read = await respStream.ReadAsync(buffer, ctsUnduh.Token)) > 0)
+                {
+                    await mem.WriteAsync(buffer.AsMemory(0, read), ctsUnduh.Token);
+                    totalRead += read;
+                    // Dibatasi max ~5x/detik (bukan tiap chunk 80KB, bisa
+                    // ratusan kali/detik) - UI thread cukup, tidak perlu
+                    // update lebih sering dari mata bisa lihat.
+                    if (totalBytes > 0 && (DateTime.UtcNow - lastReport).TotalMilliseconds >= 200)
+                    {
+                        lastReport = DateTime.UtcNow;
+                        var persen = totalRead * 100.0 / totalBytes;
+                        ProgressChanged?.Invoke(persen);
+                        StatusChanged?.Invoke($"Memperbarui ke versi {remote} ({totalRead / 1024.0 / 1024.0:F0}/{totalBytes / 1024.0 / 1024.0:F0} MB) - JANGAN TUTUP APLIKASI INI sampai selesai...");
+                    }
+                }
+                ProgressChanged?.Invoke(100);
+                zipBytes = mem.ToArray();
             }
             Log($"Unduhan selesai ({zipBytes.Length} bytes). Menerapkan pembaruan...");
 
+            ProgressChanged?.Invoke(null); // balik indeterminate - tahap ekstrak/salin tidak py progress granular
             StatusChanged?.Invoke("Update selesai diunduh - aplikasi akan tertutup sebentar lalu terbuka lagi otomatis...");
             ApplyAndRestart(zipBytes, server);
             Log("ApplyAndRestart selesai dipanggil, Shutdown() diminta.");
@@ -131,6 +171,7 @@ public class UpdateChecker
             // sama sekali).
             Log($"GAGAL cek/terapkan update: {ex}");
             StatusChanged?.Invoke(null);
+            ProgressChanged?.Invoke(null);
             return false;
         }
     }

@@ -48,6 +48,7 @@ public partial class App : Application
         splash.Show();
         var updateChecker = new UpdateChecker();
         updateChecker.StatusChanged += status => { if (status is not null) splash.SetStatus(status); };
+        updateChecker.ProgressChanged += splash.SetProgress;
         var updateApplied = await updateChecker.CheckAndApplyAsync(new ServerProcessManager(), CancellationToken.None);
         if (updateApplied) return; // Shutdown() sudah dipanggil di dalam - jangan lanjut apapun lagi
         splash.Close();

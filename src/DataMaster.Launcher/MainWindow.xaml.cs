@@ -22,6 +22,7 @@ public partial class MainWindow : Window
         Closing += MainWindow_Closing;
         _server.ServerExitedUnexpectedly += Server_ExitedUnexpectedly;
         _updateChecker.StatusChanged += UpdateChecker_StatusChanged;
+        _updateChecker.ProgressChanged += UpdateChecker_ProgressChanged;
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -94,6 +95,17 @@ public partial class MainWindow : Window
             Browser.Visibility = Visibility.Collapsed;
             SplashOverlay.Visibility = Visibility.Visible;
             SplashStatus.Text = status;
+        });
+    }
+
+    // ProgressChanged (2026-09-24) - null = indeterminate, 0-100 = persentase
+    // unduhan real. Pola sama persis UpdateChecker_StatusChanged di atas.
+    private void UpdateChecker_ProgressChanged(double? persen)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            SplashProgress.IsIndeterminate = persen is null;
+            if (persen is not null) SplashProgress.Value = persen.Value;
         });
     }
 

@@ -27,6 +27,7 @@
                 <TextBlock Text="Al-Ikhlas 86" FontSize="14"
                            Foreground="#9CA3AF" HorizontalAlignment="Center" Margin="0,0,0,32"/>
                 <ProgressBar x:Name="SplashProgress" IsIndeterminate="True" Height="4"
+                             Minimum="0" Maximum="100"
                              Background="#374151" Foreground="#22C55E" BorderThickness="0"/>
                 <TextBlock x:Name="SplashStatus" Text="Memeriksa pembaruan..." FontSize="13"
                            Foreground="#D1D5DB" HorizontalAlignment="Center" Margin="0,16,0,0"/>
