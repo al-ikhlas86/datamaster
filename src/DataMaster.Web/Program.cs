@@ -220,6 +220,49 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Auto-pulih dari HTTP 400 validasi CSRF (2026-09-24, BUG NYATA - laporan user:
+// hapus Tingkat & form POST lain mendadak "This page isn't working, HTTP ERROR
+// 400" mentah dari browser, TIDAK ADA cara pulih selain staf teknis manual hapus
+// folder cache WebView2 di %LocalAppData%\DataMaster\webview2-data - jelas tidak
+// masuk akal utk staf TU sekolah awam). Akar masalah (kunci Data Protection tidak
+// persisten lintas restart, lihat komentar AddDataProtection di atas) SUDAH
+// diperbaiki sejak v1.5.6, TAPI cookie yang SUDAH terlanjur rusak dari SEBELUM
+// perbaikan itu tetap nyangkut selamanya di profil browser sampai dihapus manual -
+// app ini SEKARANG membersihkan sendiri cookie yang bermasalah begitu 400 terjadi
+// (bukan cuma sekali di sini, tapi utk KAPAN PUN validasi CSRF gagal ke depan,
+// mis. kalau suatu saat Windows/AV mengosongkan folder DataProtection-Keys) lalu
+// mengarahkan balik ke halaman asal - dari sudut pandang user awam, keliatannya
+// cuma "kepencet, lalu halaman ke-refresh sendiri", tanpa perlu tahu apa pun soal
+// cache/folder/CSRF sama sekali.
+app.UseStatusCodePages(async statusCodeContext =>
+{
+    var http = statusCodeContext.HttpContext;
+    if (http.Response.StatusCode != StatusCodes.Status400BadRequest || http.Response.HasStarted) return;
+
+    foreach (var namaCookie in http.Request.Cookies.Keys)
+    {
+        if (namaCookie.StartsWith(".AspNetCore.Antiforgery", StringComparison.Ordinal) ||
+            namaCookie.StartsWith(".AspNetCore.Cookies", StringComparison.Ordinal))
+        {
+            http.Response.Cookies.Delete(namaCookie, new CookieOptions { Path = "/" });
+        }
+    }
+
+    var tujuan = http.Request.Headers.Referer.FirstOrDefault();
+    if (string.IsNullOrEmpty(tujuan)) tujuan = "/";
+
+    http.Response.ContentType = "text/html; charset=utf-8";
+    await http.Response.WriteAsync($$"""
+        <!DOCTYPE html><html><head><meta charset="utf-8">
+        <title>Menyegarkan...</title></head>
+        <body style="font-family:sans-serif;text-align:center;padding-top:15vh;color:#555">
+        <p>Sesi perlu disegarkan sebentar, mengarahkan ulang...</p>
+        <script>setTimeout(function () { location.href = {{JsonSerializer.Serialize(tujuan)}}; }, 600);</script>
+        </body></html>
+        """);
+});
+
 app.UseRouting();
 
 app.UseSession();
