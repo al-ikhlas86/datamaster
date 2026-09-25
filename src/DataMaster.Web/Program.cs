@@ -190,6 +190,8 @@ builder.Services.AddScoped<DocumentStorageService>();
 builder.Services.AddScoped<PsbService>();
 builder.Services.AddScoped<WaliKelasService>();
 builder.Services.AddScoped<KepalaSekolahService>();
+builder.Services.AddScoped<TahunAjaranKerjaService>();
+builder.Services.AddScoped<KenaikanKelasService>();
 builder.Services.AddScoped<DatabaseBackupService>();
 builder.Services.AddScoped<AppSettingsWriterService>();
 builder.Services.AddHttpClient<HubApiRegistrationService>();

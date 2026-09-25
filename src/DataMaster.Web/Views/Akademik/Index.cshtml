@@ -24,6 +24,14 @@ else if (Model.KelompokSiswa.Count == 0)
 }
 else
 {
+    @if (Model.ModePersiapan)
+    {
+        <div class="alert alert-info">
+            <i class="feather-tool me-1"></i>
+            <strong>Mode Persiapan - Tahun Ajaran Kerja: @Model.TahunKerjaNama.</strong>
+            Tombol proses di bawah TIDAK langsung memindahkan siswa - cuma menyusun <em>rencana</em> yang akan diterapkan otomatis begitu @Model.TahunKerjaNama diaktifkan lewat menu Tahun Ajaran. Belum ada yang berubah di tampilan orang tua/guru.
+        </div>
+    }
     <ul class="nav nav-tabs mb-3" id="akademikTabs">
         <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabNaik">Kenaikan Kelas</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabLulus">Kelulusan</button></li>
@@ -47,22 +55,44 @@ else
                                 </select>
                             </div>
                             <div class="col-md-6">
-                                <button type="submit" class="btn btn-primary">Proses Naik Kelas</button>
+                                <button type="submit" class="btn btn-primary">@(Model.ModePersiapan ? "Simpan sbg Rencana Naik Kelas" : "Proses Naik Kelas")</button>
                             </div>
                         </div>
+
+                        <hr />
+                        <p class="text-muted small mb-1">Atau <strong>acak kenaikan berdasar Nilai Sikap</strong> - siswa dgn grade "Perlu Bimbingan" otomatis disebar round-robin supaya tidak numpuk 1 kelas, sisanya benar-benar acak. Isi dulu nilai sikap di menu <a asp-controller="Penilaian" asp-action="Index">Penilaian Sikap</a> kalau belum ada.</p>
+                        <label class="form-label">Kelas Tujuan Tersedia (centang semua kelas yang mau diisi hasil acak)</label>
+                        <div class="d-flex flex-wrap gap-2 mb-2">
+                            @foreach (var k in Model.KelasList)
+                            {
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" name="kelas_tujuan_acak" value="@k.KelasId" id="ktAcak-@k.KelasId" />
+                                    <label class="form-check-label" for="ktAcak-@k.KelasId">@k.NamaKelas</label>
+                                </div>
+                            }
+                        </div>
+                        <button type="submit" formaction="@Url.Action("GenerateRandomKenaikan")" class="btn btn-outline-primary">Acak &amp; Preview</button>
+                        @if (Model.ModePersiapan)
+                        {
+                            <div class="form-text">Hasil acak nanti disimpan sbg rencana juga (bukan langsung diproses) selama masih Mode Persiapan.</div>
+                        }
                     </div>
                 </div>
 
                 @foreach (var grup in Model.KelompokSiswa)
                 {
-                    <div class="card mb-2">
-                        <div class="card-header">
-                            <input type="checkbox" class="js-select-all-naik form-check-input me-2" data-target="naik-@(grup.KelasId?.ToString() ?? "none")" />
-                            <strong>@grup.NamaKelas</strong> <span class="text-muted small">(@grup.SiswaList.Count siswa)</span>
-                        </div>
+                    var panelId = "panelNaik-" + (grup.KelasId?.ToString() ?? "none");
+                    <div class="accordion-item card mb-2">
+                        <h2 class="accordion-header d-flex align-items-center">
+                            <input type="checkbox" class="js-select-all-naik form-check-input mx-2" data-target="naik-@(grup.KelasId?.ToString() ?? "none")" />
+                            <button class="accordion-button collapsed flex-grow-1" type="button" data-bs-toggle="collapse" data-bs-target="#@panelId">
+                                <strong>@grup.NamaKelas</strong>&nbsp;<span class="text-muted small">(@grup.SiswaList.Count siswa)</span>
+                            </button>
+                        </h2>
+                        <div id="@panelId" class="accordion-collapse collapse">
                         <div class="card-body p-0">
                             <table class="table table-sm mb-0">
-                                <thead><tr><th style="width:2rem"></th><th>NIS</th><th>Nama</th><th>JK</th></tr></thead>
+                                <thead><tr><th style="width:2rem"></th><th>NIS</th><th>Nama</th><th>JK</th><th>Sikap</th>@if (Model.ModePersiapan) {<th>Rencana</th>}</tr></thead>
                                 <tbody>
                                 @foreach (var s in grup.SiswaList)
                                 {
@@ -71,10 +101,34 @@ else
                                         <td>@s.Nis</td>
                                         <td>@s.Nama</td>
                                         <td><span class="badge @(s.JenisKelamin == "L" ? "bg-primary" : "bg-danger")">@s.JenisKelamin</span></td>
+                                        <td>
+                                            @if (s.GradeSikapKumulatif is null)
+                                            {
+                                                <span class="text-muted small">-</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge @(s.GradeSikapKumulatif == "Perlu Bimbingan" ? "bg-warning text-dark" : "bg-light text-dark border")">@s.GradeSikapKumulatif</span>
+                                            }
+                                        </td>
+                                        @if (Model.ModePersiapan)
+                                        {
+                                            <td>
+                                                @if (s.RencanaLabel is null)
+                                                {
+                                                    <span class="text-muted small">Belum direncanakan</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-info text-dark">@s.RencanaLabel</span>
+                                                }
+                                            </td>
+                                        }
                                     </tr>
                                 }
                                 </tbody>
                             </table>
+                        </div>
                         </div>
                     </div>
                 }
@@ -85,21 +139,34 @@ else
             <form asp-action="ProsesKelulusan" method="post" id="formKelulusan">
                 <div class="card mb-3">
                     <div class="card-body">
-                        <p class="text-muted small">Pilih siswa yang akan diluluskan. Data diarsipkan pada TA @Model.TahunAktifNama. Pilih siswa dan tekan Enter atau klik tombol Proses Kelulusan untuk konfirmasi pilihan.</p>
-                        <button type="submit" class="btn btn-success">Proses Kelulusan</button>
+                        <p class="text-muted small">
+                            @if (Model.ModePersiapan)
+                            {
+                                <text>Pilih siswa yang akan diluluskan. Rencana ini akan diarsipkan pada TA @Model.TahunAktifNama begitu @Model.TahunKerjaNama diaktifkan.</text>
+                            }
+                            else
+                            {
+                                <text>Pilih siswa yang akan diluluskan. Data diarsipkan pada TA @Model.TahunAktifNama. Pilih siswa dan tekan Enter atau klik tombol Proses Kelulusan untuk konfirmasi pilihan.</text>
+                            }
+                        </p>
+                        <button type="submit" class="btn btn-success">@(Model.ModePersiapan ? "Simpan sbg Rencana Kelulusan" : "Proses Kelulusan")</button>
                     </div>
                 </div>
 
                 @foreach (var grup in Model.KelompokSiswa)
                 {
-                    <div class="card mb-2">
-                        <div class="card-header">
-                            <input type="checkbox" class="js-select-all-lulus form-check-input me-2" data-target="lulus-@(grup.KelasId?.ToString() ?? "none")" />
-                            <strong>@grup.NamaKelas</strong> <span class="text-muted small">(@grup.SiswaList.Count siswa)</span>
-                        </div>
+                    var panelId = "panelLulus-" + (grup.KelasId?.ToString() ?? "none");
+                    <div class="accordion-item card mb-2">
+                        <h2 class="accordion-header d-flex align-items-center">
+                            <input type="checkbox" class="js-select-all-lulus form-check-input mx-2" data-target="lulus-@(grup.KelasId?.ToString() ?? "none")" />
+                            <button class="accordion-button collapsed flex-grow-1" type="button" data-bs-toggle="collapse" data-bs-target="#@panelId">
+                                <strong>@grup.NamaKelas</strong>&nbsp;<span class="text-muted small">(@grup.SiswaList.Count siswa)</span>
+                            </button>
+                        </h2>
+                        <div id="@panelId" class="accordion-collapse collapse">
                         <div class="card-body p-0">
                             <table class="table table-sm mb-0">
-                                <thead><tr><th style="width:2rem"></th><th>NIS</th><th>Nama</th><th>JK</th></tr></thead>
+                                <thead><tr><th style="width:2rem"></th><th>NIS</th><th>Nama</th><th>JK</th>@if (Model.ModePersiapan) {<th>Rencana</th>}</tr></thead>
                                 <tbody>
                                 @foreach (var s in grup.SiswaList)
                                 {
@@ -108,10 +175,24 @@ else
                                         <td>@s.Nis</td>
                                         <td>@s.Nama</td>
                                         <td><span class="badge @(s.JenisKelamin == "L" ? "bg-primary" : "bg-danger")">@s.JenisKelamin</span></td>
+                                        @if (Model.ModePersiapan)
+                                        {
+                                            <td>
+                                                @if (s.RencanaLabel is null)
+                                                {
+                                                    <span class="text-muted small">Belum direncanakan</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-info text-dark">@s.RencanaLabel</span>
+                                                }
+                                            </td>
+                                        }
                                     </tr>
                                 }
                                 </tbody>
                             </table>
+                        </div>
                         </div>
                     </div>
                 }
@@ -133,15 +214,18 @@ else
             });
         });
 
+        var modePersiapan = @Json.Serialize(Model.ModePersiapan);
         document.getElementById('formNaikKelas')?.addEventListener('submit', function (e) {
             var n = this.querySelectorAll('input[name="siswa_ids"]:checked').length;
             if (n === 0) { alert('Pilih minimal satu siswa.'); e.preventDefault(); return; }
-            if (!confirm(n + ' siswa akan dinaikkan kelas.')) e.preventDefault();
+            var pesan = modePersiapan ? (n + ' siswa akan disimpan sbg rencana naik kelas.') : (n + ' siswa akan dinaikkan kelas.');
+            if (!confirm(pesan)) e.preventDefault();
         });
         document.getElementById('formKelulusan')?.addEventListener('submit', function (e) {
             var n = this.querySelectorAll('input[name="siswa_ids"]:checked').length;
             if (n === 0) { alert('Pilih minimal satu siswa.'); e.preventDefault(); return; }
-            if (!confirm(n + ' siswa akan diluluskan dan diarsipkan.')) e.preventDefault();
+            var pesan = modePersiapan ? (n + ' siswa akan disimpan sbg rencana kelulusan.') : (n + ' siswa akan diluluskan dan diarsipkan.');
+            if (!confirm(pesan)) e.preventDefault();
         });
     </script>
 }

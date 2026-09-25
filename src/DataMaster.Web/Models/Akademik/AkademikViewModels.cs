@@ -8,6 +8,14 @@ public class SiswaAktifRow
     public required string Nama { get; set; }
     public required string Nis { get; set; }
     public required string JenisKelamin { get; set; }
+    // Grade sikap kumulatif TA aktif (rata2 ganjil+genap yang sudah diisi) -
+    // null = belum dinilai sama sekali. Cuma dipakai utk transparansi di layar
+    // TU & sbg dasar GenerateRandomKenaikan, TIDAK memengaruhi kenaikan manual.
+    public string? GradeSikapKumulatif { get; set; }
+    // "Rencana: Naik ke Kelas 6B" / "Rencana: Lulus" - HANYA terisi saat TU
+    // sedang mode persiapan (Tahun Ajaran Kerja != tahun aktif) DAN siswa ini
+    // sudah punya RencanaKenaikan tersimpan utk tahun kerja itu. Null di mode normal.
+    public string? RencanaLabel { get; set; }
 }
 
 public class KelompokKelasSiswa
@@ -24,6 +32,11 @@ public class AkademikIndexViewModel
     public string? TahunAktifNama { get; set; }
     public List<KelompokKelasSiswa> KelompokSiswa { get; set; } = [];
     public List<KelasOption> KelasList { get; set; } = [];
+    // Tahun Ajaran Kerja (2026-09-25) - kalau beda dari TahunAktifNama, TU sedang
+    // "mode persiapan": tombol proses TIDAK langsung pindah kelas, cuma nyusun
+    // RencanaKenaikan (lihat AkademikController).
+    public bool ModePersiapan { get; set; }
+    public string? TahunKerjaNama { get; set; }
 }
 
 public class RiwayatAkademikRow
@@ -62,4 +75,21 @@ public class RekapLulusanViewModel
     public int TahunAjaranId { get; set; }
     public List<(int Id, string Nama)> TahunAjaranList { get; set; } = [];
     public List<RekapLulusanRow> Lulusan { get; set; } = [];
+}
+
+public class RandomKenaikanProposalRow
+{
+    public int SiswaId { get; set; }
+    public required string Nama { get; set; }
+    public required string Nis { get; set; }
+    public string? GradeSikapKumulatif { get; set; } // null = belum dinilai
+    public int KelasTujuanTerpilih { get; set; } // hasil acak, bisa diubah manual TU sblm ACC
+}
+
+public class RandomKenaikanReviewViewModel
+{
+    public List<RandomKenaikanProposalRow> Proposal { get; set; } = [];
+    public List<KelasOption> KelasTujuanList { get; set; } = [];
+    public bool ModePersiapan { get; set; }
+    public string? TahunKerjaNama { get; set; }
 }

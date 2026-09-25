@@ -32,6 +32,17 @@
         </select>
     </div>
     <div class="col-md-8 d-flex gap-2">
+        <form asp-action="Salin" method="post" class="d-flex gap-2">
+            <input type="hidden" name="tahun_ajaran_id" value="@Model.TahunAjaranId" />
+            <select name="sumber_id" class="form-select form-select-sm" required>
+                <option value="">Salin dari tahun ajaran...</option>
+                @foreach (var (id, nama) in Model.TahunAjaranList)
+                {
+                    if (id != Model.TahunAjaranId) { <option value="@id">@nama</option> }
+                }
+            </select>
+            <button type="submit" class="btn btn-outline-secondary btn-sm">Salin</button>
+        </form>
         <a asp-action="Import" asp-route-tahun="@Model.TahunAjaranId" class="btn btn-outline-success btn-sm"><i class="feather-upload me-1"></i>Import Excel</a>
     </div>
 </div>

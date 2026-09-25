@@ -35,10 +35,18 @@
     </script>
 
     <link rel="shortcut icon" type="image/x-icon" href="~/assets/images/logo-abbr.png">
-    <link rel="stylesheet" type="text/css" href="~/assets/css/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="~/assets/vendors/css/vendors.min.css">
-    <link rel="stylesheet" type="text/css" href="~/assets/css/theme.min.css">
-    <link rel="stylesheet" type="text/css" href="~/assets/css/custom-fixes.css">
+    @* asp-append-version (2026-09-25) - sebelumnya TIDAK ada versioning sama sekali
+       di aset statis ini, jadi browser yang sudah pernah cache CSS/JS lama (mis.
+       Brave yang jarang dibuka ulang/di-hard-refresh dibanding Chrome) bisa terus
+       menampilkan versi SEBELUM sebuah perbaikan tampilan di-deploy, walau server
+       sudah punya file terbaru - kelihatan seperti "bug lama muncul lagi" padahal
+       cuma cache browser yang belum ke-invalidate. asp-append-version menambah
+       query string hash-konten (?v=...) yang otomatis berubah tiap file-nya
+       berubah, jadi browser manapun otomatis re-fetch begitu ada update. *@
+    <link rel="stylesheet" type="text/css" href="~/assets/css/bootstrap.min.css" asp-append-version="true">
+    <link rel="stylesheet" type="text/css" href="~/assets/vendors/css/vendors.min.css" asp-append-version="true">
+    <link rel="stylesheet" type="text/css" href="~/assets/css/theme.min.css" asp-append-version="true">
+    <link rel="stylesheet" type="text/css" href="~/assets/css/custom-fixes.css" asp-append-version="true">
     <style>
         .nxl-header { top: 0 !important; }
 
@@ -143,10 +151,10 @@
         </div>
     </main>
 
-    <script src="~/assets/vendors/js/vendors.min.js"></script>
-    <script src="~/assets/js/common-init.min.js"></script>
-    <script src="~/assets/js/theme-customizer-init.min.js"></script>
-    <script src="~/assets/vendors/js/sweetalert2.min.js"></script>
+    <script src="~/assets/vendors/js/vendors.min.js" asp-append-version="true"></script>
+    <script src="~/assets/js/common-init.min.js" asp-append-version="true"></script>
+    <script src="~/assets/js/theme-customizer-init.min.js" asp-append-version="true"></script>
+    <script src="~/assets/vendors/js/sweetalert2.min.js" asp-append-version="true"></script>
 
     <partial name="_FlashMessages" />
 

@@ -16,13 +16,16 @@ namespace DataMaster.Web.Controllers;
 // di sini hanya merender combobox-nya & memanggil endpoint tsb via JS.
 [Authorize(Roles = "admin")]
 [Route("kelas")]
-public class KelasController(DataMasterDbContext db, WaliKelasService waliKelas) : Controller
+public class KelasController(DataMasterDbContext db, WaliKelasService waliKelas, TahunAjaranKerjaService tahunAjaranKerja) : Controller
 {
     [HttpGet("")]
     public async Task<IActionResult> Index(int? tahun)
     {
+        // aktifId TETAP literal tahun aktif (dipakai TahunAjaranAktif di bawah, utk
+        // warning "Bukan tahun aktif" di view) - taId (yang dipakai sbg default
+        // tampilan) yang berubah ikut Tahun Ajaran Kerja (2026-09-25).
         var aktifId = await db.TahunAjaran.Where(t => t.IsActive).Select(t => t.TahunAjaranId).FirstOrDefaultAsync();
-        var taId = tahun ?? aktifId;
+        var taId = tahun ?? await tahunAjaranKerja.GetKerjaIdAsync();
 
         var kelasList = await db.Kelas
             .Select(k => new

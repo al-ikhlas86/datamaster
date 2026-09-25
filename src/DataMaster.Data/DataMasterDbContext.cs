@@ -28,6 +28,8 @@ public class DataMasterDbContext : DbContext
     public DbSet<JadwalPiket> JadwalPiket => Set<JadwalPiket>();
     public DbSet<KalenderAkademik> KalenderAkademik => Set<KalenderAkademik>();
     public DbSet<RiwayatAkademik> RiwayatAkademik => Set<RiwayatAkademik>();
+    public DbSet<PenilaianSikap> PenilaianSikap => Set<PenilaianSikap>();
+    public DbSet<RencanaKenaikan> RencanaKenaikan => Set<RencanaKenaikan>();
     public DbSet<User> Users => Set<User>();
     public DbSet<AuthGroup> AuthGroups => Set<AuthGroup>();
     public DbSet<AuthGroupUser> AuthGroupUsers => Set<AuthGroupUser>();
@@ -221,6 +223,29 @@ public class DataMasterDbContext : DbContext
             e.HasOne(x => x.Siswa).WithMany(s => s.RiwayatAkademikList).HasForeignKey(x => x.SiswaId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.TahunAjaran).WithMany(t => t.RiwayatAkademikList).HasForeignKey(x => x.TahunAjaranId).OnDelete(DeleteBehavior.Cascade);
             // KelasId SENGAJA tanpa FK (murni snapshot) - lihat komentar entity.
+        });
+
+        modelBuilder.Entity<PenilaianSikap>(e =>
+        {
+            e.HasKey(x => x.PenilaianSikapId);
+            e.HasIndex(x => new { x.SiswaId, x.TahunAjaranId, x.Semester }).IsUnique();
+            e.HasIndex(x => x.TahunAjaranId);
+            e.Property(x => x.Semester).HasConversion<string>();
+            e.Property(x => x.Grade).HasConversion<string>();
+            e.HasOne(x => x.Siswa).WithMany().HasForeignKey(x => x.SiswaId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.TahunAjaran).WithMany().HasForeignKey(x => x.TahunAjaranId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<RencanaKenaikan>(e =>
+        {
+            e.HasKey(x => x.RencanaKenaikanId);
+            e.HasIndex(x => new { x.SiswaId, x.TahunAjaranTujuanId }).IsUnique();
+            e.HasIndex(x => x.TahunAjaranTujuanId);
+            e.HasOne(x => x.Siswa).WithMany().HasForeignKey(x => x.SiswaId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.TahunAjaranTujuan).WithMany().HasForeignKey(x => x.TahunAjaranTujuanId).OnDelete(DeleteBehavior.Cascade);
+            // KelasTujuanId SENGAJA tanpa FK - siswa bisa direncanakan lulus (null)
+            // atau ke kelas yang mungkin diarsipkan sebelum rencana diterapkan; TU
+            // yang bertanggung jawab revisi rencana kalau kelas tujuannya berubah.
         });
 
         modelBuilder.Entity<User>(e =>

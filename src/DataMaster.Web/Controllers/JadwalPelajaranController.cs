@@ -4,6 +4,7 @@ using ClosedXML.Excel;
 using DataMaster.Data;
 using DataMaster.Data.Entities;
 using DataMaster.Web.Models.JadwalPelajaran;
+using DataMaster.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,13 +15,15 @@ namespace DataMaster.Web.Controllers;
 // mengajar mapel berkode K. Kode tanpa angka ("F") = mapel TANPA guru tetap (BTAQ Ummi
 // berkelompok - FITUR, bukan bug). Sel dikosongkan = hapus slot.
 [Route("jadwal-pelajaran")]
-public class JadwalPelajaranController(DataMasterDbContext db) : Controller
+public class JadwalPelajaranController(DataMasterDbContext db, TahunAjaranKerjaService tahunAjaranKerja) : Controller
 {
     // -------------------------------------------------------------- Konteks
 
+    // Default ke Tahun Ajaran KERJA (2026-09-25) - lihat catatan sama di
+    // KurikulumController.ResolveTahunAjaranIdAsync.
     private async Task<(int TahunAjaranId, string Semester)> KonteksAsync(int? tahun, string? semester)
     {
-        var ta = tahun ?? await db.TahunAjaran.Where(t => t.IsActive).Select(t => t.TahunAjaranId).FirstOrDefaultAsync();
+        var ta = tahun ?? await tahunAjaranKerja.GetKerjaIdAsync();
         var sem = semester is "genap" ? "genap" : "ganjil";
         return (ta, sem);
     }

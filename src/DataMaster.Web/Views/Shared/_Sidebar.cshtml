@@ -1,5 +1,9 @@
+@using DataMaster.Data
 @using DataMaster.Web.Services
+@using Microsoft.EntityFrameworkCore
 @inject InstallTypeService InstallTypeSvc
+@inject DataMasterDbContext Db
+@inject TahunAjaranKerjaService TahunAjaranKerja
 @{
     // Port 1:1 dari app/Views/templates/sidebar.php - urutan & pengelompokan
     // caption ("Menu Utama"/"Data Master"/"Data Kelas"/"Akademik"/"Arsip"/"Akun")
@@ -50,6 +54,43 @@
                 }
             </div>
 
+            @if (isPendidikan)
+            {
+                // Tahun Ajaran Kerja (2026-09-25) - selector GLOBAL, terpisah dari Tahun
+                // Ajaran AKTIF (yang menentukan tampilan orang tua/guru di webview-app).
+                // TU bisa pilih tahun mana pun di sini utk kerja/isi kurikulum-jadwal-wali
+                // kelas-kenaikan kelas TANPA mengubah apa pun yang terlihat orang lain -
+                // lihat TahunAjaranKerjaService & AkademikController utk detail lengkap.
+                var taListSidebar = await Db.TahunAjaran.OrderByDescending(t => t.Nama).Select(t => new { t.TahunAjaranId, t.Nama }).ToListAsync();
+                var taAktifSidebar = await Db.TahunAjaran.Where(t => t.IsActive).Select(t => new { t.TahunAjaranId, t.Nama }).FirstOrDefaultAsync();
+                var takIdSidebar = await TahunAjaranKerja.GetKerjaIdAsync();
+                var modePersiapanSidebar = taAktifSidebar is not null && takIdSidebar != taAktifSidebar.TahunAjaranId;
+                if (taListSidebar.Count > 0)
+                {
+                    <div style="padding: 10px 20px 14px; border-bottom: 1px solid rgba(0,0,0,0.06);">
+                        <label class="form-label fw-semibold mb-1" style="font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:#8a94a6;">Tahun Ajaran Kerja</label>
+                        @if (modePersiapanSidebar)
+                        {
+                            <div><span class="badge bg-info text-dark mb-1"><i class="feather-tool"></i> Mode Persiapan</span></div>
+                        }
+                        else
+                        {
+                            <div><span class="badge bg-success mb-1">Aktif</span></div>
+                        }
+                        <form asp-controller="TahunAjaran" asp-action="SetKerja" method="post">
+                            <select name="tahun_ajaran_id" class="form-select form-select-sm" onchange="this.form.submit()">
+                                @foreach (var t in taListSidebar)
+                                {
+                                    var labelSidebar = t.Nama + (taAktifSidebar is not null && t.TahunAjaranId == taAktifSidebar.TahunAjaranId ? " (aktif)" : "");
+                                    if (t.TahunAjaranId == takIdSidebar) { <option value="@t.TahunAjaranId" selected>@labelSidebar</option> }
+                                    else { <option value="@t.TahunAjaranId">@labelSidebar</option> }
+                                }
+                            </select>
+                        </form>
+                    </div>
+                }
+            }
+
             <ul class="nxl-navbar">
 
                 <li class="nxl-item nxl-caption"><label>Menu Utama</label></li>
@@ -96,6 +137,12 @@
                         <a asp-controller="Akademik" asp-action="Index" class="nxl-link">
                             <span class="nxl-micon"><i class="feather-trending-up"></i></span>
                             <span class="nxl-mtext">Kenaikan &amp; Kelulusan</span>
+                        </a>
+                    </li>
+                    <li class="nxl-item @(Aktif("penilaian-sikap") ? "active" : "")">
+                        <a asp-controller="Penilaian" asp-action="Index" class="nxl-link">
+                            <span class="nxl-micon"><i class="feather-star"></i></span>
+                            <span class="nxl-mtext">Penilaian Sikap</span>
                         </a>
                     </li>
 

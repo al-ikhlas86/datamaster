@@ -24,11 +24,13 @@ public class KepalaSekolahIndexViewModel
 }
 
 [Route("kepala-sekolah")]
-public class KepalaSekolahController(DataMasterDbContext db, KepalaSekolahService kepsek) : Controller
+public class KepalaSekolahController(DataMasterDbContext db, KepalaSekolahService kepsek, TahunAjaranKerjaService tahunAjaranKerja) : Controller
 {
     [HttpGet("")]
     public async Task<IActionResult> Index(int? tahun)
     {
+        // aktifId TETAP literal tahun aktif (dipakai TahunAjaranAktif di view) - taId
+        // (default tampilan) ikut Tahun Ajaran Kerja (2026-09-25).
         var aktifId = await db.TahunAjaran.Where(t => t.IsActive).Select(t => t.TahunAjaranId).FirstOrDefaultAsync();
         var tahunAjaranList = await db.TahunAjaran.OrderByDescending(t => t.Nama).Select(t => new { t.TahunAjaranId, t.Nama }).ToListAsync();
 
@@ -37,7 +39,8 @@ public class KepalaSekolahController(DataMasterDbContext db, KepalaSekolahServic
             return View(new KepalaSekolahIndexViewModel { AdaTahunAjaran = false });
         }
 
-        var taId = tahun is > 0 ? tahun.Value : (aktifId > 0 ? aktifId : tahunAjaranList[0].TahunAjaranId);
+        var kerjaId = await tahunAjaranKerja.GetKerjaIdAsync();
+        var taId = tahun is > 0 ? tahun.Value : (kerjaId > 0 ? kerjaId : tahunAjaranList[0].TahunAjaranId);
 
         var vm = new KepalaSekolahIndexViewModel
         {

@@ -10,7 +10,7 @@ namespace DataMaster.Web.Controllers;
 
 // Port 1:1 dari app/Controllers/KalenderAkademik.php - lihat 03-akademik-jadwal.md §6-7.
 [Route("kalender-akademik")]
-public class KalenderAkademikController(DataMasterDbContext db) : Controller
+public class KalenderAkademikController(DataMasterDbContext db, TahunAjaranKerjaService tahunAjaranKerja) : Controller
 {
     private static readonly Dictionary<string, string> WarnaSaranDefault = new()
     {
@@ -22,11 +22,12 @@ public class KalenderAkademikController(DataMasterDbContext db) : Controller
         ["Ujian Kelas 6"] = "#6f42c1",
     };
 
+    // Default ke Tahun Ajaran KERJA (2026-09-25) - lihat catatan sama di
+    // KurikulumController.ResolveTahunAjaranIdAsync.
     private async Task<int> ResolveTahunAjaranIdAsync(int? tahun)
     {
         if (tahun is > 0) return tahun.Value;
-        var aktif = await db.TahunAjaran.FirstOrDefaultAsync(t => t.IsActive);
-        return aktif?.TahunAjaranId ?? 0;
+        return await tahunAjaranKerja.GetKerjaIdAsync();
     }
 
     // Rentang tanggal WAJAR 1 tahun ajaran, buffer ~1 bulan tiap sisi - dipakai
@@ -185,6 +186,61 @@ public class KalenderAkademikController(DataMasterDbContext db) : Controller
         await db.SaveChangesAsync();
 
         TempData["message"] = "Agenda diperbarui.";
+        return RedirectToAction(nameof(Index), new { tahun = tahun_ajaran_id });
+    }
+
+    // Salin dari tahun ajaran lain (2026-09-25, permintaan eksplisit user - "jangan
+    // mulai dari 0 tiap tahun ajaran") - port pola SalinAlokasi/SalinJam di
+    // KurikulumController. Tanggal digeser otomatis sesuai selisih tahun nama TA
+    // ("YYYY/YYYY") - agenda tanggal-tetap (Libur Nasional dkk) langsung benar,
+    // agenda kalender Hijriah (Idul Fitri dkk) tetap perlu dikoreksi manual TU
+    // sesudahnya karena tidak bisa dihitung dari pergeseran tahun Masehi.
+    [HttpPost("salin")]
+    public async Task<IActionResult> Salin(int tahun_ajaran_id, int sumber_id)
+    {
+        if (sumber_id <= 0 || sumber_id == tahun_ajaran_id)
+        {
+            TempData["error"] = "Pilih tahun ajaran sumber yang berbeda.";
+            return RedirectToAction(nameof(Index), new { tahun = tahun_ajaran_id });
+        }
+        var sumberTa = await db.TahunAjaran.FindAsync(sumber_id);
+        var tujuanTa = await db.TahunAjaran.FindAsync(tahun_ajaran_id);
+        if (sumberTa is null || tujuanTa is null)
+        {
+            TempData["error"] = "Tahun ajaran tidak ditemukan.";
+            return RedirectToAction(nameof(Index), new { tahun = tahun_ajaran_id });
+        }
+
+        var mSumber = Regex.Match(sumberTa.Nama, @"^(\d{4})/");
+        var mTujuan = Regex.Match(tujuanTa.Nama, @"^(\d{4})/");
+        var deltaTahun = mSumber.Success && mTujuan.Success ? int.Parse(mTujuan.Groups[1].Value) - int.Parse(mSumber.Groups[1].Value) : 0;
+
+        var sumberAgenda = await db.KalenderAkademik.Where(k => k.TahunAjaranId == sumber_id).ToListAsync();
+        var tujuanSet = (await db.KalenderAkademik.Where(k => k.TahunAjaranId == tahun_ajaran_id).Select(k => new { k.Judul, k.TanggalMulai }).ToListAsync())
+            .Select(x => (x.Judul, x.TanggalMulai)).ToHashSet();
+
+        var n = 0;
+        foreach (var a in sumberAgenda)
+        {
+            var tglMulaiBaru = a.TanggalMulai.AddYears(deltaTahun);
+            if (tujuanSet.Contains((a.Judul, tglMulaiBaru))) continue;
+            db.KalenderAkademik.Add(new Data.Entities.KalenderAkademik
+            {
+                TahunAjaranId = tahun_ajaran_id,
+                Judul = a.Judul,
+                Kategori = a.Kategori,
+                Warna = a.Warna,
+                TanggalMulai = tglMulaiBaru,
+                TanggalSelesai = a.TanggalSelesai?.AddYears(deltaTahun),
+                Waktu = a.Waktu,
+                Sasaran = a.Sasaran,
+                IsLibur = a.IsLibur,
+                Keterangan = a.Keterangan,
+            });
+            n++;
+        }
+        await db.SaveChangesAsync();
+        TempData["message"] = $"{n} agenda disalin dari {sumberTa.Nama} (tanggal digeser {deltaTahun} tahun otomatis - koreksi manual dulu utk agenda yang ikut kalender Hijriah spt Idul Fitri).";
         return RedirectToAction(nameof(Index), new { tahun = tahun_ajaran_id });
     }
 

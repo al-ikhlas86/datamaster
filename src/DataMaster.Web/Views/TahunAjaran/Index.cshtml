@@ -2,6 +2,7 @@
 @{
     ViewData["Title"] = "Tahun Ajaran";
     var tahunSekarang = DateTime.Now.Year;
+    var confirmSetActiveId = TempData["confirm_set_active_id"] as int?;
 }
 
 <h3 class="mb-3">Tahun Ajaran</h3>
@@ -66,6 +67,13 @@
                                             <form asp-action="SetActive" asp-route-id="@t.TahunAjaranId" method="post" class="d-inline form-aktifkan-ta" data-nama="@t.Nama">
                                                 <button type="submit" class="btn btn-sm btn-outline-success">Aktifkan</button>
                                             </form>
+                                            @if (confirmSetActiveId == t.TahunAjaranId)
+                                            {
+                                                <form asp-action="SetActive" asp-route-id="@t.TahunAjaranId" method="post" class="d-inline form-aktifkan-ta-paksa" data-nama="@t.Nama">
+                                                    <input type="hidden" name="confirm" value="true" />
+                                                    <button type="submit" class="btn btn-sm btn-warning">Lanjutkan tanpa mereka</button>
+                                                </form>
+                                            }
                                             <form asp-action="Delete" asp-route-id="@t.TahunAjaranId" method="post" class="d-inline form-hapus-ta" data-nama="@t.Nama">
                                                 <button type="submit" class="btn btn-sm btn-outline-danger">Hapus</button>
                                             </form>
@@ -87,6 +95,11 @@
         document.querySelectorAll('.form-aktifkan-ta').forEach(function (f) {
             f.addEventListener('submit', function (e) {
                 if (!confirm('Tahun ajaran ' + this.dataset.nama + ' akan diaktifkan. Tahun ajaran lain akan dinonaktifkan.')) e.preventDefault();
+            });
+        });
+        document.querySelectorAll('.form-aktifkan-ta-paksa').forEach(function (f) {
+            f.addEventListener('submit', function (e) {
+                if (!confirm('Lanjutkan aktifkan ' + this.dataset.nama + ' TANPA memproses siswa yang belum direncanakan? Mereka akan tetap di kelas lamanya.')) e.preventDefault();
             });
         });
         document.querySelectorAll('.form-hapus-ta').forEach(function (f) {

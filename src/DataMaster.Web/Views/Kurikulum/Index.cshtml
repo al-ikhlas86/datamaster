@@ -179,8 +179,9 @@ else
                 <div class="col-lg-6">
                     <div class="card mb-3">
                         <div class="card-header">@namaHari[h]</div>
+                        <div class="table-responsive">
                         <table class="table table-sm mb-0 align-middle">
-                            <thead><tr><th style="width:40px">Ke</th><th>Mulai</th><th>Selesai</th><th>Jenis</th><th>Label</th><th></th></tr></thead>
+                            <thead><tr><th style="width:40px">Ke</th><th style="width:110px">Mulai</th><th style="width:110px">Selesai</th><th style="width:130px">Jenis</th><th>Label</th><th style="width:40px"></th></tr></thead>
                             <tbody>
                                 @foreach (var j in list)
                                 {
@@ -210,23 +211,32 @@ else
                                     </tr>
                                 }
                             </tbody>
+                            <tfoot>
+                                <tr class="table-light">
+                                    <td class="text-muted text-center"><i class="feather-plus"></i></td>
+                                    <td><input type="time" name="jam_mulai" form="formJam-@h" class="form-control form-control-sm" required /></td>
+                                    <td><input type="time" name="jam_selesai" form="formJam-@h" class="form-control form-control-sm" required /></td>
+                                    <td>
+                                        <select name="jenis" form="formJam-@h" class="form-select form-select-sm">
+                                            <option value="pelajaran">Pelajaran</option>
+                                            <option value="kegiatan">Kegiatan</option>
+                                        </select>
+                                    </td>
+                                    <td><input type="text" name="label" form="formJam-@h" class="form-control form-control-sm" placeholder="Label" /></td>
+                                    <td><button type="submit" form="formJam-@h" class="btn btn-sm btn-primary">+</button></td>
+                                </tr>
+                            </tfoot>
                         </table>
-                        <div class="card-footer">
-                            <form asp-action="StoreJam" method="post" class="row g-1 align-items-end">
-                                <input type="hidden" name="tahun_ajaran_id" value="@Model.TahunAjaranId" />
-                                <input type="hidden" name="hari" value="@h" />
-                                <div class="col-3"><input type="time" name="jam_mulai" class="form-control form-control-sm" required /></div>
-                                <div class="col-3"><input type="time" name="jam_selesai" class="form-control form-control-sm" required /></div>
-                                <div class="col-3">
-                                    <select name="jenis" class="form-select form-select-sm">
-                                        <option value="pelajaran">Pelajaran</option>
-                                        <option value="kegiatan">Kegiatan</option>
-                                    </select>
-                                </div>
-                                <div class="col-2"><input type="text" name="label" class="form-control form-control-sm" placeholder="Label" /></div>
-                                <div class="col-1"><button type="submit" class="btn btn-sm btn-primary w-100">+</button></div>
-                            </form>
                         </div>
+                        @* Form terpisah (StoreJam - target beda dgn UpdateJamBatch pembungkus tabel semua hari)
+                           TIDAK membungkus baris tambah di atas (form tidak boleh nested) - baris tambah
+                           dihubungkan ke form ini lewat atribut HTML5 form="..." di tiap input/tombolnya,
+                           supaya kolomnya tetap SATU tabel yang sama dgn baris data (rapi, sejajar persis),
+                           bukan grid Bootstrap terpisah seperti sebelumnya (penyebab tampilan berantakan). *@
+                        <form id="formJam-@h" asp-action="StoreJam" method="post" class="d-none">
+                            <input type="hidden" name="tahun_ajaran_id" value="@Model.TahunAjaranId" />
+                            <input type="hidden" name="hari" value="@h" />
+                        </form>
                     </div>
                 </div>
             }

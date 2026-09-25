@@ -79,3 +79,15 @@ public enum StatusRiwayatAkademik
     naik,
     lulus,
 }
+
+// penilaian_sikap.grade - urutan enum INI yang dipakai sbg urutan "terburuk"
+// (indeks terbesar = terburuk) oleh algoritma acak kenaikan kelas di
+// AkademikController.GenerateRandomKenaikan - JANGAN ubah urutan tanpa
+// menyesuaikan logika di sana.
+public enum GradeSikap
+{
+    sangat_baik,
+    baik,
+    cukup,
+    perlu_bimbingan,
+}

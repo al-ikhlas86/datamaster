@@ -1,0 +1,101 @@
+@model DataMaster.Web.Models.Akademik.RandomKenaikanReviewViewModel
+@{
+    ViewData["Title"] = "Review Acak Kenaikan Kelas";
+}
+
+<h3 class="mb-1">Review Acak Kenaikan Kelas</h3>
+<p class="text-muted small mb-3">Cek hasil acak di bawah - kalau ada yang perlu diubah, pilih kelas tujuan lain lewat dropdown per baris sebelum di-ACC. Belum ada yang tersimpan/berpindah kelas sampai tombol di bawah diklik.</p>
+
+@if (Model.ModePersiapan)
+{
+    <div class="alert alert-info">
+        <i class="feather-tool me-1"></i>
+        <strong>Mode Persiapan - Tahun Ajaran Kerja: @Model.TahunKerjaNama.</strong>
+        Klik ACC di bawah akan menyimpan hasil ini sbg rencana, BUKAN langsung memindahkan siswa - diterapkan otomatis begitu @Model.TahunKerjaNama diaktifkan.
+    </div>
+}
+
+@if (Model.Proposal.Count == 0)
+{
+    <div class="alert alert-secondary">Tidak ada hasil untuk direview.</div>
+}
+else
+{
+    <form asp-action="ProsesRandomKenaikan" method="post" id="formReview">
+        <div class="card mb-3">
+            <div class="card-body p-0">
+                <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>NIS</th><th>Nama</th><th>Sikap</th><th style="width:260px">Kelas Tujuan</th></tr></thead>
+                    <tbody>
+                    @for (var i = 0; i < Model.Proposal.Count; i++)
+                    {
+                        var p = Model.Proposal[i];
+                        <tr>
+                            <td>@p.Nis</td>
+                            <td>
+                                @p.Nama
+                                <input type="hidden" name="rows[@i].SiswaId" value="@p.SiswaId" />
+                            </td>
+                            <td>
+                                @if (p.GradeSikapKumulatif is null)
+                                {
+                                    <span class="text-muted small">-</span>
+                                }
+                                else
+                                {
+                                    <span class="badge @(p.GradeSikapKumulatif == "Perlu Bimbingan" ? "bg-warning text-dark" : "bg-light text-dark border")">@p.GradeSikapKumulatif</span>
+                                }
+                            </td>
+                            <td>
+                                <select name="rows[@i].KelasTujuan" class="form-select form-select-sm">
+                                    @foreach (var k in Model.KelasTujuanList)
+                                    {
+                                        if (k.KelasId == p.KelasTujuanTerpilih) { <option value="@k.KelasId" selected>@k.NamaKelas</option> }
+                                        else { <option value="@k.KelasId">@k.NamaKelas</option> }
+                                    }
+                                </select>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <strong>Ringkasan per kelas tujuan:</strong>
+            <div class="d-flex flex-wrap gap-2 mt-1" id="ringkasan"></div>
+        </div>
+
+        @{
+            var pesanKonfirmasi = Model.ModePersiapan
+                ? $"{Model.Proposal.Count} siswa akan disimpan sbg rencana kenaikan sesuai pembagian di atas. Lanjutkan?"
+                : $"{Model.Proposal.Count} siswa akan dinaikkan kelas sesuai pembagian di atas. Lanjutkan?";
+        }
+        <button type="submit" class="btn btn-success" onclick="return confirm(@Html.Raw(Json.Serialize(pesanKonfirmasi)));">@(Model.ModePersiapan ? "ACC & Simpan sbg Rencana" : "ACC & Proses Kenaikan")</button>
+        <a asp-action="Index" class="btn btn-outline-secondary">Batal</a>
+    </form>
+}
+
+@section Scripts {
+    <script>
+        (function () {
+            var ringkasan = document.getElementById('ringkasan');
+            if (!ringkasan) return;
+            function hitungUlang() {
+                var counts = {};
+                document.querySelectorAll('#formReview select[name$=".KelasTujuan"]').forEach(function (sel) {
+                    var label = sel.options[sel.selectedIndex].text;
+                    counts[label] = (counts[label] || 0) + 1;
+                });
+                ringkasan.innerHTML = Object.keys(counts).map(function (k) {
+                    return '<span class="badge bg-secondary">' + k + ': ' + counts[k] + ' siswa</span>';
+                }).join('');
+            }
+            document.querySelectorAll('#formReview select[name$=".KelasTujuan"]').forEach(function (sel) {
+                sel.addEventListener('change', hitungUlang);
+            });
+            hitungUlang();
+        })();
+    </script>
+}

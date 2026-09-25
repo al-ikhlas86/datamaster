@@ -4,6 +4,7 @@ using ClosedXML.Excel;
 using DataMaster.Data;
 using DataMaster.Data.Entities;
 using DataMaster.Web.Models.Kurikulum;
+using DataMaster.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,15 +16,18 @@ namespace DataMaster.Web.Controllers;
 // endpoint Tingkat MASIH aktif, dipanggil dari menu Kelola Kelas (route tetap di
 // bawah "kurikulum/tingkat" persis arsitektur PHP asli).
 [Route("kurikulum")]
-public class KurikulumController(DataMasterDbContext db) : Controller
+public class KurikulumController(DataMasterDbContext db, TahunAjaranKerjaService tahunAjaranKerja) : Controller
 {
     private static readonly string[] Hari = ["senin", "selasa", "rabu", "kamis", "jumat", "sabtu", "minggu"];
 
+    // Default ke Tahun Ajaran KERJA (2026-09-25, bukan lagi literal tahun aktif) -
+    // supaya TU bisa isi kurikulum/jam belajar tahun depan tanpa harus selalu pilih
+    // manual lewat dropdown. Override eksplisit via param `tahun` tetap jalan sama
+    // persis seperti sebelumnya - lihat TahunAjaranKerjaService.
     private async Task<int> ResolveTahunAjaranIdAsync(int? tahun)
     {
         if (tahun is > 0) return tahun.Value;
-        var aktif = await db.TahunAjaran.FirstOrDefaultAsync(t => t.IsActive);
-        return aktif?.TahunAjaranId ?? 0;
+        return await tahunAjaranKerja.GetKerjaIdAsync();
     }
 
     private IActionResult Back(string tab, int ta) => RedirectToAction(nameof(Index), new { tab, tahun_ajaran_id = ta });

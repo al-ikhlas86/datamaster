@@ -3,6 +3,7 @@ using System;
 using DataMaster.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DataMaster.Data.Migrations
 {
     [DbContext(typeof(DataMasterDbContext))]
-    partial class DataMasterDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260925140015_AddPenilaianSikap")]
+    partial class AddPenilaianSikap
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.11");
@@ -682,40 +685,6 @@ namespace DataMaster.Data.Migrations
                     b.ToTable("PenilaianSikap");
                 });
 
-            modelBuilder.Entity("DataMaster.Data.Entities.RencanaKenaikan", b =>
-                {
-                    b.Property<int>("RencanaKenaikanId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime?>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int?>("KelasTujuanId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("Lulus")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("SiswaId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("TahunAjaranTujuanId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("RencanaKenaikanId");
-
-                    b.HasIndex("TahunAjaranTujuanId");
-
-                    b.HasIndex("SiswaId", "TahunAjaranTujuanId")
-                        .IsUnique();
-
-                    b.ToTable("RencanaKenaikan");
-                });
-
             modelBuilder.Entity("DataMaster.Data.Entities.RiwayatAkademik", b =>
                 {
                     b.Property<int>("RiwayatAkademikId")
@@ -1245,25 +1214,6 @@ namespace DataMaster.Data.Migrations
                     b.Navigation("Siswa");
 
                     b.Navigation("TahunAjaran");
-                });
-
-            modelBuilder.Entity("DataMaster.Data.Entities.RencanaKenaikan", b =>
-                {
-                    b.HasOne("DataMaster.Data.Entities.Siswa", "Siswa")
-                        .WithMany()
-                        .HasForeignKey("SiswaId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("DataMaster.Data.Entities.TahunAjaran", "TahunAjaranTujuan")
-                        .WithMany()
-                        .HasForeignKey("TahunAjaranTujuanId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Siswa");
-
-                    b.Navigation("TahunAjaranTujuan");
                 });
 
             modelBuilder.Entity("DataMaster.Data.Entities.RiwayatAkademik", b =>

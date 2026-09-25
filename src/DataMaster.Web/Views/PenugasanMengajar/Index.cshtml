@@ -211,8 +211,16 @@
                         });
                         mapelBaruArea.innerHTML = '';
                         mapelBaruArea.classList.add('d-none');
-                        errBox.textContent = (res.errors && res.errors.length > 0) ? res.errors.join(' ') : '';
-                        // TIDAK toggle keluar mode edit, TIDAK scroll - persis §5.4.
+                        var adaError = res.errors && res.errors.length > 0;
+                        errBox.textContent = adaError ? res.errors.join(' ') : '';
+                        // Keluar dari mode edit HANYA kalau simpan benar2 bersih tanpa error
+                        // (2026-09-25) - sebelumnya SENGAJA tetap di mode edit apapun hasilnya,
+                        // tapi itu bikin TU kira klik Simpan tidak ngefek (tampilan tidak
+                        // berubah sama sekali walau data SUDAH tersimpan di server - baru
+                        // kelihatan tersimpan setelah pindah halaman & balik lagi). Kalau ada
+                        // error tetap di mode edit supaya pesan errBox & input yang salah masih
+                        // kelihatan utk diperbaiki - TIDAK scroll (perilaku lama itu tetap).
+                        if (!adaError) setEditMode(false);
                     }).catch(function () {
                         errBox.textContent = 'Gagal menyimpan - periksa koneksi.';
                     });

@@ -1,0 +1,92 @@
+@model DataMaster.Web.Models.Penilaian.PenilaianSikapIndexViewModel
+@{
+    ViewData["Title"] = "Penilaian Sikap";
+    var opsiGrade = new (string Value, string Label)[]
+    {
+        ("sangat_baik", "Sangat Baik"),
+        ("baik", "Baik"),
+        ("cukup", "Cukup"),
+        ("perlu_bimbingan", "Perlu Bimbingan"),
+    };
+}
+
+<h3 class="mb-3">Penilaian Sikap</h3>
+<p class="text-muted small">Nilai sikap per semester ini jadi dasar fitur <strong>Acak Kenaikan Kelas</strong> di menu Kenaikan &amp; Kelulusan - siswa dgn grade "Perlu Bimbingan" otomatis disebar supaya tidak numpuk 1 kelas tujuan.</p>
+
+@if (!Model.AdaTahunAktif)
+{
+    <div class="alert alert-warning"><strong>Tidak ada Tahun Ajaran aktif.</strong> Atur Tahun Ajaran terlebih dahulu.</div>
+}
+else
+{
+    <div class="mb-3" style="max-width:320px">
+        <label class="form-label">Pilih Kelas</label>
+        <select class="form-select" onchange="window.location.href='@Url.Action("Index")?kelas_id='+this.value">
+            <option value="">-- Pilih Kelas --</option>
+            @foreach (var k in Model.KelasList)
+            {
+                if (k.KelasId == Model.KelasId) { <option value="@k.KelasId" selected>@k.NamaKelas</option> }
+                else { <option value="@k.KelasId">@k.NamaKelas</option> }
+            }
+        </select>
+        <div class="form-text">Tahun Ajaran aktif: @Model.TahunAktifNama</div>
+    </div>
+
+    @if (Model.KelasId is > 0)
+    {
+        <form asp-action="Simpan" method="post">
+            <input type="hidden" name="kelas_id" value="@Model.KelasId" />
+            <div class="card">
+                <div class="card-body">
+                    <table class="table table-sm align-middle">
+                        <thead><tr><th>NIS</th><th>Nama</th><th style="width:200px">Semester Ganjil</th><th style="width:200px">Semester Genap</th></tr></thead>
+                        <tbody>
+                        @if (Model.Siswa.Count == 0)
+                        {
+                            <tr><td colspan="4" class="text-center text-muted py-4">Tidak ada siswa aktif di kelas ini.</td></tr>
+                        }
+                        else
+                        {
+                            for (var i = 0; i < Model.Siswa.Count; i++)
+                            {
+                                var s = Model.Siswa[i];
+                                <tr>
+                                    <td>@s.Nis</td>
+                                    <td>
+                                        @s.Nama
+                                        <input type="hidden" name="rows[@i].SiswaId" value="@s.SiswaId" />
+                                    </td>
+                                    <td>
+                                        <select name="rows[@i].GradeGanjil" class="form-select form-select-sm">
+                                            <option value="">-- belum dinilai --</option>
+                                            @foreach (var (value, label) in opsiGrade)
+                                            {
+                                                if (value == s.GradeGanjil) { <option value="@value" selected>@label</option> }
+                                                else { <option value="@value">@label</option> }
+                                            }
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <select name="rows[@i].GradeGenap" class="form-select form-select-sm">
+                                            <option value="">-- belum dinilai --</option>
+                                            @foreach (var (value, label) in opsiGrade)
+                                            {
+                                                if (value == s.GradeGenap) { <option value="@value" selected>@label</option> }
+                                                else { <option value="@value">@label</option> }
+                                            }
+                                        </select>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            @if (Model.Siswa.Count > 0)
+            {
+                <button type="submit" class="btn btn-success mt-2">Simpan Nilai Sikap</button>
+            }
+        </form>
+    }
+}
