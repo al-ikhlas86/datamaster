@@ -363,6 +363,16 @@ public sealed class ServerProcessManager : IDisposable
     // Dipanggil saat window ditutup pengguna - membedakan "berhenti krn diminta"
     // dari "berhenti sendiri" (restore) supaya tidak salah restart sesudah user
     // benar2 menutup aplikasi.
+    // SENGAJA HANYA menangani mode anak-proses (_process, mandiri/klien) -
+    // TIDAK PERNAH menyentuh Windows Service di sini walau ada, WALAUPUN
+    // namanya "StopIntentionally" - method ini jg dipanggil MainWindow_Closing
+    // (tombol X app) yang JUSTRU HARUS MEMBIARKAN service tetap hidup
+    // (itulah alasan Windows Service dibuat: "server tetap nyala walau app
+    // ditutup", lihat catatan panjang WindowsServiceHelper.cs). Pemanggil yang
+    // GENUINELY butuh service ikut restart (update selesai, ganti jaringan)
+    // WAJIB memanggil WindowsServiceHelper.StopDanTungguUntukUpdate() secara
+    // EKSPLISIT sendiri di sisi pemanggil, BUKAN lewat method umum ini - lihat
+    // UpdateChecker.ApplyAndRestart()/MainWindow.BtnGantiJaringan_Click.
     public void StopIntentionally()
     {
         _intentionalStop = true;

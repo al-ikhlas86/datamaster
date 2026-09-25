@@ -157,6 +157,37 @@ public static class WindowsServiceHelper
         try { RunElevated("sc.exe", $"stop {ServiceName}"); } catch { /* non-fatal - fallback tetap dicoba walau stop gagal */ }
     }
 
+    // StopDanTungguUntukUpdate (2026-09-25, BUG NYATA - laporan user PC TU
+    // SD: halaman Setting tidak pernah menampilkan versi walau log update
+    // sudah bilang sukses ke 1.5.11). Akar masalah: ServerProcessManager.
+    // StopIntentionally() (dipanggil UpdateChecker.ApplyAndRestart() SEBELUM
+    // xcopy menimpa berkas web\) SEBELUMNYA cuma mematikan `_process` (anak
+    // proses, mode mandiri/klien) - TIDAK PERNAH menyentuh Windows Service
+    // (mode server). Windows MENGIZINKAN menimpa .exe yang sedang berjalan
+    // TANPA error apa pun kelihatan - proses SERVICE LAMA tetap hidup penuh
+    // di memori dgn kode LAMA, file di disk sudah baru tapi TIDAK PERNAH
+    // benar2 dipakai sampai service di-restart manual/PC reboot. Setelahnya
+    // EnsureStarted() (dipanggil ulang saat Launcher restart) cuma no-op
+    // kalau service masih Running - jadi service TIDAK PERNAH ter-restart
+    // otomatis oleh auto-update sama sekali, WALAU beberapa kali update
+    // "sukses" menimpa file. BEDA dari StopUntukFallback() di atas (fire-
+    // and-forget, dipakai saat healthz gagal & memang mau lanjut ke fallback
+    // apa pun hasil stop-nya) - method ini WAJIB menunggu sampai BENAR2
+    // Stopped (bukan cuma StopPending) SEBELUM xcopy menimpa berkas,
+    // supaya tidak race dgn file yang masih dikunci proses lama.
+    public static void StopDanTungguUntukUpdate()
+    {
+        try
+        {
+            using var sc = new ServiceController(ServiceName);
+            sc.Refresh();
+            if (sc.Status == ServiceControllerStatus.Stopped) return;
+            RunElevated("sc.exe", $"stop {ServiceName}");
+            sc.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(20));
+        }
+        catch { /* non-fatal - kalau gagal berhenti, xcopy di bawah paling apes gagal menimpa exe yg dikunci (retry update berikutnya), TIDAK memperburuk keadaan drpd sebelum fix ini */ }
+    }
+
     // BUG NYATA ditemukan 2026-09-16 (PC TU TK): sebelumnya pakai
     // `ServiceController.Start()` LANGSUNG (bukan lewat RunElevated spt semua
     // titik lain di file ini) - method .NET ini butuh PROSES PEMANGGIL sendiri

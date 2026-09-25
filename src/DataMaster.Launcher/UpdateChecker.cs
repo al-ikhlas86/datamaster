@@ -220,6 +220,20 @@ public class UpdateChecker
         // installDir\web\) ikut ditimpa xcopy nanti, kuncinya harus lepas dulu.
         // BEDA dari Presensi (aplikasi tunggal, tidak punya proses anak).
         server.StopIntentionally();
+        // BUG NYATA ditemukan 2026-09-25 (PC TU SD - user lapor halaman
+        // Setting tidak pernah menampilkan versi walau log update sudah
+        // bilang sukses): StopIntentionally() di atas SENGAJA tidak
+        // menyentuh Windows Service (lihat catatan panjang di situ) - kalau
+        // TIDAK dimatikan EKSPLISIT di sini, Windows tetap mengizinkan xcopy
+        // di bawah menimpa exe yang sedang berjalan TANPA error kelihatan,
+        // tapi proses SERVICE LAMA (mode server) terus hidup memakai kode
+        // LAMA di memori - file di disk sudah baru tapi kode yg BENAR2
+        // dipakai tidak pernah ikut ter-update sampai service di-restart
+        // manual/PC reboot. WindowsServiceHelper.EnsureStarted() (dipanggil
+        // ulang saat Launcher relaunch di bawah) cuma menyalakan service yg
+        // Stopped - TIDAK PERNAH me-restart yang masih Running - jadi harus
+        // benar2 dimatikan DI SINI dulu, bukan mengandalkan langkah setelahnya.
+        if (WindowsServiceHelper.IsInstalled()) WindowsServiceHelper.StopDanTungguUntukUpdate();
 
         var pid = Process.GetCurrentProcess().Id;
         var scriptPath = Path.Combine(Path.GetTempPath(), "datamaster-update.bat");

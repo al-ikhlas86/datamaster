@@ -186,6 +186,15 @@ public partial class MainWindow : Window
 
         _closingIntentionally = true;
         _server.StopIntentionally();
+        // Sama alasannya dgn UpdateChecker.ApplyAndRestart() (lihat catatan
+        // lengkap di situ & WindowsServiceHelper.StopDanTungguUntukUpdate())
+        // - kalau PC ini SEBELUMNYA mode "server" dgn Windows Service
+        // terpasang & config-nya baru saja diubah (mis. port), service LAMA
+        // harus benar2 dimatikan dulu di sini SEBELUM proses baru start -
+        // StopIntentionally() di atas SENGAJA tidak menyentuh service sama
+        // sekali, TerapkanEnvironment/EnsureStarted() di proses baru nanti
+        // cuma menyalakan yg Stopped, tidak pernah me-restart yg masih Running.
+        if (WindowsServiceHelper.IsInstalled()) WindowsServiceHelper.StopDanTungguUntukUpdate();
         Process.Start(Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule!.FileName!);
         Application.Current.Shutdown();
     }
