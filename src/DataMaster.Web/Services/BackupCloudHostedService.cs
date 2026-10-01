@@ -36,6 +36,13 @@ public class BackupCloudHostedService(IServiceScopeFactory scopeFactory, IHttpCl
 
     private async Task JalankanSiklusAsync(CancellationToken ct)
     {
+        // Sandbox development tidak menitipkan backup ke Hub/awan produksi (2026-10-01).
+        if (string.Equals(options.Value.InstallType, "pengembang", StringComparison.OrdinalIgnoreCase))
+        {
+            logger.LogInformation("Backup awan dilewati: mode pengembang (sandbox).");
+            return;
+        }
+
         var url = (options.Value.HubApiUrl ?? "").Trim().TrimEnd('/');
         var token = (options.Value.HubApiToken ?? "").Trim();
         var passphrase = options.Value.BackupPassphrase ?? "";

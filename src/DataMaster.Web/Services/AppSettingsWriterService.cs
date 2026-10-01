@@ -22,8 +22,8 @@ namespace DataMaster.Web.Services;
 // MENANG di atas appsettings.json bawaan apa pun yang datang dari rilis baru).
 public class AppSettingsWriterService(ILogger<AppSettingsWriterService> logger)
 {
-    private static string PathHubApiEksternal => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DataMaster", "hubapi.json");
+    // Folder per mode (lihat AppPaths.cs) - sandbox development punya hubapi.json sendiri.
+    private static string PathHubApiEksternal => Path.Combine(AppPaths.DataDirectory, "hubapi.json");
 
     public async Task SetHubApiConfigAsync(string? hubApiUrl, string? hubApiToken)
     {

@@ -54,7 +54,7 @@ catch { /* non-fatal - lihat komentar di atas */ }
 // pengembangan ini).
 try
 {
-    var dataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DataMaster");
+    var dataDir = AppPaths.DataDirectory; // "DataMaster" (server) atau "DataMaster-Dev" (sandbox development)
     var appDataDir = Path.Combine(dataDir, "App_Data");
     Directory.CreateDirectory(appDataDir);
 
@@ -127,7 +127,7 @@ builder.Host.UseWindowsService();
 // restart proses apa pun.
 try
 {
-    var dpDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DataMaster", "DataProtection-Keys");
+    var dpDir = Path.Combine(AppPaths.DataDirectory, "DataProtection-Keys");
     Directory.CreateDirectory(dpDir);
     builder.Services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo(dpDir));
 }

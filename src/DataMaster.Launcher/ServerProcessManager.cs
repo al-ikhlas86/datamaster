@@ -35,7 +35,14 @@ public sealed class ServerProcessManager : IDisposable
     // catatan modul Auth/Setting). MainWindow merespons dgn restart otomatis.
     public event Action? ServerExitedUnexpectedly;
 
-    public string DataDirectory { get; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DataMaster");
+    // Folder data PER MODE (2026-10-01): server/mandiri/klien = "DataMaster" (data asli,
+    // tanpa migrasi), "development" = "DataMaster-Dev" (SANDBOX kosong terpisah TOTAL:
+    // database, hubapi.json/token Hub, fingerprint sinkron, passphrase backup). Harus
+    // sama persis dgn DataMaster.Web.Services.AppPaths. Ganti mode = ganti folder;
+    // data asli tidak pernah tersentuh dari mode development.
+    public string DataDirectory => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        _config.Mode == "development" ? "DataMaster-Dev" : "DataMaster");
 
     public async Task<bool> StartAsync(CancellationToken ct)
     {

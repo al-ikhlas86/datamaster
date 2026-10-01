@@ -49,6 +49,15 @@ public class HubApiSyncService(DataMasterDbContext db, HttpClient http, IOptions
 
     public async Task RunAsync(CancellationToken ct = default)
     {
+        // Sandbox development TIDAK PERNAH sinkron ke Hub produksi (2026-10-01) - lapisan
+        // kedua setelah folder data terpisah (AppPaths.cs): walau seseorang menempelkan
+        // token di halaman Setting, data uji tidak boleh sampai ke aplikasi orang tua/guru.
+        if (string.Equals(options.Value.InstallType, "pengembang", StringComparison.OrdinalIgnoreCase))
+        {
+            logger.LogInformation("Sync dilewati: mode pengembang (sandbox) tidak terhubung ke Hub.");
+            return;
+        }
+
         var url = (options.Value.HubApiUrl ?? "").Trim().TrimEnd('/');
         var token = (options.Value.HubApiToken ?? "").Trim();
         if (url == "" || token == "")

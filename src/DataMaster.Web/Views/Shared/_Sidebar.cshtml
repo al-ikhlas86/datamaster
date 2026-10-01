@@ -31,6 +31,10 @@
             <div style="padding: 14px 20px; border-bottom: 1px solid rgba(0,0,0,0.06);">
                 @if (InstallTypeSvc.InstallType() == "pengembang")
                 {
+                    <div style="margin-bottom:10px; padding:8px 10px; border-radius:8px; background:#fff4d6; color:#8a5a00; font-size:11px; line-height:1.4;">
+                        <strong>MODE PENGEMBANG (SANDBOX)</strong><br />
+                        Data di sini terpisah dari data asli &amp; tidak terhubung ke Hub/aplikasi. Ganti ke mode Server untuk memakai data sungguhan.
+                    </div>
                     <label class="form-label fw-semibold" style="font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:#8a94a6;">Preview Tampilan (Pengembang)</label>
                     <form asp-controller="DevPreview" asp-action="Set" method="post">
                         <select name="type" class="form-select form-select-sm" onchange="this.form.submit()">
