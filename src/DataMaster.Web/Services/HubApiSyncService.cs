@@ -33,7 +33,10 @@ public class HubApiSyncService(DataMasterDbContext db, HttpClient http, IOptions
     // perubahan data asli, bug nyata yang bikin 5 siswa Al Jabbar duplikat
     // TIDAK PERNAH ter-reconcile walau kode server sudah benar. Bump versi
     // ini memaksa SATU KALI re-kirim penuh semua entitas sbg "berubah".
-    private const string ProtocolVersion = "v5-siswa-guru-full";
+    // v6 (2026-10-01): payload guru membawa gelar_terakhir (sebelumnya field itu terisi di
+    // Data Master tapi TIDAK PERNAH ikut sync, jadi Keuangan selalu menerima jenjang
+    // pendidikan kosong). Bump ini memaksa semua guru dikirim ulang SEKALI.
+    private const string ProtocolVersion = "v6-guru-gelar";
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
 
     // Deteksi 401 (2026-09-14, fitur persetujuan admin di Hub API) - dipakai
@@ -328,6 +331,9 @@ public class HubApiSyncService(DataMasterDbContext db, HttpClient http, IOptions
             StatusAktif = g.StatusAktif ? 1 : 0,
             IsKepalaSekolah = kepalaSet.Contains(g.GuruId),
             StatusKeluar = g.StatusKeluar?.ToString(),
+            // Teks mentah (maks 100 karakter, sama dgn batas Hub API); pemetaan ke SMA/D3/S1/S2/S3
+            // dilakukan di Webview-App. null kalau kosong - PC lama yang tidak mengirim juga tetap lolos.
+            GelarTerakhir = string.IsNullOrWhiteSpace(g.GelarTerakhir) ? null : g.GelarTerakhir.Trim(),
         }).ToList();
         await PostAsync(url, token, "/api/v1/sync/guru", rows, full: true, "Guru", ct);
     }
