@@ -41,8 +41,8 @@ public class UpdateChecker
     public event Action<double?>? ProgressChanged;
 
     private const string AssetName = "DataMaster-win-x64.zip";
-    private const string ApiLatestReleaseUrl = "https://api.github.com/repos/al-ikhlas86/datamaster-desktop/releases/latest";
-    private const string ApiAssetUrlTemplate = "https://api.github.com/repos/al-ikhlas86/datamaster-desktop/releases/assets/{0}";
+    private const string ApiLatestReleaseUrl = "https://api.github.com/repos/al-ikhlas86/datamaster/releases/latest";
+    private const string ApiAssetUrlTemplate = "https://api.github.com/repos/al-ikhlas86/datamaster/releases/assets/{0}";
 
     // Kembalikan true kalau update DITERAPKAN (artinya Application.Current.Shutdown()
     // SUDAH dipanggil di dalam ApplyAndRestart - pemanggil WAJIB berhenti lanjut,

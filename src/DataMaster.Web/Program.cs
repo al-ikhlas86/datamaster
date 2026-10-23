@@ -207,6 +207,7 @@ builder.Services.AddHostedService<HubApiSyncHostedService>();
 builder.Services.AddHostedService<BackupCloudHostedService>();
 builder.Services.AddScoped<TrashPurgeService>();
 builder.Services.AddHostedService<TrashPurgeHostedService>();
+builder.Services.AddHostedService<ServiceAutoUpdateHostedService>(); // update otomatis saat berjalan sbg Windows Service (tanpa buka aplikasi)
 
 var app = builder.Build();
 

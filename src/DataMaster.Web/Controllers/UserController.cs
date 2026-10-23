@@ -57,11 +57,19 @@ public class UserController(DataMasterDbContext db, DatabaseBackupService backup
             LanMode = appOptions.Value.LanMode,
             LanHostname = appOptions.Value.LanHostname,
             LanPort = appOptions.Value.LanPort,
-            AppVersion = appOptions.Value.AppVersion,
+            AppVersion = VersiBerjalan() ?? appOptions.Value.AppVersion,
             HubApiStatus = hubApiStatus,
             BackupPassphraseAktif = !string.IsNullOrWhiteSpace(appOptions.Value.BackupPassphrase),
         };
         return View(vm);
+    }
+
+    // Versi sebenarnya dari berkas yang berjalan (dicap dari tag rilis saat build). Env AppSettings__AppVersion
+    // hanya diperbarui saat Launcher dibuka, jadi setelah update otomatis layanan (tanpa Launcher) nilainya basi.
+    private static string? VersiBerjalan()
+    {
+        var v = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version;
+        return v is null || (v.Major == 0 && v.Minor == 0 && v.Build <= 0) ? null : v.ToString(3);
     }
 
     [HttpPost("update")]
