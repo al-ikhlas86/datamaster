@@ -42,7 +42,7 @@ public class ServiceAutoUpdateHostedService(IConfiguration config, ILogger<Servi
     {
         try
         {
-            if (!WindowsServiceHelpers.IsWindowsService()) return;
+            if (!Microsoft.Extensions.Hosting.WindowsServices.WindowsServiceHelpers.IsWindowsService()) return;
             if (string.Equals(config["AppSettings:AutoUpdateServer"], "false", StringComparison.OrdinalIgnoreCase)) return;
             if (string.Equals(config["AppSettings:InstallType"], "pengembang", StringComparison.OrdinalIgnoreCase)) return;
 
