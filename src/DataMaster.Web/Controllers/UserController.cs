@@ -66,11 +66,7 @@ public class UserController(DataMasterDbContext db, DatabaseBackupService backup
 
     // Versi sebenarnya dari berkas yang berjalan (dicap dari tag rilis saat build). Env AppSettings__AppVersion
     // hanya diperbarui saat Launcher dibuka, jadi setelah update otomatis layanan (tanpa Launcher) nilainya basi.
-    private static string? VersiBerjalan()
-    {
-        var v = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version;
-        return v is null || (v.Major == 0 && v.Minor == 0 && v.Build <= 0) ? null : v.ToString(3);
-    }
+    private static string? VersiBerjalan() => AppVersionInfo.Resmi;
 
     [HttpPost("update")]
     public async Task<IActionResult> Update(string? username, IFormFile? user_image)
