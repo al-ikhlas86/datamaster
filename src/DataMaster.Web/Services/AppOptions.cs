@@ -14,7 +14,7 @@ public class AppOptions
     // 3) rilis versi baru - SEMUA PC (baru maupun yang sudah lama jalan) akan
     // otomatis ikut pindah sendiri lewat auto-update, TANPA staf mana pun
     // perlu edit apapun manual di PC-nya.
-    public const string HubApiUrlResmi = "https://alikhlas86.duckdns.org/hub-api";
+    public const string HubApiUrlResmi = "https://app.yayasanalikhlas86.sch.id/hub-api";
 
     // Riwayat alamat resmi SEBELUMNYA (kosong = belum pernah pindah) - dipakai
     // Program.cs utk mengenali "ini alamat bawaan LAMA, bukan alamat custom
@@ -22,7 +22,7 @@ public class AppOptions
     // di atas. JANGAN dihapus riwayatnya - biarkan menumpuk supaya PC yang baru
     // update setelah SEKIAN LAMA (lewat beberapa kali pindah VPS) tetap ikut
     // termigrasi dari alamat manapun yang pernah jadi bawaan resmi.
-    public static readonly string[] HubApiUrlLama = [];
+    public static readonly string[] HubApiUrlLama = ["https://alikhlas86.duckdns.org/hub-api"]; // 2026-10-26: pindah ke domain sch.id (domain lama tetap hidup)
 
     // Kunci BERSAMA (bukan token per-unit) yang ditanam di SEMUA instalasi
     // Data Master - dipakai AuthController.Setup() memanggil POST /api/v1/register
