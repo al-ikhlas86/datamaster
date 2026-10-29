@@ -47,10 +47,68 @@ public class UpdateChecker
     // Kembalikan true kalau update DITERAPKAN (artinya Application.Current.Shutdown()
     // SUDAH dipanggil di dalam ApplyAndRestart - pemanggil WAJIB berhenti lanjut,
     // JANGAN membuka wizard/MainWindow lagi krn proses ini sudah dalam proses mati).
-    public async Task<bool> CheckAndApplyAsync(ServerProcessManager server, CancellationToken ct)
+    // Maksimal percobaan menerapkan update yang SAMA (versi tujuan sama, versi terpasang tak berubah) sebelum berhenti mencoba otomatis.
+    private const int MaksPercobaan = 2;
+
+    // BUG NYATA 2026-10-29 (laptop dev, update 1.7.1 -> 1.8.2 berputar tanpa henti, 147 MB diunduh berulang, jendela terbuka ganda):
+    // (1) tidak ada penjaga satu-instance, jadi dua Launcher berjalan bersamaan dan saling mengunci berkas (xcopy gagal diam-diam),
+    // (2) hasil salin tidak pernah diperiksa lalu aplikasi LAMA dibuka lagi, (3) tidak ada pembatas pengulangan, sehingga siklus
+    // unduh-salin-buka tak pernah berhenti. Perbaikan: mutex satu-instance (App.xaml.cs), robocopy + cek kode keluar + log helper,
+    // status percobaan di update_state.json, dan satu pemeriksaan pada satu waktu di dalam proses (App dan MainWindow keduanya memanggil).
+    private static readonly SemaphoreSlim KunciPeriksa = new(1, 1);
+
+    // true = sesi ini jangan memeriksa update (mis. dibuka ulang oleh helper setelah penyalinan gagal; jangan langsung unduh lagi).
+    public static bool LewatiSesiIni { get; set; }
+    // Pesan untuk pengguna bila update otomatis dihentikan sementara karena gagal berulang (ditampilkan App setelah splash).
+    public static string? PesanTahan { get; private set; }
+
+    internal sealed record StatusPercobaan(string Target, int Percobaan, DateTime TerakhirUtc);
+
+    private static string BerkasStatus => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DataMaster", "update_state.json");
+
+    private static StatusPercobaan? BacaStatus()
+    {
+        try { return File.Exists(BerkasStatus) ? JsonSerializer.Deserialize<StatusPercobaan>(File.ReadAllText(BerkasStatus)) : null; }
+        catch { return null; }
+    }
+
+    private static void TulisStatus(StatusPercobaan s)
     {
         try
         {
+            Directory.CreateDirectory(Path.GetDirectoryName(BerkasStatus)!);
+            File.WriteAllText(BerkasStatus, JsonSerializer.Serialize(s));
+        }
+        catch { /* gagal menyimpan status tidak boleh menghentikan update */ }
+    }
+
+    private static void HapusStatus()
+    {
+        try { if (File.Exists(BerkasStatus)) File.Delete(BerkasStatus); }
+        catch { /* abaikan */ }
+    }
+
+    public async Task<bool> CheckAndApplyAsync(ServerProcessManager server, CancellationToken ct)
+    {
+        // Satu pemeriksaan pada satu waktu di proses ini: App.OnStartup dan MainWindow sama-sama memanggil method ini.
+        if (!await KunciPeriksa.WaitAsync(0, ct))
+        {
+            Log("Pemeriksaan update lain masih berjalan - dilewati.");
+            return false;
+        }
+        try { return await CheckAndApplyCoreAsync(server, ct); }
+        finally { KunciPeriksa.Release(); }
+    }
+
+    private async Task<bool> CheckAndApplyCoreAsync(ServerProcessManager server, CancellationToken ct)
+    {
+        try
+        {
+            if (LewatiSesiIni)
+            {
+                Log("Sesi ini melewati pemeriksaan update (penyalinan update sebelumnya gagal).");
+                return false;
+            }
             Log("Mulai cek update...");
             var installed = Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0);
             Log($"Versi terpasang: {installed}.");
@@ -86,7 +144,20 @@ public class UpdateChecker
             if (remote <= installed)
             {
                 Log($"Sudah versi terbaru ({installed} >= {remote}) - tidak ada yang diunduh.");
+                HapusStatus(); // update sebelumnya (kalau ada) sudah berhasil
                 return false; // sudah versi terbaru
+            }
+
+            // Pembatas: versi tujuan yang SAMA sudah dicoba MaksPercobaan kali dalam 24 jam terakhir tetapi versi terpasang tidak berubah
+            // = penerapan terus gagal. Berhenti mengunduh ulang (hemat kuota) dan beri tahu pengguna, jangan berputar selamanya.
+            var tujuan = remote.ToString();
+            var status = BacaStatus();
+            if (status is not null && status.Target == tujuan && status.Percobaan >= MaksPercobaan && (DateTime.UtcNow - status.TerakhirUtc) < TimeSpan.FromHours(24))
+            {
+                Log($"Update ke {tujuan} sudah dicoba {status.Percobaan}x dan gagal diterapkan - pembaruan otomatis ditahan 24 jam. Lihat update_helper.log.");
+                PesanTahan = $"Pembaruan otomatis ke versi {remote.ToString(3)} gagal diterapkan {status.Percobaan} kali. Aplikasi tetap bisa dipakai dengan versi sekarang ({installed.ToString(3)}).\n\n" +
+                             "Tutup SEMUA jendela Data Master (cek Task Manager), lalu buka lagi untuk mencoba kembali besok, atau minta Admin IT memperbarui secara manual. Rincian: %LocalAppData%\\DataMaster\\logs\\update_helper.log";
+                return false;
             }
 
             long assetId = 0;
@@ -155,7 +226,7 @@ public class UpdateChecker
 
             ProgressChanged?.Invoke(null); // balik indeterminate - tahap ekstrak/salin tidak py progress granular
             StatusChanged?.Invoke("Update selesai diunduh - aplikasi akan tertutup sebentar lalu terbuka lagi otomatis...");
-            ApplyAndRestart(zipBytes, server);
+            ApplyAndRestart(zipBytes, server, tujuan);
             Log("ApplyAndRestart selesai dipanggil, Shutdown() diminta.");
             return true;
         }
@@ -200,8 +271,12 @@ public class UpdateChecker
         return string.Join(".", padded);
     }
 
-    private static void ApplyAndRestart(byte[] zipBytes, ServerProcessManager server)
+    private static void ApplyAndRestart(byte[] zipBytes, ServerProcessManager server, string versiTujuan)
     {
+        // Catat percobaan SEBELUM menerapkan: bila penyalinan gagal dan aplikasi lama terbuka lagi, percobaan ini tetap terhitung.
+        var sebelumnya = BacaStatus();
+        TulisStatus(new StatusPercobaan(versiTujuan, (sebelumnya is not null && sebelumnya.Target == versiTujuan ? sebelumnya.Percobaan : 0) + 1, DateTime.UtcNow));
+
         var installDir = AppContext.BaseDirectory.TrimEnd('\\', '/');
         var exePath = Path.Combine(installDir, "DataMaster.Launcher.exe");
 
@@ -241,18 +316,34 @@ public class UpdateChecker
         // "update.lock dgn stale-timeout" PHP (§12) yang LEBIH SEDERHANA & tanpa
         // ambiguitas basi/tidak sama sekali: kalau PID sudah tidak ada, memang
         // sudah tidak ada, tidak perlu heuristik "berapa lama dianggap macet".
+        // robocopy (BUKAN xcopy; /IS = tetap timpa berkas yang tampak sama, seperti xcopy /Y dulu): mengulang otomatis bila berkas masih terkunci (/R:15 /W:2 = sampai ~30 dtk per berkas) dan KODE KELUARNYA
+        // diperiksa (>= 8 = gagal). xcopy sebelumnya gagal diam-diam, lalu aplikasi LAMA dibuka lagi tanpa ada yang tahu. Semua langkah
+        // dicatat ke update_helper.log. Bila gagal, aplikasi lama dibuka dengan --update-gagal (sesi itu tidak langsung mengunduh ulang).
         var script =
             "@echo off\r\n" +
+            "set \"LOGDIR=%LOCALAPPDATA%\\DataMaster\\logs\"\r\n" +
+            "if not exist \"%LOGDIR%\" mkdir \"%LOGDIR%\"\r\n" +
+            "set \"LOG=%LOGDIR%\\update_helper.log\"\r\n" +
+            $"echo [%date% %time%] helper mulai, menunggu PID {pid} keluar >> \"%LOG%\"\r\n" +
             ":wait\r\n" +
             $"tasklist /FI \"PID eq {pid}\" 2>NUL | find \"{pid}\" >NUL\r\n" +
             "if not errorlevel 1 (\r\n" +
             "    ping 127.0.0.1 -n 2 >NUL\r\n" +
             "    goto wait\r\n" +
             ")\r\n" +
-            $"xcopy \"{stagingDir}\\*\" \"{installDir}\\\" /Y /E /I >NUL\r\n" +
+            $"robocopy \"{stagingDir}\" \"{installDir}\" /E /IS /R:15 /W:2 /NFL /NDL /NJH /NJS /NP >> \"%LOG%\" 2>&1\r\n" +
+            "set \"RC=%ERRORLEVEL%\"\r\n" +
+            "echo [%date% %time%] robocopy kode keluar %RC% >> \"%LOG%\"\r\n" +
+            "if %RC% GEQ 8 goto gagal\r\n" +
             $"rmdir /S /Q \"{stagingDir}\"\r\n" +
+            "echo [%date% %time%] update diterapkan, membuka aplikasi baru >> \"%LOG%\"\r\n" +
             $"start \"\" \"{exePath}\"\r\n" +
-            "del \"%~f0\"\r\n";
+            "goto selesai\r\n" +
+            ":gagal\r\n" +
+            "echo [%date% %time%] PENYALINAN GAGAL, berkas masih terkunci - membuka aplikasi lama >> \"%LOG%\"\r\n" +
+            $"start \"\" \"{exePath}\" --update-gagal\r\n" +
+            ":selesai\r\n" +
+            "(goto) 2>NUL & del \"%~f0\"\r\n"; // idiom: helper menghapus dirinya tanpa pesan galat "batch file cannot be found"
         File.WriteAllText(scriptPath, script);
 
         Process.Start(new ProcessStartInfo
