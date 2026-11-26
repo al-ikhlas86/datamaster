@@ -120,6 +120,12 @@
                             <span class="nxl-mtext">Calon Siswa</span>
                         </a>
                     </li>
+                    <li class="nxl-item @(Aktif("kelola-psb") ? "active" : "")">
+                        <a asp-controller="KelolaPsb" asp-action="Index" class="nxl-link">
+                            <span class="nxl-micon"><i class="feather-clipboard"></i></span>
+                            <span class="nxl-mtext">Kelola PSB</span>
+                        </a>
+                    </li>
                 }
                 <li class="nxl-item @(Aktif("guru") && path != "guru/arsip" ? "active" : "")">
                     <a asp-controller="Guru" asp-action="Index" class="nxl-link">

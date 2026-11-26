@@ -202,6 +202,7 @@ builder.Services.AddHttpClient<HubApiRegistrationService>();
 // proses CLI terpisah PHP asli, lihat komentar di masing2 HostedService).
 builder.Services.AddHttpClient<HubApiSyncService>();
 builder.Services.AddHttpClient<LulusanTkService>();
+builder.Services.AddHttpClient<PsbKelolaService>();
 builder.Services.AddHttpClient();
 builder.Services.AddHostedService<HubApiSyncHostedService>();
 builder.Services.AddHostedService<BackupCloudHostedService>();
