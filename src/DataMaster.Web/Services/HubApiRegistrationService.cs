@@ -27,7 +27,7 @@ public class HubApiRegistrationService(HttpClient http, ILogger<HubApiRegistrati
         {
             http.Timeout = TimeSpan.FromSeconds(15);
             using var resp = await http.PostAsJsonAsync($"{AppOptions.HubApiUrlResmi}/api/v1/register",
-                new { kunci = AppOptions.RegisterSharedKey, nama = namaUnit });
+                new { kunci = AppOptions.RegisterSharedKey, nama = namaUnit, device_uid = DeviceIdentity.Uid });
 
             var body = await resp.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(body);
