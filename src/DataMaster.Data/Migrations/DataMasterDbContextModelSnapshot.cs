@@ -121,6 +121,24 @@ namespace DataMaster.Data.Migrations
                     b.Property<string>("PekerjaanIbu")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("PsbDisinkronAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PsbGelombang")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PsbJson")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PsbNomor")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("PsbOnlineId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("PsbStatus")
+                        .HasColumnType("TEXT");
+
                     b.Property<int?>("SiswaId")
                         .HasColumnType("INTEGER");
 
@@ -144,6 +162,10 @@ namespace DataMaster.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("CalonSiswaId");
+
+                    b.HasIndex("PsbOnlineId")
+                        .IsUnique()
+                        .HasFilter("PsbOnlineId IS NOT NULL");
 
                     b.HasIndex("SiswaId")
                         .IsUnique();

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using System.Text.RegularExpressions;
 using DataMaster.Data;
 using DataMaster.Data.Entities;
+using DataMaster.Data.Psb;
 using DataMaster.Web.Models.CalonSiswa;
 using DataMaster.Web.Models.Siswa;
 using DataMaster.Web.Services;
@@ -47,6 +48,7 @@ public class CalonSiswaController(DataMasterDbContext db, DocumentStorageService
                 NoHandphone = c.NoHandphone,
                 Status = c.Status.ToString(),
                 CreatedAt = c.CreatedAt,
+                DariPsbOnline = c.PsbOnlineId != null,
             })
             .ToList();
 
@@ -214,6 +216,12 @@ public class CalonSiswaController(DataMasterDbContext db, DocumentStorageService
             SiswaIdHasilTerima = calon.SiswaId,
             CreatedAt = calon.CreatedAt,
             TingkatOptions = await GetDistinctTingkatOptionsAsync(),
+            DariPsbOnline = calon.PsbOnlineId != null,
+            PsbNomor = calon.PsbNomor,
+            PsbStatusLabel = PsbOnlineMapper.LabelStatus(calon.PsbStatus),
+            PsbGelombang = calon.PsbGelombang,
+            PsbDisinkronAt = calon.PsbDisinkronAt,
+            PsbBerkas = PsbOnlineMapper.NamaBerkas(calon.PsbJson),
         };
 
         // Dropdown kelas utk "Terima" dibatasi ke tingkat tujuan pendaftaran;

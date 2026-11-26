@@ -5,4 +5,7 @@
     <Project Path="src/DataMaster.MigrationTool/DataMaster.MigrationTool.csproj" />
     <Project Path="src/DataMaster.Web/DataMaster.Web.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DataMaster.Tests/DataMaster.Tests.csproj" />
+  </Folder>
 </Solution>

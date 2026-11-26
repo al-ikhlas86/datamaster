@@ -82,6 +82,7 @@ public class DataMasterDbContext : DbContext
         {
             e.HasKey(x => x.CalonSiswaId);
             e.HasIndex(x => x.Status);
+            e.HasIndex(x => x.PsbOnlineId).IsUnique().HasFilter("PsbOnlineId IS NOT NULL");
             e.Property(x => x.JenisKelamin).HasConversion<string>();
             e.Property(x => x.Status).HasConversion<string>();
             e.HasOne(x => x.Siswa)

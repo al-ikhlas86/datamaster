@@ -24,6 +24,7 @@ public class CalonSiswaRow
     public string? NoHandphone { get; set; }
     public required string Status { get; set; }
     public DateTime? CreatedAt { get; set; }
+    public bool DariPsbOnline { get; set; }
 }
 
 public class CalonSiswaFormInput
@@ -69,4 +70,12 @@ public class CalonSiswaFormViewModel
     public int? SiswaIdHasilTerima { get; set; }
     public DateTime? CreatedAt { get; set; }
     public List<Siswa.KelasOption> KelasOptionsUntukTerima { get; set; } = [];
+
+    // Hanya terisi bila calon berasal dari PSB online (webview-app)
+    public bool DariPsbOnline { get; set; }
+    public string? PsbNomor { get; set; }
+    public string? PsbStatusLabel { get; set; }
+    public string? PsbGelombang { get; set; }
+    public DateTime? PsbDisinkronAt { get; set; }
+    public List<string> PsbBerkas { get; set; } = [];
 }

@@ -33,6 +33,33 @@
             </div>
         </div>
 
+        @if (Model.DariPsbOnline)
+        {
+            <div class="card border-info mb-3">
+                <div class="card-header"><strong>Dari PSB Online</strong></div>
+                <div class="card-body">
+                    <dl class="row mb-2 small">
+                        <dt class="col-5">Nomor</dt><dd class="col-7">@Model.PsbNomor</dd>
+                        <dt class="col-5">Gelombang</dt><dd class="col-7">@(Model.PsbGelombang ?? "-")</dd>
+                        <dt class="col-5">Status di web</dt><dd class="col-7">@Model.PsbStatusLabel</dd>
+                        <dt class="col-5">Diperbarui</dt><dd class="col-7">@(Model.PsbDisinkronAt?.ToString("dd MMM yyyy HH:mm") ?? "-")</dd>
+                    </dl>
+                    <div class="small fw-semibold mb-1">Berkas yang diunggah orang tua</div>
+                    @if (Model.PsbBerkas.Count == 0)
+                    {
+                        <div class="small text-muted mb-2">Tidak ada berkas.</div>
+                    }
+                    else
+                    {
+                        <ul class="small mb-2">
+                            @foreach (var b in Model.PsbBerkas) { <li>@b</li> }
+                        </ul>
+                    }
+                    <div class="alert alert-light border small mb-0">Berkas bersifat privat dan tidak disimpan di komputer ini. Buka aplikasi web Al-Ikhlas 86, menu <strong>Pendaftaran PSB</strong>, pilih gelombang, lalu tombol <strong>Unduh berkas (ZIP)</strong> (bisa memilih semua pendaftar sekaligus; hasilnya sudah tertata per tahun ajaran dan gelombang). Status di web (diterima, cadangan, dan seterusnya) hanya informasi: keputusan masuk sebagai siswa tetap di sini.</div>
+                </div>
+            </div>
+        }
+
         @if (Model.Status == "menunggu")
         {
             <div class="card border-success mb-3">

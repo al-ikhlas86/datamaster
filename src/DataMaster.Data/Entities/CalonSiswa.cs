@@ -40,6 +40,16 @@ public class CalonSiswa
     // daftar lulusan dari Hub API, baris yang SumberLulusanId-nya sudah cocok
     // disembunyikan dari daftar (sudah pernah diimpor).
     public int? SumberLulusanId { get; set; }
+    // PSB online (2026-11-27) - terisi bila calon ini berasal dari pendaftaran online (webview-app) yang ditarik lewat Hub API. PsbOnlineId = id pendaftar di
+    // webview-app (unik; mencegah impor dobel). Kolom Psb* hanya informasi; keputusan Terima/Tolak tetap di Data Master seperti calon lain. Berkas TIDAK
+    // disalin ke sini (privat di webview-app): PsbJson memuat daftar nama berkas saja. Calon dari PSB online tidak dikirim balik ke Hub (lihat HubApiSyncService).
+    public int? PsbOnlineId { get; set; }
+    public string? PsbNomor { get; set; }
+    public string? PsbStatus { get; set; }
+    public string? PsbGelombang { get; set; }
+    public string? PsbJson { get; set; }
+    public DateTime? PsbDisinkronAt { get; set; }
+
     public DateTime? CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
 

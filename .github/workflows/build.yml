@@ -54,6 +54,10 @@ jobs:
       - name: Restore
         run: dotnet restore DataMaster.slnx
 
+      # Uji otomatis (2026-11-27): migrasi database harus berjalan dari nol dan model harus sama dengan snapshot; pemeta PSB online. Gagal = tidak ada rilis.
+      - name: Uji otomatis
+        run: dotnet test tests/DataMaster.Tests/DataMaster.Tests.csproj -c Release --no-restore
+
       - name: Publish Launcher (self-contained win-x64)
         run: dotnet publish src/DataMaster.Launcher/DataMaster.Launcher.csproj -c Release -r win-x64 --self-contained true -p:PublishReadyToRun=false -p:Version=${{ steps.version.outputs.version }} -o publish/DataMaster
 

@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using DataMaster.Data;
 using DataMaster.Data.Entities;
+using DataMaster.Data.Psb;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -93,6 +94,7 @@ public class HubApiSyncService(DataMasterDbContext db, HttpClient http, IOptions
             await PushKalenderAkademikAsync(url, token, ct);
             await PushCalonSiswaAsync(url, token, ct);
             await PullKeputusanPsbAsync(url, token, ct);
+            await PullPsbOnlineAsync(url, token, ct);
         }
 
         // Dicatat SETELAH seluruh siklus (bukan per-push) - cukup 1 sinyal
@@ -408,7 +410,8 @@ public class HubApiSyncService(DataMasterDbContext db, HttpClient http, IOptions
         // Dikirim SEMUA status (bukan cuma 'menunggu') - perubahan lokal (TU proses
         // via web) ikut ter-update di Mobile-app. Nama file dokumen fisik TIDAK
         // PERNAH dikirim - cuma ada di disk PC ini.
-        var rows = (await db.CalonSiswa.ToListAsync(ct)).Select(c => (object)new
+        // Calon dari PSB online TIDAK ikut dikirim balik: asalnya webview-app (sumber kebenaran pendaftaran), dan layar "Persetujuan PSB" lama tidak boleh menggandakannya.
+        var rows = (await db.CalonSiswa.Where(c => c.PsbOnlineId == null).ToListAsync(ct)).Select(c => (object)new
         {
             SourceId = c.CalonSiswaId,
             c.Nama,
@@ -509,6 +512,105 @@ public class HubApiSyncService(DataMasterDbContext db, HttpClient http, IOptions
 
             await LaporKeputusanSelesaiAsync(url, token, item.Id, statusLapor, pesanGagal, ct);
         }
+    }
+
+    // ---------------------------------------------------------------- Pull PSB online (2026-11-27)
+
+    private const string KeyPsbOnlineCursor = "psb_online_cursor";
+
+    // Menarik snapshot pendaftar PSB online milik unit ini dari Hub API (kursor = id terakhir yang sudah diproses, disimpan di SystemSettings) dan
+    // menjadikannya calon siswa. Idempoten: PsbOnlineId unik, jadi snapshot ganda hanya memperbarui baris yang sama. Gagal jaringan = coba lagi siklus depan.
+    private async Task PullPsbOnlineAsync(string url, string token, CancellationToken ct)
+    {
+        var setting = await db.SystemSettings.FindAsync([KeyPsbOnlineCursor], ct);
+        var kursor = long.TryParse(setting?.SettingValue, out var awal) && awal >= 0 ? awal : 0;
+        var tingkat = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var t in await db.Tingkat.Where(t => t.IsActive).OrderBy(t => t.Urutan).ToListAsync(ct)) tingkat.TryAdd(t.Nama, t.Kode);
+
+        for (var putaran = 0; putaran < 20; putaran++) // maks 20 x 200 pendaftar per siklus
+        {
+            JsonDocument doc;
+            try
+            {
+                using var req = new HttpRequestMessage(HttpMethod.Get, $"{url}/api/v1/psb/online?since={kursor}&limit=200");
+                req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                cts.CancelAfter(TimeSpan.FromSeconds(20));
+                using var resp = await http.SendAsync(req, cts.Token);
+                if (resp.StatusCode == System.Net.HttpStatusCode.NotFound) return; // Hub lama yang belum punya endpoint ini
+                if (!resp.IsSuccessStatusCode) { logger.LogWarning("Pull PSB online: GAGAL HTTP {Status}", (int)resp.StatusCode); return; }
+                doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Pull PSB online: GAGAL koneksi - {Message}", ex.Message);
+                return;
+            }
+
+            using (doc)
+            {
+                var root = doc.RootElement;
+                if (!root.TryGetProperty("success", out var ok) || ok.ValueKind != JsonValueKind.True) return;
+                if (!root.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Array) return;
+                foreach (var item in data.EnumerateArray())
+                {
+                    if (item.TryGetProperty("payload", out var payload)) await TerapkanPsbOnlineAsync(payload, tingkat, ct);
+                }
+                var maks = GetIntFlexible(root, "max_id") ?? 0;
+                if (maks > kursor)
+                {
+                    kursor = maks;
+                    if (setting is null) { setting = new Data.Entities.SystemSetting { SettingKey = KeyPsbOnlineCursor, SettingValue = kursor.ToString(), UpdatedAt = DateTime.Now }; db.SystemSettings.Add(setting); }
+                    else { setting.SettingValue = kursor.ToString(); setting.UpdatedAt = DateTime.Now; }
+                    await db.SaveChangesAsync(ct);
+                }
+                var adaLagi = root.TryGetProperty("ada_lagi", out var al) && al.ValueKind == JsonValueKind.True;
+                if (!adaLagi) return;
+            }
+        }
+    }
+
+    // Satu snapshot -> satu calon siswa. Baru: dibuat berstatus menunggu. Sudah ada: data biodata HANYA mengisi kolom yang masih kosong (TU mungkin sudah
+    // menyuntingnya di sini, jadi tidak ditimpa); informasi PSB (status, gelombang, berkas) selalu diperbarui.
+    private async Task TerapkanPsbOnlineAsync(JsonElement payload, IReadOnlyDictionary<string, string> tingkat, CancellationToken ct)
+    {
+        var h = PsbOnlineMapper.Baca(payload, tingkat);
+        if (h is null) return;
+        var calon = await db.CalonSiswa.FirstOrDefaultAsync(c => c.PsbOnlineId == h.PsbId, ct);
+        if (calon is null)
+        {
+            calon = new CalonSiswa
+            {
+                Nama = h.Nama,
+                JenisKelamin = h.JenisKelamin ?? JenisKelamin.L,
+                Status = StatusCalonSiswa.menunggu,
+                CreatedAt = DateTime.Now,
+                PsbOnlineId = h.PsbId,
+                Catatan = h.JenisKelamin is null ? "Dari PSB online. Jenis kelamin belum terbaca, mohon periksa dan lengkapi." : null,
+            };
+            db.CalonSiswa.Add(calon);
+        }
+        calon.Nisn ??= h.Nisn;
+        calon.TempatLahir ??= h.TempatLahir;
+        calon.TanggalLahir ??= h.TanggalLahir;
+        calon.AsalSekolah ??= h.AsalSekolah;
+        calon.TingkatDituju ??= h.TingkatDituju;
+        calon.AlamatJalan ??= h.AlamatJalan;
+        calon.AlamatRt ??= h.AlamatRt;
+        calon.AlamatRw ??= h.AlamatRw;
+        calon.AlamatKelurahan ??= h.AlamatKelurahan;
+        calon.AlamatKecamatan ??= h.AlamatKecamatan;
+        calon.NamaAyah ??= h.NamaAyah;
+        calon.PekerjaanAyah ??= h.PekerjaanAyah;
+        calon.NamaIbu ??= h.NamaIbu;
+        calon.PekerjaanIbu ??= h.PekerjaanIbu;
+        calon.NoHandphone ??= h.NoHandphone;
+        calon.PsbNomor = h.Nomor;
+        calon.PsbStatus = h.Status;
+        calon.PsbGelombang = h.Gelombang;
+        calon.PsbJson = PsbOnlineMapper.JsonUntukSimpan(payload);
+        calon.PsbDisinkronAt = DateTime.Now;
+        await db.SaveChangesAsync(ct);
     }
 
     private async Task LaporKeputusanSelesaiAsync(string url, string token, int id, string status, string? pesanGagal, CancellationToken ct)
