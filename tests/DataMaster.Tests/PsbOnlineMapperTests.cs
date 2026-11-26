@@ -63,7 +63,7 @@ public class PsbOnlineMapperTests
         var panjang = new string('a', 500);
         var h = PsbOnlineMapper.Baca(Json($"{{\"psb_id\":1,\"nomor\":\"PSB-1-0001\",\"nama\":\"Ab\\u0000c\\nd{panjang}\"}}"), Tingkat)!;
         Assert.Equal(100, h.Nama.Length);
-        Assert.False(h.Nama.Any(char.IsControl));
+        Assert.True(h.Nama.All(ch => !char.IsControl(ch)));
     }
 
     [Fact]
@@ -83,5 +83,6 @@ public class PsbOnlineMapperTests
         Assert.Null(PsbOnlineMapper.JsonUntukSimpan(Json($"{{\"a\":\"{new string('x', 70000)}\"}}")));
         Assert.Equal("Diterima (lulus tes)", PsbOnlineMapper.LabelStatus("diterima"));
         Assert.Equal("-", PsbOnlineMapper.LabelStatus(null));
+        Assert.Equal("Dihapus di web", PsbOnlineMapper.LabelStatus("dihapus"));
     }
 }

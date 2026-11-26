@@ -577,6 +577,15 @@ public class HubApiSyncService(DataMasterDbContext db, HttpClient http, IOptions
         var h = PsbOnlineMapper.Baca(payload, tingkat);
         if (h is null) return;
         var calon = await db.CalonSiswa.FirstOrDefaultAsync(c => c.PsbOnlineId == h.PsbId, ct);
+        if (h.Status == "dihapus")
+        {
+            // Pendaftar dihapus di web (mis. data uji). Calon yang belum diproses ikut dihapus; yang sudah diterima/ditolak dibiarkan (jejak riwayat), hanya ditandai.
+            if (calon is null) return;
+            if (calon.Status == StatusCalonSiswa.menunggu && calon.SiswaId is null) db.CalonSiswa.Remove(calon);
+            else { calon.PsbStatus = "dihapus"; calon.PsbDisinkronAt = DateTime.Now; }
+            await db.SaveChangesAsync(ct);
+            return;
+        }
         if (calon is null)
         {
             calon = new CalonSiswa

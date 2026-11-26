@@ -67,6 +67,7 @@ public static partial class PsbOnlineMapper
         "cadangan" => "Cadangan",
         "ditolak" => "Ditolak",
         "mundur" => "Mundur",
+        "dihapus" => "Dihapus di web",
         _ => status ?? "-",
     };
 
