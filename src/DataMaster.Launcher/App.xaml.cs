@@ -71,22 +71,17 @@ public partial class App : Application
             args.Handled = true; // jangan langsung matikan aplikasi kalau masih bisa dipulihkan
         };
 
-        // Cek update SEDINI mungkin - SEBELUM wizard pun sempat tampil. Dulu
-        // UpdateChecker cuma jalan di dalam MainWindow, yang baru ada SETELAH
-        // wizard selesai diisi - artinya PC yang baru instal & belum pernah
-        // menyelesaikan wizard TIDAK PERNAH ke-cek update sama sekali, staf IT
-        // terpaksa unduh manual dari GitHub Releases sendiri (gap nyata,
-        // ditemukan langsung saat uji instalasi bersih v1.0.5/v1.0.6). Splash
-        // kecil terpisah (BUKAN splash MainWindow, krn MainWindow belum ada di
-        // titik ini) supaya unduhan besar tidak berjalan diam-diam tanpa tanda.
-        var splash = new UpdateSplashWindow();
-        splash.Show();
-        var updateChecker = new UpdateChecker();
-        updateChecker.StatusChanged += status => { if (status is not null) splash.SetStatus(status); };
-        updateChecker.ProgressChanged += splash.SetProgress;
-        var updateApplied = await updateChecker.CheckAndApplyAsync(new ServerProcessManager(), CancellationToken.None);
-        if (updateApplied) return; // Shutdown() sudah dipanggil di dalam - jangan lanjut apapun lagi
-        splash.Close();
+        // Pembaruan yang SUDAH diunduh lengkap (pengguna memilih "Nanti" sebelumnya): terapkan sekarang, cepat dan tanpa jaringan. Pemeriksaan dan unduhan baru
+        // TIDAK lagi di sini: berjalan di latar belakang dari MainWindow (juga untuk PC yang wizard-nya sudah selesai) supaya aplikasi langsung bisa dipakai
+        // walau jaringan lambat. PC yang baru diinstal dan belum menyelesaikan wizard memeriksa update begitu MainWindow terbuka pertama kali.
+        if (!UpdateChecker.LewatiSesiIni && UpdateChecker.VersiSiap() is { } versiSiap)
+        {
+            var splash = new UpdateSplashWindow();
+            splash.Show();
+            splash.SetStatus($"Memasang pembaruan {versiSiap} yang sudah diunduh - aplikasi akan terbuka lagi otomatis...");
+            if (UpdateChecker.TerapkanBilaSiap(new ServerProcessManager())) return; // Shutdown() sudah dipanggil di dalam - jangan lanjut apapun lagi
+            splash.Close();
+        }
 
         // Update otomatis ditahan karena gagal berulang, atau baru saja gagal disalin: beri tahu sekali, aplikasi lama tetap jalan.
         if (UpdateChecker.PesanTahan is { } pesanTahan)
