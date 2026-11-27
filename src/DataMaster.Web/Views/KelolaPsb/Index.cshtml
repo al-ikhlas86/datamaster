@@ -1,23 +1,21 @@
 @{
     ViewData["Title"] = "Kelola PSB";
+    var url = ViewData["UrlPsb"] as string;
+    var galat = ViewData["PesanGalat"] as string;
 }
 
-<div class="card">
-    <div class="card-body">
-        <h5 class="mb-2">Kelola PSB Online</h5>
-        <p class="text-muted mb-3">
-            Atur seluruh Penerimaan Siswa Baru sekolah ini dari sini: buat dan tutup gelombang, lihat pendaftar dan berkasnya, ubah status
-            (diverifikasi, diterima, cadangan, ditolak), atur jadwal tes, dan kirim pengumuman. Anda otomatis masuk, tanpa perlu membuka alamat web
-            atau login lagi, dan hanya melihat data PSB sekolah ini.
-        </p>
-        @if (TempData["PsbGalat"] is string galat)
-        {
-            <div class="alert alert-danger">@galat</div>
-        }
-        <form asp-action="Buka" method="post" target="_blank">
-            @Html.AntiForgeryToken()
-            <button type="submit" class="btn btn-primary"><i class="feather-external-link me-1"></i> Buka Kelola PSB</button>
-        </form>
-        <p class="text-muted small mt-3 mb-0">Halaman terbuka di tab baru dan berlaku sekitar 8 jam. Pendaftar yang formulirnya sudah lengkap otomatis muncul juga di menu Calon Siswa.</p>
+@if (url is null)
+{
+    <div class="card">
+        <div class="card-body">
+            <h5 class="mb-2">Kelola PSB Online</h5>
+            <div class="alert alert-danger mb-3">@(galat ?? "Tidak bisa membuka Kelola PSB.")</div>
+            <a asp-action="Index" class="btn btn-primary"><i class="feather-refresh-cw me-1"></i> Coba lagi</a>
+        </div>
     </div>
-</div>
+}
+else
+{
+    @* Halaman PSB webview ditanam di sini (masuk otomatis lewat tiket sekali pakai); tidak membuka tab baru. *@
+    <iframe src="@url" title="Kelola PSB" style="width:100%;height:calc(100vh - 140px);min-height:520px;border:0;border-radius:8px;background:#fff" referrerpolicy="no-referrer"></iframe>
+}
