@@ -49,6 +49,7 @@ public class CalonSiswaController(DataMasterDbContext db, DocumentStorageService
                 Status = c.Status.ToString(),
                 CreatedAt = c.CreatedAt,
                 DariPsbOnline = c.PsbOnlineId != null,
+                PsbTagihanStatus = c.PsbOnlineId != null ? c.PsbTagihanStatus : null,
             })
             .ToList();
 
@@ -220,6 +221,8 @@ public class CalonSiswaController(DataMasterDbContext db, DocumentStorageService
             PsbNomor = calon.PsbNomor,
             PsbStatusLabel = PsbOnlineMapper.LabelStatus(calon.PsbStatus),
             PsbGelombang = calon.PsbGelombang,
+            PsbTagihanLabel = PsbTagihanAwal.Label(calon.PsbTagihanStatus) + (calon.PsbTagihanTotal is > 0 ? $" (Rp {calon.PsbTagihanDibayar ?? 0:N0} dari Rp {calon.PsbTagihanTotal:N0})" : ""),
+            PsbTagihanStatus = calon.PsbTagihanStatus,
             PsbDisinkronAt = calon.PsbDisinkronAt,
             PsbBerkas = PsbOnlineMapper.NamaBerkas(calon.PsbJson),
         };
@@ -285,6 +288,71 @@ public class CalonSiswaController(DataMasterDbContext db, DocumentStorageService
 
         TempData["message"] = "Data calon siswa berhasil diperbarui.";
         return RedirectToAction(nameof(Detail), new { id }); // BUKAN index - lihat §3.22
+    }
+
+    // ------------------------------------------- Penempatan kelas acak (2026-11-28)
+    // Calon PSB online yang tagihan awalnya LUNAS di Keuangan ditempatkan acak merata ke kelas paralel satu tingkat. Halaman ini hanya MENYUSUN usulan
+    // (tanpa menyimpan); "Terapkan" mengirim pasangan calon-kelas yang tampil lalu setiap pasangan diproses PsbService.TerimaAsync (aturan Terima yang sama,
+    // termasuk pemeriksaan lunas), jadi tidak ada jalur pintas ke siswa aktif.
+
+    private IQueryable<Data.Entities.CalonSiswa> CalonLunas() =>
+        db.CalonSiswa.Where(c => c.Status == StatusCalonSiswa.menunggu && c.PsbOnlineId != null && c.SiswaId == null);
+
+    [HttpGet("penempatan")]
+    public async Task<IActionResult> Penempatan(string? tingkat, int? seed)
+    {
+        var vm = new PenempatanViewModel { Tingkat = tingkat, Seed = seed ?? Random.Shared.Next(1, int.MaxValue) };
+        vm.TingkatOptions = (await CalonLunas().Where(c => c.TingkatDituju != null).Select(c => c.TingkatDituju!).Distinct().ToListAsync()).Order().ToList();
+        if (string.IsNullOrEmpty(tingkat)) return View(vm);
+
+        var calonLunas = await CalonLunas().Where(c => c.TingkatDituju == tingkat && c.PsbTagihanStatus == "lunas").OrderBy(c => c.CalonSiswaId).ToListAsync();
+        vm.MenungguBayar = await CalonLunas().CountAsync(c => c.TingkatDituju == tingkat && c.PsbTagihanStatus != "lunas");
+        var kelas = await db.Kelas.Where(k => k.IsActive && k.Tingkat == tingkat).OrderBy(k => k.NamaKelas).ToListAsync();
+        if (kelas.Count == 0) { vm.Pesan = $"Belum ada kelas aktif untuk tingkat {tingkat}. Buat kelasnya dulu di menu Kelas."; return View(vm); }
+        if (calonLunas.Count == 0) { vm.Pesan = "Belum ada calon yang tagihan awalnya lunas untuk tingkat ini."; return View(vm); }
+
+        var kelasIds = kelas.Select(k => k.KelasId).ToList();
+        var isi = (await db.Siswa.Where(s => s.Status == StatusSiswa.aktif && s.KelasId != null && kelasIds.Contains(s.KelasId.Value))
+            .GroupBy(s => s.KelasId!.Value).Select(g => new { Id = g.Key, N = g.Count(), L = g.Count(s => s.JenisKelamin == JenisKelamin.L) }).ToListAsync())
+            .ToDictionary(x => x.Id);
+
+        var usulan = PenempatanKelas.Susun(
+            calonLunas.Select(c => new PenempatanKelas.Calon(c.CalonSiswaId, c.JenisKelamin == JenisKelamin.L)).ToList(),
+            kelas.Select(k => new PenempatanKelas.Kelas(k.KelasId, isi.TryGetValue(k.KelasId, out var x) ? x.N : 0, isi.TryGetValue(k.KelasId, out var y) ? y.L : 0)).ToList(),
+            vm.Seed);
+        var per = calonLunas.ToDictionary(c => c.CalonSiswaId);
+        vm.Grup = kelas.Select(k => new PenempatanKelasGrup
+        {
+            KelasId = k.KelasId, NamaKelas = k.NamaKelas,
+            Terisi = isi.TryGetValue(k.KelasId, out var a) ? a.N : 0, LakiTerisi = isi.TryGetValue(k.KelasId, out var b) ? b.L : 0,
+            Calon = usulan.Where(u => u.KelasId == k.KelasId).Select(u => new PenempatanCalon { CalonSiswaId = u.CalonId, Nama = per[u.CalonId].Nama, Laki = per[u.CalonId].JenisKelamin == JenisKelamin.L })
+                .OrderBy(c => c.Nama).ToList(),
+        }).ToList();
+        return View(vm);
+    }
+
+    [HttpPost("penempatan/terapkan")]
+    public async Task<IActionResult> TerapkanPenempatan(string tingkat, string[]? pasangan)
+    {
+        if (string.IsNullOrWhiteSpace(tingkat) || pasangan is null || pasangan.Length == 0)
+        {
+            TempData["error"] = "Tidak ada penempatan untuk diterapkan.";
+            return RedirectToAction(nameof(Penempatan), new { tingkat });
+        }
+        var kelasSah = await db.Kelas.Where(k => k.IsActive && k.Tingkat == tingkat).Select(k => k.KelasId).ToListAsync();
+        int ok = 0; var gagal = new List<string>();
+        foreach (var p in pasangan.Take(500))
+        {
+            var bagian = (p ?? "").Split('-');
+            if (bagian.Length != 2 || !int.TryParse(bagian[0], out var calonId) || !int.TryParse(bagian[1], out var kelasId) || !kelasSah.Contains(kelasId)) { gagal.Add("data tidak sah"); continue; }
+            var calon = await CalonLunas().FirstOrDefaultAsync(c => c.CalonSiswaId == calonId && c.TingkatDituju == tingkat && c.PsbTagihanStatus == "lunas");
+            if (calon is null) { gagal.Add($"calon #{calonId} tidak memenuhi syarat lagi"); continue; }
+            var hasil = await psb.TerimaAsync(calonId, null, kelasId);
+            if (hasil.Success) ok++; else gagal.Add($"{calon.Nama}: {hasil.Message}");
+        }
+        TempData["message"] = $"{ok} calon siswa ditempatkan ke kelas.";
+        if (gagal.Count > 0) TempData["error"] = $"{gagal.Count} gagal: " + string.Join("; ", gagal.Take(5)) + (gagal.Count > 5 ? "; ..." : "");
+        return RedirectToAction(nameof(Index));
     }
 
     // -------------------------------------------------------- Terima/Tolak

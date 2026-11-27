@@ -618,6 +618,9 @@ public class HubApiSyncService(DataMasterDbContext db, HttpClient http, IOptions
         calon.PsbNomor = h.Nomor;
         calon.PsbStatus = h.Status;
         calon.PsbGelombang = h.Gelombang;
+        calon.PsbTagihanStatus = h.TagihanStatus; // Keuangan: status tagihan awal (calon baru boleh masuk kelas setelah lunas)
+        calon.PsbTagihanTotal = h.TagihanTotal;
+        calon.PsbTagihanDibayar = h.TagihanDibayar;
         calon.PsbJson = PsbOnlineMapper.JsonUntukSimpan(payload);
         calon.PsbDisinkronAt = DateTime.Now;
         await db.SaveChangesAsync(ct);

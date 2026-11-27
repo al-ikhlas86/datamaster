@@ -12,6 +12,7 @@
 @section PageActions {
     <div class="d-flex gap-2">
         <a asp-action="LulusanTk" class="btn btn-outline-success btn-action" title="Impor siswa yang sudah ditandai lulus dari sekolah asal (mis. TK)"><i class="bi bi-mortarboard me-1"></i> Lulusan TK</a>
+        <a asp-action="Penempatan" class="btn btn-outline-primary btn-action" title="Tempatkan calon PSB yang sudah lunas ke kelas secara acak merata"><i class="bi bi-shuffle me-1"></i> Penempatan Kelas (Acak)</a>
         <a asp-action="Create" class="btn btn-primary btn-action"><i class="feather-plus me-1"></i> Tambah Calon Siswa</a>
     </div>
 }
@@ -68,7 +69,7 @@
                         var (cls, label) = statusBadge[c.Status];
                         <tr>
                             <td>@(no++)</td>
-                            <td><a asp-action="Detail" asp-route-id="@c.CalonSiswaId">@c.Nama</a>@if (c.DariPsbOnline) { <span class="badge bg-info text-dark ms-1" title="Pendaftaran online (webview-app)">PSB Online</span> }</td>
+                            <td><a asp-action="Detail" asp-route-id="@c.CalonSiswaId">@c.Nama</a>@if (c.DariPsbOnline) { <span class="badge bg-info text-dark ms-1" title="Pendaftaran online (webview-app)">PSB Online</span> if (c.PsbTagihanStatus is not null) { <span class="badge @(c.PsbTagihanStatus == "lunas" ? "bg-success" : c.PsbTagihanStatus == "tanpa_tagihan" ? "bg-secondary" : "bg-warning text-dark") ms-1" title="Tagihan awal di Keuangan">@DataMaster.Data.Psb.PsbTagihanAwal.Label(c.PsbTagihanStatus)</span> } }</td>
                             <td><span class="badge @(c.JenisKelamin == "L" ? "bg-primary" : "bg-danger")">@c.JenisKelamin</span></td>
                             <td>
                                 @if (string.IsNullOrEmpty(c.TingkatDituju))

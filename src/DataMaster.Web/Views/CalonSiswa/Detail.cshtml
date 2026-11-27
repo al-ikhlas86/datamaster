@@ -42,6 +42,7 @@
                         <dt class="col-5">Nomor</dt><dd class="col-7">@Model.PsbNomor</dd>
                         <dt class="col-5">Gelombang</dt><dd class="col-7">@(Model.PsbGelombang ?? "-")</dd>
                         <dt class="col-5">Status di web</dt><dd class="col-7">@Model.PsbStatusLabel</dd>
+                        <dt class="col-5">Tagihan awal</dt><dd class="col-7"><span class="badge @(Model.PsbTagihanStatus == "lunas" ? "bg-success" : (Model.PsbTagihanStatus is "belum" or "sebagian") ? "bg-warning text-dark" : "bg-secondary")">@Model.PsbTagihanLabel</span></dd>
                         <dt class="col-5">Diperbarui</dt><dd class="col-7">@(Model.PsbDisinkronAt?.ToString("dd MMM yyyy HH:mm") ?? "-")</dd>
                     </dl>
                     <div class="small fw-semibold mb-1">Berkas yang diunggah orang tua</div>

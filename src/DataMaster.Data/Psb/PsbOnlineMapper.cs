@@ -13,7 +13,8 @@ public static partial class PsbOnlineMapper
     public sealed record Hasil(
         int PsbId, string Nomor, string Status, string? Gelombang, string Nama, JenisKelamin? JenisKelamin, string? Nisn, string? TempatLahir,
         DateOnly? TanggalLahir, string? AsalSekolah, string? TingkatDituju, string? AlamatJalan, string? AlamatRt, string? AlamatRw, string? AlamatKelurahan,
-        string? AlamatKecamatan, string? NamaAyah, string? PekerjaanAyah, string? NamaIbu, string? PekerjaanIbu, string? NoHandphone);
+        string? AlamatKecamatan, string? NamaAyah, string? PekerjaanAyah, string? NamaIbu, string? PekerjaanIbu, string? NoHandphone,
+        string? TagihanStatus = null, decimal? TagihanTotal = null, decimal? TagihanDibayar = null);
 
     private const int MaksJson = 60000;
 
@@ -25,11 +26,13 @@ public static partial class PsbOnlineMapper
         var nama = Str(p, "nama", 100);
         var nomor = Str(p, "nomor", 30);
         if (psbId is not > 0 || nama is null || nomor is null) return null;
+        var tagihan = TagihanAwal(p);
         return new Hasil(
             psbId.Value, nomor, Str(p, "status", 20) ?? "baru", Str(p, "gelombang", 120), nama, KodeJenisKelamin(Str(p, "jenis_kelamin", 2)), Str(p, "nisn", 20),
             Str(p, "tempat_lahir", 100), Tanggal(Str(p, "tanggal_lahir", 10)), Str(p, "asal_sekolah", 150), Tingkat(Str(p, "tingkat_dituju", 20), tingkatNamaKeKode),
             Str(p, "alamat_jalan", 255), Str(p, "alamat_rt", 10), Str(p, "alamat_rw", 10), Str(p, "alamat_kelurahan", 100), Str(p, "alamat_kecamatan", 100),
-            Str(p, "nama_ayah", 100), Str(p, "pekerjaan_ayah", 100), Str(p, "nama_ibu", 100), Str(p, "pekerjaan_ibu", 100), Digit(Str(p, "no_hp", 25)));
+            Str(p, "nama_ayah", 100), Str(p, "pekerjaan_ayah", 100), Str(p, "nama_ibu", 100), Str(p, "pekerjaan_ibu", 100), Digit(Str(p, "no_hp", 25)),
+            tagihan.Status, tagihan.Total, tagihan.Dibayar);
     }
 
     /// <summary>Teks mentah snapshot untuk disimpan (dibatasi); berlebih -> null supaya tidak membengkakkan database.</summary>
@@ -77,6 +80,18 @@ public static partial class PsbOnlineMapper
         var s = new string((v.GetString() ?? "").Where(c => !char.IsControl(c) || c == ' ').ToArray()).Trim();
         if (s.Length == 0) return null;
         return s.Length > maks ? s[..maks] : s;
+    }
+
+    private static readonly string[] StatusTagihan = ["tanpa_tagihan", "belum", "sebagian", "lunas"];
+
+    /// <summary>"tagihan_awal":{status,total,dibayar} dari Keuangan; status tak dikenal/hilang = tak ada kabar (null), nominal negatif atau bukan angka dibuang.</summary>
+    private static (string? Status, decimal? Total, decimal? Dibayar) TagihanAwal(JsonElement p)
+    {
+        if (!p.TryGetProperty("tagihan_awal", out var t) || t.ValueKind != JsonValueKind.Object) return (null, null, null);
+        var status = Str(t, "status", 14);
+        if (status is null || !StatusTagihan.Contains(status)) return (null, null, null);
+        decimal? Angka(string k) => t.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetDecimal(out var d) && d >= 0 && d < 1_000_000_000_000m ? d : null;
+        return (status, Angka("total"), Angka("dibayar"));
     }
 
     private static int? Int(JsonElement o, string nama) => o.TryGetProperty(nama, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var i) ? i : null;

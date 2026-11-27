@@ -139,6 +139,15 @@ namespace DataMaster.Data.Migrations
                     b.Property<string>("PsbStatus")
                         .HasColumnType("TEXT");
 
+                    b.Property<decimal?>("PsbTagihanDibayar")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PsbTagihanStatus")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("PsbTagihanTotal")
+                        .HasColumnType("TEXT");
+
                     b.Property<int?>("SiswaId")
                         .HasColumnType("INTEGER");
 

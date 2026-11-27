@@ -1,0 +1,82 @@
+@model DataMaster.Web.Models.CalonSiswa.PenempatanViewModel
+@{
+    ViewData["Title"] = "Penempatan Kelas (Acak)";
+}
+
+@section PageActions {
+    <a asp-action="Index" class="btn btn-outline-secondary btn-action"><i class="feather-arrow-left me-1"></i> Kembali ke Calon Siswa</a>
+}
+
+<div class="alert alert-info">
+    Calon dari PSB online yang <strong>tagihan awalnya sudah lunas</strong> di Keuangan ditempatkan <strong>acak</strong> ke kelas paralel satu tingkat:
+    jumlah murid tiap kelas dibuat rata dan komposisi laki-laki/perempuan diseimbangkan. Ini hanya <strong>usulan</strong>; tidak ada yang tersimpan sampai Anda menekan
+    <em>Terapkan</em>. Setelah diterapkan, calon menjadi siswa aktif di kelas tersebut (NIS dibuat otomatis).
+</div>
+
+<form method="get" asp-action="Penempatan" class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <label class="mb-0" for="tingkat">Tingkat</label>
+    <select id="tingkat" name="tingkat" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+        <option value="">- pilih tingkat -</option>
+        @foreach (var t in Model.TingkatOptions)
+        {
+            <option value="@t" selected="@(t == Model.Tingkat)">@t</option>
+        }
+    </select>
+</form>
+
+@if (Model.TingkatOptions.Count == 0)
+{
+    <div class="text-center text-muted py-5">Belum ada calon PSB online yang menunggu penempatan.</div>
+}
+else if (!string.IsNullOrEmpty(Model.Pesan))
+{
+    <div class="alert alert-warning">@Model.Pesan</div>
+}
+else if (Model.Grup.Count > 0)
+{
+    if (Model.MenungguBayar > 0)
+    {
+        <div class="alert alert-warning small">@Model.MenungguBayar calon di tingkat ini belum lunas dan <strong>tidak ikut</strong> diacak. Mereka bisa ditempatkan setelah tagihan awalnya lunas di Keuangan.</div>
+    }
+    <div class="d-flex flex-wrap gap-2 mb-3">
+        <a class="btn btn-outline-secondary btn-sm" asp-action="Penempatan" asp-route-tingkat="@Model.Tingkat"><i class="bi bi-shuffle me-1"></i> Acak ulang</a>
+        <span class="align-self-center text-muted small">@Model.TotalCalon calon dibagi ke @Model.Grup.Count kelas</span>
+    </div>
+
+    <div class="row g-3 mb-3">
+        @foreach (var g in Model.Grup)
+        {
+            var laki = g.LakiTerisi + g.Calon.Count(c => c.Laki);
+            var total = g.Terisi + g.Calon.Count;
+            <div class="col-md-6 col-xl-4">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between">
+                        <strong>@g.NamaKelas</strong>
+                        <span class="small text-muted">+@g.Calon.Count baru</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="small text-muted mb-2">Sudah ada @g.Terisi siswa. Setelah penempatan: @total siswa (L @laki, P @(total - laki)).</div>
+                        <ul class="small mb-0">
+                            @foreach (var c in g.Calon)
+                            {
+                                <li>@c.Nama <span class="badge @(c.Laki ? "bg-primary" : "bg-danger")">@(c.Laki ? "L" : "P")</span></li>
+                            }
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <form method="post" asp-action="TerapkanPenempatan" onsubmit="return confirm('Terapkan penempatan ini? Calon akan menjadi siswa aktif di kelas masing-masing.');">
+        <input type="hidden" name="tingkat" value="@Model.Tingkat" />
+        @foreach (var g in Model.Grup)
+        {
+            foreach (var c in g.Calon)
+            {
+                <input type="hidden" name="pasangan" value="@c.CalonSiswaId-@g.KelasId" />
+            }
+        }
+        <button type="submit" class="btn btn-primary">Terapkan Penempatan (@Model.TotalCalon calon)</button>
+    </form>
+}

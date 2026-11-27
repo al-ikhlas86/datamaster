@@ -18,6 +18,9 @@ public class PsbService(DataMasterDbContext db)
         var calon = await db.CalonSiswa.FindAsync(calonSiswaId);
         if (calon is null) return new PsbResult(false, $"Calon siswa dengan ID {calonSiswaId} tidak ditemukan.");
         if (calon.Status != StatusCalonSiswa.menunggu) return new PsbResult(false, "Calon siswa ini sudah diproses sebelumnya.");
+        // Calon dari PSB online: tagihan awal di Keuangan wajib lunas dulu (status null/tanpa tagihan tidak memblokir). Jalur ini dipakai web, Hub, dan penempatan acak.
+        if (calon.PsbOnlineId is not null && !PsbTagihanAwal.BolehMasukKelas(calon.PsbTagihanStatus))
+            return new PsbResult(false, PsbTagihanAwal.PesanBlokir(calon.PsbTagihanStatus, calon.PsbTagihanTotal, calon.PsbTagihanDibayar));
 
         string nis;
         var trimmed = (nisInput ?? "").Trim();

@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\DataMaster.Data\DataMaster.Data.csproj" />
+    <ProjectReference Include="..\..\src\DataMaster.Web\DataMaster.Web.csproj" />
   </ItemGroup>
 
 </Project>

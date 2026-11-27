@@ -49,6 +49,11 @@ public class CalonSiswa
     public string? PsbGelombang { get; set; }
     public string? PsbJson { get; set; }
     public DateTime? PsbDisinkronAt { get; set; }
+    // Tagihan awal dari Keuangan (2026-11-28): status tanpa_tagihan | belum | sebagian | lunas, null = belum ada kabar. Calon BARU hanya bisa masuk kelas bila tidak
+    // belum/sebagian (lihat PsbTagihanAwal). Hanya informasi dari Keuangan, tidak pernah diubah dari sini.
+    public string? PsbTagihanStatus { get; set; }
+    public decimal? PsbTagihanTotal { get; set; }
+    public decimal? PsbTagihanDibayar { get; set; }
 
     public DateTime? CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }

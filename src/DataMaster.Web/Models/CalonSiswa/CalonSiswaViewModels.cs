@@ -25,6 +25,35 @@ public class CalonSiswaRow
     public required string Status { get; set; }
     public DateTime? CreatedAt { get; set; }
     public bool DariPsbOnline { get; set; }
+    public string? PsbTagihanStatus { get; set; }
+}
+
+// Penempatan kelas acak calon PSB yang tagihan awalnya lunas (2026-11-28)
+public class PenempatanViewModel
+{
+    public string? Tingkat { get; set; }
+    public int Seed { get; set; }
+    public List<string> TingkatOptions { get; set; } = [];
+    public int MenungguBayar { get; set; } // calon PSB tingkat ini yang belum lunas (tidak ikut diacak)
+    public string? Pesan { get; set; }
+    public List<PenempatanKelasGrup> Grup { get; set; } = [];
+    public int TotalCalon => Grup.Sum(g => g.Calon.Count);
+}
+
+public class PenempatanKelasGrup
+{
+    public int KelasId { get; set; }
+    public required string NamaKelas { get; set; }
+    public int Terisi { get; set; }
+    public int LakiTerisi { get; set; }
+    public List<PenempatanCalon> Calon { get; set; } = [];
+}
+
+public class PenempatanCalon
+{
+    public int CalonSiswaId { get; set; }
+    public required string Nama { get; set; }
+    public bool Laki { get; set; }
 }
 
 public class CalonSiswaFormInput
@@ -76,6 +105,8 @@ public class CalonSiswaFormViewModel
     public string? PsbNomor { get; set; }
     public string? PsbStatusLabel { get; set; }
     public string? PsbGelombang { get; set; }
+    public string? PsbTagihanLabel { get; set; }
+    public string? PsbTagihanStatus { get; set; }
     public DateTime? PsbDisinkronAt { get; set; }
     public List<string> PsbBerkas { get; set; } = [];
 }
