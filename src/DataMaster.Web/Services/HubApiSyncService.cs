@@ -146,8 +146,7 @@ public class HubApiSyncService(DataMasterDbContext db, HttpClient http, IOptions
         {
             using var req = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}{path}");
             req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-            if (AppVersionInfo.Resmi is { } versiApp) req.Headers.TryAddWithoutValidation("X-App-Version", versiApp);
-            if (DeviceIdentity.Uid is { } uidPc) req.Headers.TryAddWithoutValidation("X-Device-Uid", uidPc);
+            HubHeaders.Terapkan(req);
             req.Content = JsonContent.Create(new { data = rows, full }, options: JsonOpts);
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(TimeSpan.FromSeconds(15));
@@ -443,6 +442,7 @@ public class HubApiSyncService(DataMasterDbContext db, HttpClient http, IOptions
         try
         {
             using var req = new HttpRequestMessage(HttpMethod.Get, $"{url}/api/v1/psb/keputusan");
+            HubHeaders.Terapkan(req);
             req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(TimeSpan.FromSeconds(15));
@@ -533,6 +533,7 @@ public class HubApiSyncService(DataMasterDbContext db, HttpClient http, IOptions
             try
             {
                 using var req = new HttpRequestMessage(HttpMethod.Get, $"{url}/api/v1/psb/online?since={kursor}&limit=200");
+                HubHeaders.Terapkan(req);
                 req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 cts.CancelAfter(TimeSpan.FromSeconds(20));
@@ -627,6 +628,7 @@ public class HubApiSyncService(DataMasterDbContext db, HttpClient http, IOptions
         try
         {
             using var req = new HttpRequestMessage(HttpMethod.Post, $"{url}/api/v1/psb/keputusan/{id}/selesai");
+            HubHeaders.Terapkan(req);
             req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
             req.Content = JsonContent.Create(new { status, pesan_gagal = pesanGagal });
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);

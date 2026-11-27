@@ -127,8 +127,7 @@ public class DatabaseBackupService(DataMasterDbContext db, IConfiguration config
 
                 using var req = new HttpRequestMessage(HttpMethod.Post, $"{url}/api/v1/backup/upload");
                 req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            if (AppVersionInfo.Resmi is { } versiApp) req.Headers.TryAddWithoutValidation("X-App-Version", versiApp);
-                if (DeviceIdentity.Uid is { } uidPc) req.Headers.TryAddWithoutValidation("X-Device-Uid", uidPc);
+            HubHeaders.Terapkan(req);
                 req.Content = content;
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
                 using var resp = await http.SendAsync(req, cts.Token);

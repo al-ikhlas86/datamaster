@@ -24,8 +24,7 @@ public class PsbKelolaService(HttpClient http, IOptions<AppOptions> options, ILo
         {
             using var req = new HttpRequestMessage(HttpMethod.Post, $"{url}/api/v1/psb/tiket");
             req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            if (AppVersionInfo.Resmi is { } versiApp) req.Headers.TryAddWithoutValidation("X-App-Version", versiApp);
-            if (DeviceIdentity.Uid is { } uidPc) req.Headers.TryAddWithoutValidation("X-Device-Uid", uidPc);
+            HubHeaders.Terapkan(req);
             req.Content = new StringContent(JsonSerializer.Serialize(new { nama = PsbKelola.BersihkanNama(namaPengguna) }), Encoding.UTF8, "application/json");
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(TimeSpan.FromSeconds(15));

@@ -35,6 +35,7 @@ public class LulusanTkService(HttpClient http, IOptions<AppOptions> options, ILo
         try
         {
             using var req = new HttpRequestMessage(HttpMethod.Get, $"{url}/api/v1/siswa/lulusan");
+            HubHeaders.Terapkan(req);
             req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(TimeSpan.FromSeconds(15));
