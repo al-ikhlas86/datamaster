@@ -60,6 +60,7 @@ public class UserController(DataMasterDbContext db, DatabaseBackupService backup
             AppVersion = VersiBerjalan() ?? appOptions.Value.AppVersion,
             HubApiStatus = hubApiStatus,
             BackupPassphraseAktif = !string.IsNullOrWhiteSpace(appOptions.Value.BackupPassphrase),
+            UpdateRestartKapanSaja = AppSettingsWriterService.BacaUpdateKapanSaja(),
         };
         return View(vm);
     }
@@ -282,6 +283,17 @@ public class UserController(DataMasterDbContext db, DatabaseBackupService backup
         await appSettingsWriter.SetBackupPassphraseAsync(nilai);
         TempData["message"] = "Kata sandi backup awan berhasil disimpan. Menyalakan ulang sebentar untuk mengaktifkannya...";
         lifetime.StopApplication();
+        return RedirectToAction(nameof(Index));
+    }
+
+    // Pengaturan pembaruan server: boleh restart layanan kapan saja (bawaan mati = jendela malam 22:00-05:00). Tanpa restart aplikasi: updater membaca berkas tiap siklus.
+    [HttpPost("update-pengaturan")]
+    public async Task<IActionResult> SimpanUpdatePengaturan(bool restart_kapan_saja)
+    {
+        await appSettingsWriter.SetUpdateKapanSajaAsync(restart_kapan_saja);
+        TempData["message"] = restart_kapan_saja
+            ? "Server akan memasang pembaruan begitu unduhan selesai (kapan saja)."
+            : "Server memasang pembaruan di jendela malam 22:00-05:00.";
         return RedirectToAction(nameof(Index));
     }
 

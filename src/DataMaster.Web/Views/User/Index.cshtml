@@ -181,6 +181,28 @@
                 <button type="button" class="btn btn-outline-warning w-100" data-bs-toggle="modal" data-bs-target="#modalRestore">Pemulihan Data</button>
             </div>
         </div>
+
+        <div class="card mt-3">
+            <div class="card-header">Pembaruan Aplikasi</div>
+            <div class="card-body small">
+                <div class="form-check mb-1">
+                    <input class="form-check-input" type="checkbox" id="chkAutoRestart" disabled />
+                    <label class="form-check-label" for="chkAutoRestart">Mulai ulang otomatis setelah pembaruan diunduh (PC ini)</label>
+                </div>
+                <p class="text-muted mb-2">Mati (bawaan): muncul notifikasi di pojok kanan bawah, Anda yang memilih kapan mulai ulang; pembaruan juga terpasang sendiri saat aplikasi dibuka lagi. Menyala: hitung mundur 60 detik lalu mulai ulang (bisa ditunda).</p>
+                <p id="infoTanpaLauncher" class="text-muted d-none">Tersedia di aplikasi Data Master desktop.</p>
+                <button type="button" id="btnMulaiUlangUpdate" class="btn btn-success btn-sm mb-3 d-none"></button>
+
+                <form asp-controller="User" asp-action="SimpanUpdatePengaturan" method="post">
+                    <div class="form-check mb-1">
+                        <input class="form-check-input" type="checkbox" id="chkKapanSaja" name="restart_kapan_saja" value="true" checked="@Model.UpdateRestartKapanSaja" onchange="this.form.submit()" />
+                        <input type="hidden" name="restart_kapan_saja" value="false" />
+                        <label class="form-check-label" for="chkKapanSaja">Server boleh restart layanan kapan saja saat ada pembaruan</label>
+                    </div>
+                    <p class="text-muted mb-0">Mati (bawaan): layanan server baru dipasang di jendela malam 22:00-05:00. Menyala: dipasang begitu unduhan selesai; PC klien tersendat beberapa detik lalu tersambung ulang. Berlaku bila PC ini server (Windows Service).</p>
+                </form>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -226,3 +248,27 @@
         }
     </script>
 }
+
+<script>
+    // Jembatan ke Launcher (WebView2) untuk pengaturan pembaruan PC ini. Di peramban biasa jembatan tidak ada: kotak dinonaktifkan.
+    (function () {
+        var b = window.chrome && window.chrome.webview;
+        var chk = document.getElementById('chkAutoRestart');
+        if (!chk) return;
+        if (!b) { document.getElementById('infoTanpaLauncher').classList.remove('d-none'); return; }
+        var btn = document.getElementById('btnMulaiUlangUpdate');
+        b.addEventListener('message', function (e) {
+            var d = e.data;
+            if (!d || d.type !== 'update-status') return;
+            chk.disabled = false;
+            chk.checked = !!d.autoRestart;
+            if (d.versiSiap) {
+                btn.textContent = 'Mulai ulang sekarang untuk memasang v' + String(d.versiSiap).split('.').slice(0, 3).join('.');
+                btn.classList.remove('d-none');
+            } else { btn.classList.add('d-none'); }
+        });
+        chk.addEventListener('change', function () { b.postMessage({ type: 'update-simpan', autoRestart: chk.checked }); });
+        btn.addEventListener('click', function () { b.postMessage({ type: 'update-mulai-ulang' }); });
+        b.postMessage({ type: 'update-ambil' });
+    })();
+</script>

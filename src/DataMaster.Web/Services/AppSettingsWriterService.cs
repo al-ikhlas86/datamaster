@@ -68,6 +68,25 @@ public class AppSettingsWriterService(ILogger<AppSettingsWriterService> logger)
         await TulisAsync(root);
     }
 
+    // Pengaturan pembaruan server (2026-11-27): "boleh restart layanan kapan saja". Bawaan MATI = layanan baru dipasang di jendela malam.
+    // Dibaca LANGSUNG dari berkas oleh updater layanan tiap siklus (tanpa restart), jadi perubahan berlaku segera.
+    public async Task SetUpdateKapanSajaAsync(bool nilai)
+    {
+        var root = await BacaAsync();
+        root["UpdateRestartKapanSaja"] = nilai;
+        await TulisAsync(root);
+    }
+
+    public static bool BacaUpdateKapanSaja()
+    {
+        try
+        {
+            if (!File.Exists(PathHubApiEksternal)) return false;
+            return JsonNode.Parse(File.ReadAllText(PathHubApiEksternal))?["UpdateRestartKapanSaja"]?.GetValue<bool>() ?? false;
+        }
+        catch { return false; } // berkas rusak/terkunci: tetap jendela malam (aman)
+    }
+
     private async Task<JsonObject> BacaAsync()
     {
         var path = PathHubApiEksternal;

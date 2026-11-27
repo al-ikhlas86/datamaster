@@ -120,6 +120,8 @@ public class ServiceAutoUpdateHostedService(IConfiguration config, ILogger<Servi
         _tertundaSejak = BacaTertundaSejak(remote);
         var jamMulai = int.TryParse(config["AppSettings:AutoUpdateJamMulai"], out var jm) ? jm : 22;
         var jamSelesai = int.TryParse(config["AppSettings:AutoUpdateJamSelesai"], out var js) ? js : 5;
+        // Pengaturan 'boleh restart kapan saja' (halaman Pengaturan, bawaan mati): jam mulai = jam selesai berarti sepanjang hari.
+        if (AppSettingsWriterService.BacaUpdateKapanSaja()) { jamMulai = 0; jamSelesai = 0; }
         if (!AutoUpdatePolicy.BolehTerapkan(DateTime.Now, _tertundaSejak, BatasPaksa, jamMulai, jamSelesai))
         {
             Catat($"Versi {remote} tersedia (terpasang {terpasang}); menunggu jendela {jamMulai:00}:00-{jamSelesai:00}:00.");

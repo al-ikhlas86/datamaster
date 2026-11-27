@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Threading;
 using Microsoft.Web.WebView2.Core;
@@ -41,6 +42,7 @@ public partial class MainWindow : Window
         var env = await CoreWebView2Environment.CreateAsync(userDataFolder: envDataDir);
         await Browser.EnsureCoreWebView2Async(env);
         await BersihkanCacheBilaVersiBerubahAsync();
+        Browser.CoreWebView2.WebMessageReceived += Browser_WebMessageReceived;
         // Pastikan EKSPLISIT (bukan mengandalkan default runtime WebView2 yang
         // terpasang di PC, yang bisa berbeda2/kena kebijakan GPO kantor) - staf
         // TU minta ID+password bisa diingat otomatis persis spt browser biasa
@@ -101,21 +103,56 @@ public partial class MainWindow : Window
         catch (OperationCanceledException) { /* aplikasi ditutup */ }
     }
 
-    /// <summary>Popup "mulai ulang sekarang?" setelah unduhan selesai. true = pengguna setuju dan penerapan dimulai.</summary>
+    /// <summary>
+    /// Notifikasi pembaruan siap di pojok kanan bawah (jendela terpisah, tidak merebut fokus, tidak mengunci layar). Mode otomatis (pengaturan PC ini, bawaan mati):
+    /// hitung mundur lalu mulai ulang sendiri. true = penerapan dimulai.
+    /// </summary>
     private async Task<bool> TanyaRestartAsync(string versi)
     {
-        var jawab = await Dispatcher.InvokeAsync(() =>
+        var selesai = new TaskCompletionSource<bool>();
+        await Dispatcher.InvokeAsync(() =>
         {
-            var catatanServer = WindowsServiceHelper.IsInstalled()
-                ? "\n\nPC ini adalah server Data Master: server berhenti beberapa detik, PC klien tersambung ulang sendiri."
-                : "";
-            return MessageBox.Show(this,
-                $"Pembaruan Data Master versi {versi} sudah selesai diunduh dan siap dipasang.\n\nMulai ulang Data Master sekarang? Hanya butuh beberapa detik.{catatanServer}\n\n" +
-                "Pilih Tidak (nanti) bila sedang bekerja: pembaruan dipasang otomatis saat Data Master dibuka lagi.",
-                "Data Master - Pembaruan siap", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
+            var notif = new NotifUpdateWindow("Data Master", string.Join('.', versi.Split('.').Take(3)),
+                PengaturanUpdateLokal.AutoRestart, WindowsServiceHelper.IsInstalled()) { Owner = this };
+            notif.MulaiUlang += () => selesai.TrySetResult(UpdateChecker.TerapkanSekarang(_server));
+            notif.Nanti += () => selesai.TrySetResult(false);
+            notif.Show();
         });
-        if (jawab != MessageBoxResult.Yes) return false;
-        return await Dispatcher.InvokeAsync(() => UpdateChecker.TerapkanSekarang(_server));
+        return await selesai.Task;
+    }
+
+    // ---- jembatan pengaturan dengan halaman Pengaturan (WebView2) ----
+
+    private void Browser_WebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
+    {
+        try
+        {
+            // Hanya dari halaman aplikasi sendiri (server lokal atau server jaringan yang dipilih).
+            if (!Uri.TryCreate(e.Source, UriKind.Absolute, out var sumber) || !Uri.TryCreate(_server.BaseUrl, UriKind.Absolute, out var basis)
+                || sumber.Host != basis.Host || sumber.Port != basis.Port) return;
+            using var doc = JsonDocument.Parse(e.WebMessageAsJson);
+            var tipe = doc.RootElement.TryGetProperty("type", out var t) ? t.GetString() : null;
+            switch (tipe)
+            {
+                case "update-ambil":
+                    KirimStatusUpdate();
+                    break;
+                case "update-simpan":
+                    PengaturanUpdateLokal.Simpan(doc.RootElement.TryGetProperty("autoRestart", out var a) && a.ValueKind == JsonValueKind.True);
+                    KirimStatusUpdate();
+                    break;
+                case "update-mulai-ulang":
+                    if (UpdateChecker.VersiSiap() is not null) UpdateChecker.TerapkanSekarang(_server);
+                    break;
+            }
+        }
+        catch { /* pesan rusak diabaikan */ }
+    }
+
+    private void KirimStatusUpdate()
+    {
+        var isi = JsonSerializer.Serialize(new { type = "update-status", autoRestart = PengaturanUpdateLokal.AutoRestart, versiSiap = UpdateChecker.VersiSiap() });
+        Browser.CoreWebView2.PostWebMessageAsJson(isi);
     }
 
     // WebView2 menyimpan berkas statis di cache disk; dibersihkan SEKALI tiap versi aplikasi berubah agar tampilan lama tidak bertahan sesudah update.

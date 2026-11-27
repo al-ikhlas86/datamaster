@@ -35,4 +35,5 @@ public class UserSettingsViewModel
     // ini yang ditampilkan (bukan nilai sandinya) - begitu terisi, tidak ada
     // alasan sah menampilkannya lagi ke layar.
     public bool BackupPassphraseAktif { get; set; }
+    public bool UpdateRestartKapanSaja { get; set; }
 }
